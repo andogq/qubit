@@ -65,7 +65,7 @@ impl Server {
             .iter()
             .map(|(route, (parameter_types, return_type))| {
                 format!(
-                    "{}: ({}) => {return_type}",
+                    "{}: ({}) => Promise<{return_type}>",
                     route,
                     parameter_types
                         .into_iter()
