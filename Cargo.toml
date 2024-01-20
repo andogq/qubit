@@ -6,8 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+axum = "0.6.20"
+futures = "0.3.30"
+http = "0.2.9"
+hyper = { version = "0.14.10", features = ["server"] }
+jsonrpsee = { version = "0.21.0", features = ["server"] }
 matchit = "0.7.3"
 serde = { version = "1.0.195", features = ["derive"] }
 serde_json = "1.0.111"
+tokio = { version = "1.35.1", features = ["rt", "rt-multi-thread"] }
+tower = "0.4.13"
 ts-rs = "7.1.1"
 typeshare = "1.0.1"

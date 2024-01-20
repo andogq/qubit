@@ -1,3 +1,7 @@
+use std::net::SocketAddr;
+
+use axum::{routing::get, Router};
+use jsonrpsee::server::stop_channel;
 use serde::{Deserialize, Serialize};
 use server::Server;
 use ts_rs::TS;
@@ -49,8 +53,21 @@ fn create_user(_name: String, _email: String, _age: u32) -> User {
     todo!();
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let server = create_server();
-
     dbg!(server.get_signatures());
+
+    let (stop_handle, server_handle) = stop_channel();
+
+    let router = Router::<()>::new()
+        .route("/", get(|| async { "working" }))
+        .nest_service("/other", server.create_service(stop_handle));
+
+    hyper::Server::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
+        .serve(router.into_make_service())
+        .await
+        .unwrap();
+
+    server_handle.stop().unwrap();
 }
