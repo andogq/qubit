@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use server::Server;
 use ts_rs::TS;
 
@@ -31,7 +30,7 @@ pub fn create_server() -> Server {
         .add("create", create_user)
 }
 
-fn get_user(id: String) -> User {
+fn get_user(_id: String) -> User {
     println!("get user");
 
     User {
@@ -46,12 +45,12 @@ fn get_user(id: String) -> User {
     }
 }
 
-fn create_user(name: String, email: String, age: u32) -> User {
+fn create_user(_name: String, _email: String, _age: u32) -> User {
     todo!();
 }
 
 fn main() {
     let server = create_server();
 
-    dbg!(server.call("get", json!(["test_id"])));
+    dbg!(server.get_signatures());
 }
