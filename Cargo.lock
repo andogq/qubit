@@ -1141,7 +1141,6 @@ dependencies = [
  "http",
  "hyper",
  "jsonrpsee",
- "matchit",
  "serde",
  "serde_json",
  "tokio",

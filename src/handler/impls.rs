@@ -5,11 +5,11 @@ use ts_rs::TS;
 
 impl<F, T1, Res> Handler<(T1,), Res> for F
 where
-    F: Fn(T1) -> Res + Clone + 'static,
+    F: 'static + Fn(T1) -> Res + Clone + Send + Sync,
     T1: TS + DeserializeOwned,
     Res: TS + Serialize,
 {
-    fn call(self, params: Value) -> Value {
+    fn call(&self, params: Value) -> Value {
         let params = serde_json::from_value::<(T1,)>(params).unwrap();
 
         let res = self(params.0);
@@ -24,13 +24,13 @@ where
 
 impl<F, T1, T2, T3, Res> Handler<(T1, T2, T3), Res> for F
 where
-    F: Fn(T1, T2, T3) -> Res + Clone + 'static,
+    F: 'static + Fn(T1, T2, T3) -> Res + Clone + Send + Sync,
     T1: TS + DeserializeOwned,
     T2: TS + DeserializeOwned,
     T3: TS + DeserializeOwned,
     Res: TS + Serialize,
 {
-    fn call(self, params: Value) -> Value {
+    fn call(&self, params: Value) -> Value {
         let params = serde_json::from_value::<(T1, T2, T3)>(params).unwrap();
 
         let res = self(params.0, params.1, params.2);

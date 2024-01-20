@@ -49,8 +49,19 @@ fn get_user(_id: String) -> User {
     }
 }
 
-fn create_user(_name: String, _email: String, _age: u32) -> User {
-    todo!();
+fn create_user(name: String, email: String, age: u32) -> User {
+    println!("creating user: {name}");
+
+    User {
+        name,
+        email,
+        age,
+        metadata: Metadata {
+            param_a: String::new(),
+            param_b: 123,
+            param_c: true,
+        },
+    }
 }
 
 #[tokio::main]
@@ -62,7 +73,7 @@ async fn main() {
 
     let router = Router::<()>::new()
         .route("/", get(|| async { "working" }))
-        .nest_service("/other", server.create_service(stop_handle));
+        .nest_service("/rpc", server.create_service(stop_handle));
 
     hyper::Server::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
         .serve(router.into_make_service())

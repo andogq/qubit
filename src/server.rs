@@ -1,4 +1,4 @@
-use std::{convert::Infallible, future::Future, pin::Pin, rc::Rc};
+use std::{convert::Infallible, future::Future, pin::Pin};
 
 use futures::future::FutureExt;
 
@@ -8,71 +8,63 @@ use jsonrpsee::{
     server::{StopHandle, TowerService},
     RpcModule,
 };
-use matchit::Router;
 use serde_json::Value;
 use tower::{layer::util::Identity, Service};
 use ts_rs::TS;
 
-use crate::handler::{ErasedHandler, Handler, MakeErasedHandler};
+use crate::handler::Handler;
 
 pub struct Server {
-    /// Keep all handlers in a Vec in-order to infer signatuers for server
-    signature_routes: Vec<(String, Rc<Box<dyn ErasedHandler>>)>,
-
-    /// Only allow router to store references to handlers
-    router: Router<Rc<Box<dyn ErasedHandler>>>,
+    rpc_module: RpcModule<()>,
+    handler_signatures: Vec<(String, (Vec<(String, String)>, String))>,
 }
 
 impl Server {
     pub fn new() -> Self {
         Self {
-            signature_routes: Vec::new(),
-            router: Router::new(),
+            rpc_module: RpcModule::new(()),
+            handler_signatures: Vec::new(),
         }
     }
 
     pub fn add<Params, Return>(
         mut self,
         route: impl AsRef<str>,
-        handler: impl Handler<Params, Return> + 'static,
+        handler: impl Handler<Params, Return>,
     ) -> Self
     where
         Params: TS,
         Return: TS,
     {
-        let handler = Rc::new(Box::new(MakeErasedHandler {
-            handler,
-            do_call: |handler, params| handler.call(params),
-            get_signature: |handler| (handler.get_parameter_types(), handler.get_return_type()),
-        }) as Box<dyn ErasedHandler>);
+        self.handler_signatures.push((
+            route.as_ref().to_string(),
+            (handler.get_parameter_types(), handler.get_return_type()),
+        ));
 
-        self.signature_routes
-            .push((route.as_ref().to_string(), handler.clone()));
+        dbg!(route.as_ref());
 
-        self.router
-            .insert(route.as_ref().to_string(), handler)
+        self.rpc_module
+            .register_async_method(route.as_ref().to_string().leak(), move |params, _ctx| {
+                // TODO: Unsure if this is problematic. I believe it's only cloning the function
+                // pointer, but would have to check somehow to know for sure.
+                let handler = handler.clone();
+
+                async move {
+                    //
+                    handler.call(params.parse::<Value>().unwrap())
+                }
+            })
             .unwrap();
 
         self
     }
 
-    pub fn call(&self, route: impl AsRef<str>, parameters: Value) -> Value {
-        self.router
-            .at(route.as_ref())
-            .unwrap()
-            .value
-            .clone_box()
-            .call(parameters)
-    }
-
     pub fn get_signatures(&self) -> String {
         let body = self
-            .signature_routes
+            .handler_signatures
             .iter()
-            .map(|(route, handler)| {
-                let (parameter_types, return_type) = handler.get_signature();
-
-                let signature = format!(
+            .map(|(route, (parameter_types, return_type))| {
+                format!(
                     "{}: ({}) => {return_type}",
                     route,
                     parameter_types
@@ -80,29 +72,18 @@ impl Server {
                         .map(|(param, ty)| format!("{param}: {ty}"))
                         .collect::<Vec<_>>()
                         .join(", ")
-                );
-
-                signature
+                )
             })
             .collect::<Vec<_>>();
 
         format!("{{ {} }}", body.join(", "))
     }
 
-    pub fn create_service(&self, stop_handle: StopHandle) -> ServerService {
+    pub fn create_service(self, stop_handle: StopHandle) -> ServerService {
         let svc_builder = jsonrpsee::server::Server::builder().to_service_builder();
 
-        let mut module = RpcModule::new(());
-        module
-            .register_method("test", |_params, _ctx| {
-                println!("called");
-
-                "working"
-            })
-            .unwrap();
-
         ServerService {
-            service: svc_builder.clone().build(module.clone(), stop_handle),
+            service: svc_builder.build(self.rpc_module, stop_handle),
         }
     }
 }
