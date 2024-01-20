@@ -86,7 +86,7 @@ const constructors = {
 		});
 
 		socket.addEventListener("message", (e) => {
-			const response = parse_response(JSON.parse(e.data));
+			const response = parse_response(e.data);
 
 			if ("id" in response && outstanding[response.id]) {
 				outstanding[response.id](response);

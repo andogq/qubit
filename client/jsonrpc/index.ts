@@ -19,6 +19,10 @@ export type RpcResponse<T> = { type: "ok", id: number, value: T }
 
 export function parse_response<T>(response: any): RpcResponse<T> {
 	try {
+		if (typeof response === "string") {
+			response = JSON.parse(response);
+		}
+
 		if (response?.jsonrpc !== "2.0") {
 			throw new Error("invalid value for `jsonrpc`");
 		}
