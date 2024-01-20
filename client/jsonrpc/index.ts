@@ -13,8 +13,8 @@ export type RpcError = {
 	data: any,
 };
 
-export type RpcResponse<T> = { type: "ok", value: T }
-	| { type: "error", value: RpcError }
+export type RpcResponse<T> = { type: "ok", id: number, value: T }
+	| { type: "error", id: number, value: RpcError }
 	| { type: "bad_response" };
 
 export function parse_response<T>(response: any): RpcResponse<T> {
@@ -28,13 +28,13 @@ export function parse_response<T>(response: any): RpcResponse<T> {
 		}
 
 		if ("result" in response && !("error" in response)) {
-			return { type: "ok", value: response.result };
+			return { type: "ok", id: response.id, value: response.result };
 		}
 
 		if ("error" in response && !("result" in response)) {
 			if (typeof response.error?.code === "number" && typeof response.error?.message === "string") {
 				// TODO: Validate error.data field when it's decided
-				return { type: "error", value: response.error };
+				return { type: "error", id: response.id, value: response.error };
 			} else {
 				throw new Error("malformed error object in response");
 			}
