@@ -1,13 +1,14 @@
+mod handler;
+
 use std::net::SocketAddr;
+
+use rs_ts_api::*;
 
 use axum::{routing::get, Router};
 use jsonrpsee::server::stop_channel;
 use serde::{Deserialize, Serialize};
 use server::Server;
 use ts_rs::TS;
-
-mod handler;
-mod server;
 
 #[derive(TS, Serialize, Deserialize)]
 #[ts(export)]

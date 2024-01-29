@@ -227,6 +227,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
+name = "example"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures",
+ "http",
+ "hyper",
+ "jsonrpsee",
+ "rs-ts-api",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "ts-rs",
+ "typeshare",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -796,6 +814,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "afab94fb28594581f62d981211a9a4d53cc8130bbcbbb89a0440d9b8e81a7746"
 
 [[package]]
+name = "rs-ts-api"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures",
+ "http",
+ "hyper",
+ "jsonrpsee",
+ "rs-ts-api-macros",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "ts-rs",
+ "typeshare",
+]
+
+[[package]]
+name = "rs-ts-api-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.48",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1130,23 +1175,6 @@ dependencies = [
  "quote",
  "syn 2.0.48",
  "termcolor",
-]
-
-[[package]]
-name = "ts_test"
-version = "0.1.0"
-dependencies = [
- "axum",
- "futures",
- "http",
- "hyper",
- "jsonrpsee",
- "serde",
- "serde_json",
- "tokio",
- "tower",
- "ts-rs",
- "typeshare",
 ]
 
 [[package]]
