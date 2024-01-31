@@ -1,12 +1,12 @@
-use jsonrpsee::RpcModule;
+use jsonrpsee::{server::StopHandle, RpcModule};
 pub use rs_ts_api_macros::*;
+use server::ServerService;
 
-pub mod handler;
 pub mod server;
 
 type RegisterHandlerFn = fn(RpcModule<()>) -> RpcModule<()>;
 
-pub trait NewHandler {
+pub trait Handler {
     fn register(router: jsonrpsee::RpcModule<()>) -> jsonrpsee::RpcModule<()>;
 
     fn get_type() -> String;
@@ -32,7 +32,7 @@ impl Router {
         }
     }
 
-    pub fn handler<H: NewHandler>(mut self, _: H) -> Self {
+    pub fn handler<H: Handler>(mut self, _: H) -> Self {
         self.handlers.push((H::get_type, H::register));
 
         self
@@ -54,6 +54,21 @@ impl Router {
 
         signature
     }
+
+    pub fn create_service(self, stop_handle: StopHandle) -> ServerService {
+        let svc_builder = jsonrpsee::server::Server::builder().to_service_builder();
+
+        let rpc_module = self
+            .handlers
+            .into_iter()
+            .fold(RpcModule::new(()), |rpc_module, (_, register)| {
+                register(rpc_module)
+            });
+
+        ServerService {
+            service: svc_builder.build(rpc_module, stop_handle),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -62,7 +77,7 @@ mod test {
 
     #[allow(non_camel_case_types)]
     struct sample_handler;
-    impl NewHandler for sample_handler {
+    impl Handler for sample_handler {
         fn register(_router: jsonrpsee::RpcModule<()>) -> jsonrpsee::RpcModule<()> {
             todo!()
         }
@@ -74,7 +89,7 @@ mod test {
 
     #[allow(non_camel_case_types)]
     struct another_handler;
-    impl NewHandler for another_handler {
+    impl Handler for another_handler {
         fn register(_router: jsonrpsee::RpcModule<()>) -> jsonrpsee::RpcModule<()> {
             todo!()
         }

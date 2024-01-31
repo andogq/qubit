@@ -71,7 +71,7 @@ fn generate_signature(f: ItemFn) -> Result<TokenStream> {
 
         #[allow(non_camel_case_types)]
         struct #function_ident;
-        impl rs_ts_api::NewHandler for #function_ident {
+        impl rs_ts_api::Handler for #function_ident {
             fn get_type() -> String {
                 let parameters = [#(#parameters),*]
                     .into_iter()

@@ -1,13 +1,10 @@
-mod handler;
-
 use std::net::SocketAddr;
 
 use rs_ts_api::*;
 
-use axum::{routing::get, Router};
+use axum::routing::get;
 use jsonrpsee::server::stop_channel;
 use serde::{Deserialize, Serialize};
-use server::Server;
 use ts_rs::TS;
 
 #[derive(TS, Serialize, Deserialize)]
@@ -29,12 +26,11 @@ pub struct User {
     metadata: Metadata,
 }
 
-pub fn create_server() -> Server {
-    Server::new()
-        .add("get", get_user)
-        .add("create", create_user)
+pub fn create_server() -> Router {
+    Router::new().handler(get_user).handler(create_user)
 }
 
+#[handler]
 fn get_user(_id: String) -> User {
     println!("get user");
 
@@ -50,6 +46,7 @@ fn get_user(_id: String) -> User {
     }
 }
 
+#[handler]
 fn create_user(name: String, email: String, age: u32) -> User {
     println!("creating user: {name}");
 
@@ -68,11 +65,11 @@ fn create_user(name: String, email: String, age: u32) -> User {
 #[tokio::main]
 async fn main() {
     let server = create_server();
-    dbg!(server.get_signatures());
+    dbg!(server.get_type());
 
     let (stop_handle, server_handle) = stop_channel();
 
-    let router = Router::<()>::new()
+    let router = axum::Router::<()>::new()
         .route("/", get(|| async { "working" }))
         .nest_service("/rpc", server.create_service(stop_handle));
 
