@@ -85,7 +85,7 @@ fn generate_signature(f: ItemFn) -> Result<TokenStream> {
                     let (#(#param_names,)*) = params.parse::<(#(#param_tys,)*)>().unwrap();
 
                     // Run the handler
-                    let result = handler(#(#param_names,)*);
+                    let result = handler(#(#param_names,)*).await;
 
                     // Serialise the resulte
                     serde_json::to_value(result).unwrap()

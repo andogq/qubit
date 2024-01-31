@@ -31,7 +31,7 @@ pub fn create_server() -> Router {
 }
 
 #[handler]
-fn get_user(_id: String) -> User {
+async fn get_user(_id: String) -> User {
     println!("get user");
 
     User {
@@ -47,7 +47,7 @@ fn get_user(_id: String) -> User {
 }
 
 #[handler]
-fn create_user(name: String, email: String, age: u32) -> User {
+async fn create_user(name: String, email: String, age: u32) -> User {
     println!("creating user: {name}");
 
     User {
@@ -66,8 +66,6 @@ fn create_user(name: String, email: String, age: u32) -> User {
 async fn main() {
     let server = create_server();
     println!("{}", server.get_type());
-
-    dbg!(<User as ts_rs::TS>::dependencies());
 
     let (stop_handle, server_handle) = stop_channel();
 
