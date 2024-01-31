@@ -48,22 +48,18 @@ fn generate_signature(f: ItemFn) -> Result<TokenStream> {
 
     let test_fn = format_ident!("export_bindings_{}", function_name_str);
 
-    let params = f
+    let (param_names, param_tys): (Vec<_>, Vec<_>) = f
         .sig
         .inputs
         .iter()
         .filter_map(|param| {
             if let FnArg::Typed(arg) = param {
-                Some(arg.ty.clone())
+                Some((arg.pat.clone(), arg.ty.clone()))
             } else {
                 None
             }
         })
-        .collect::<Vec<_>>();
-
-    let ReturnType::Type(_, return_ty) = f.sig.output else {
-        panic!();
-    };
+        .unzip();
 
     Ok(quote! {
         #[cfg(test)]
@@ -80,15 +76,48 @@ fn generate_signature(f: ItemFn) -> Result<TokenStream> {
             println!("const {}: ({}) => {};", #function_name_str, parameters, #return_type);
         }
 
-        fn #function_ident(mut router: jsonrpsee::RpcModule<()>) -> jsonrpsee::RpcModule<()> {
-            #handler_fn
+        #[allow(non_camel_case_types)]
+        struct #function_ident;
+        impl rs_ts_api::NewHandler for #function_ident {
+            fn get_type() -> String {
+                let parameters = [#(#parameters),*]
+                    .into_iter()
+                    .map(|(param, ty)| {
+                        format!("{param}: {ty}")
+                    })
+                    .collect::<Vec<_>>()
+                    .join(",");
 
-            router.register_async_method(#function_name_str, |params, _ctx| async move {
-                rs_ts_api::handler::Handler::<(#(#params,)*), #return_ty>::call(&handler, params.parse::<serde_json::Value>().unwrap())
-            });
+                format!("{}: ({}) => {}", #function_name_str, parameters, #return_type)
+            }
 
-            router
+            fn register(mut router: jsonrpsee::RpcModule<()>) -> jsonrpsee::RpcModule<()> {
+                #handler_fn
+
+                router.register_async_method(#function_name_str, |params, _ctx| async move {
+                    // Parse the parameters from the request
+                    let (#(#param_names,)*) = params.parse::<(#(#param_tys,)*)>().unwrap();
+
+                    // Run the handler
+                    let result = handler(#(#param_names,)*);
+
+                    serde_json::to_value(result).unwrap()
+                })
+                .unwrap();
+
+                router
+            }
         }
+
+        // fn #function_ident(mut router: jsonrpsee::RpcModule<()>) -> jsonrpsee::RpcModule<()> {
+        //     #handler_fn
+        //
+        //     router.register_async_method(#function_name_str, |params, _ctx| async move {
+        //         rs_ts_api::handler::Handler::<(#(#params,)*), #return_ty>::call(&handler, params.parse::<serde_json::Value>().unwrap())
+        //     });
+        //
+        //     router
+        // }
     })
 }
 
