@@ -1,13 +1,6 @@
-mod router;
-
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::{spanned::Spanned, Error, FnArg, Item, ItemFn, Pat, Result, ReturnType};
-
-#[proc_macro]
-pub fn router(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    router::entry(tokens)
-}
 
 fn generate_signature(f: ItemFn) -> Result<TokenStream> {
     let handler_fn = {

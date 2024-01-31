@@ -18,14 +18,12 @@ fn get_user(_id: String) -> User {
     }
 }
 
-// #[handler(query)]
-pub fn list_users() -> Vec<User> {
+// #[handler]
+fn list_users() -> Vec<User> {
     todo!()
 }
 
 fn make_router() {
-    // let handler = Handler::<(String,), User>::call(&get_user, serde_json::Value::Null);
-
     let user_router = rs_ts_api::Router::new().handler(get_user);
-    //     .handler(list_users);
+    // .handler(list_users);
 }
