@@ -3,6 +3,11 @@ use quote::quote;
 use syn::{spanned::Spanned, Error, FnArg, Item, ItemFn, Pat, Result, ReturnType};
 
 fn generate_signature(f: ItemFn) -> Result<TokenStream> {
+    // Handlers must be async
+    if f.sig.asyncness.is_none() {
+        return Err(Error::new_spanned(f, "RPC handlers must be async"));
+    }
+
     let handler_fn = {
         let mut f = f.clone();
         f.sig.ident = Ident::new("handler", Span::call_site());
