@@ -1,5 +1,5 @@
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::{format_ident, quote};
+use quote::quote;
 use syn::{spanned::Spanned, Error, FnArg, Item, ItemFn, Pat, Result, ReturnType};
 
 fn generate_signature(f: ItemFn) -> Result<TokenStream> {
@@ -39,8 +39,6 @@ fn generate_signature(f: ItemFn) -> Result<TokenStream> {
         ReturnType::Type(_, ty) => quote!(<#ty as ts_rs::TS>::inline()),
     };
 
-    let test_fn = format_ident!("export_bindings_{}", function_name_str);
-
     let (param_names, param_tys): (Vec<_>, Vec<_>) = f
         .sig
         .inputs
@@ -55,30 +53,16 @@ fn generate_signature(f: ItemFn) -> Result<TokenStream> {
         .unzip();
 
     Ok(quote! {
-        #[cfg(test)]
-        #[test]
-        fn #test_fn() {
-            let parameters = [#(#parameters),*]
-                .into_iter()
-                .map(|(param, ty)| {
-                    format!("{param}: {ty}")
-                })
-                .collect::<Vec<_>>()
-                .join(",");
-
-            println!("const {}: ({}) => {};", #function_name_str, parameters, #return_type);
-        }
-
         #[allow(non_camel_case_types)]
         struct #function_ident;
         impl rs_ts_api::Handler for #function_ident {
-            fn get_type() -> String {
+            fn get_type() -> std::string::String {
                 let parameters = [#(#parameters),*]
                     .into_iter()
                     .map(|(param, ty)| {
                         format!("{param}: {ty}")
                     })
-                    .collect::<Vec<_>>()
+                    .collect::<std::vec::Vec<_>>()
                     .join(",");
 
                 format!("{}: ({}) => {}", #function_name_str, parameters, #return_type)
@@ -94,6 +78,7 @@ fn generate_signature(f: ItemFn) -> Result<TokenStream> {
                     // Run the handler
                     let result = handler(#(#param_names,)*);
 
+                    // Serialise the resulte
                     serde_json::to_value(result).unwrap()
                 })
                 .unwrap();
@@ -101,16 +86,6 @@ fn generate_signature(f: ItemFn) -> Result<TokenStream> {
                 router
             }
         }
-
-        // fn #function_ident(mut router: jsonrpsee::RpcModule<()>) -> jsonrpsee::RpcModule<()> {
-        //     #handler_fn
-        //
-        //     router.register_async_method(#function_name_str, |params, _ctx| async move {
-        //         rs_ts_api::handler::Handler::<(#(#params,)*), #return_ty>::call(&handler, params.parse::<serde_json::Value>().unwrap())
-        //     });
-        //
-        //     router
-        // }
     })
 }
 
