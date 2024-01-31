@@ -65,7 +65,9 @@ fn create_user(name: String, email: String, age: u32) -> User {
 #[tokio::main]
 async fn main() {
     let server = create_server();
-    dbg!(server.get_type());
+    println!("{}", server.get_type());
+
+    dbg!(<User as ts_rs::TS>::dependencies());
 
     let (stop_handle, server_handle) = stop_channel();
 

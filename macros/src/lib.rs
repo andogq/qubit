@@ -27,7 +27,7 @@ fn generate_signature(f: ItemFn) -> Result<TokenStream> {
                 let param_type = &pat.ty;
 
                 Ok(quote! {
-                    (#param_name, <#param_type as ts_rs::TS>::inline())
+                    (#param_name, <#param_type as ts_rs::TS>::name(), ts_rs::Dependency::from_ty::<#param_type>())
                 })
             } else {
                 Err(Error::new(pat.span(), "unsupported parameter type"))
@@ -36,7 +36,9 @@ fn generate_signature(f: ItemFn) -> Result<TokenStream> {
         .collect::<Result<Vec<_>>>()?;
     let return_type = match f.sig.output.clone() {
         ReturnType::Default => quote!("void"),
-        ReturnType::Type(_, ty) => quote!(<#ty as ts_rs::TS>::inline()),
+        ReturnType::Type(_, ty) => {
+            quote!((<#ty as ts_rs::TS>::name(), ts_rs::Dependency::from_ty::<#ty>()))
+        }
     };
 
     let (param_names, param_tys): (Vec<_>, Vec<_>) = f
@@ -56,16 +58,23 @@ fn generate_signature(f: ItemFn) -> Result<TokenStream> {
         #[allow(non_camel_case_types)]
         struct #function_ident;
         impl rs_ts_api::Handler for #function_ident {
-            fn get_type() -> std::string::String {
-                let parameters = [#(#parameters),*]
+            fn get_type() -> rs_ts_api::HandlerType {
+                let (parameters, mut dependencies): (std::vec::Vec<_>, std::vec::Vec<_>) = [#(#parameters),*]
                     .into_iter()
-                    .map(|(param, ty)| {
-                        format!("{param}: {ty}")
+                    .map(|(param, ty, dependency)| {
+                        (format!("{param}: {ty}"), dependency)
                     })
-                    .collect::<std::vec::Vec<_>>()
-                    .join(",");
+                    .unzip();
 
-                format!("{}: ({}) => {}", #function_name_str, parameters, #return_type)
+                let (return_type, return_dependency) = #return_type;
+
+                dependencies.push(return_dependency);
+
+                rs_ts_api::HandlerType {
+                    name: #function_name_str.to_string(),
+                    signature: format!("({}) => {}", parameters.join(", "), return_type),
+                    dependencies: dependencies.into_iter().flatten().collect(),
+                }
             }
 
             fn register(mut router: jsonrpsee::RpcModule<()>) -> jsonrpsee::RpcModule<()> {

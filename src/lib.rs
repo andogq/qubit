@@ -1,20 +1,29 @@
+use std::collections::HashSet;
+
 use jsonrpsee::{server::StopHandle, RpcModule};
 pub use rs_ts_api_macros::*;
 use server::ServerService;
+use ts_rs::Dependency;
 
 pub mod server;
 
 type RegisterHandlerFn = fn(RpcModule<()>) -> RpcModule<()>;
 
+pub struct HandlerType {
+    pub name: String,
+    pub signature: String,
+    pub dependencies: Vec<Dependency>,
+}
+
 pub trait Handler {
     fn register(router: jsonrpsee::RpcModule<()>) -> jsonrpsee::RpcModule<()>;
 
-    fn get_type() -> String;
+    fn get_type() -> HandlerType;
 }
 
 pub struct Router {
     name: Option<String>,
-    handlers: Vec<(fn() -> String, RegisterHandlerFn)>,
+    handlers: Vec<(fn() -> HandlerType, RegisterHandlerFn)>,
 }
 
 impl Router {
@@ -39,20 +48,41 @@ impl Router {
     }
 
     pub fn get_type(&self) -> String {
-        let handlers = self
+        let (handlers, dependencies) = self
             .handlers
             .iter()
-            .map(|(get_signature, _)| get_signature())
-            .collect::<Vec<_>>()
-            .join(", ");
+            .map(|(get_type, _)| get_type())
+            .map(|handler_type| {
+                (
+                    format!("{}: {}", handler_type.name, handler_type.signature),
+                    handler_type.dependencies,
+                )
+            })
+            .unzip::<_, _, Vec<_>, Vec<_>>();
 
-        let mut signature = format!("{{ {handlers} }}");
+        // Generate the router type
+        let mut router_type = format!("{{ {} }}", handlers.join(", "));
+
+        // Merge all dependencies
+        let dependencies = dependencies
+            .into_iter()
+            .flatten()
+            .map(|dependency| {
+                format!(
+                    "import type {{ {} }} from \"./{}\";",
+                    dependency.ts_name,
+                    dependency.exported_to.trim_end_matches(".ts"),
+                )
+            })
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
 
         if let Some(name) = &self.name {
-            signature = format!("{{ {name}: {signature} }}");
+            router_type = format!("{{ {name}: {router_type} }}");
         }
 
-        signature
+        format!("{}\ntype Router = {router_type};", dependencies.join("\n"))
     }
 
     pub fn create_service(self, stop_handle: StopHandle) -> ServerService {
@@ -82,8 +112,12 @@ mod test {
             todo!()
         }
 
-        fn get_type() -> String {
-            "fn_type".to_string()
+        fn get_type() -> HandlerType {
+            HandlerType {
+                name: "sample_handler".to_string(),
+                signature: "() => void".to_string(),
+                dependencies: Vec::new(),
+            }
         }
     }
 
@@ -94,8 +128,12 @@ mod test {
             todo!()
         }
 
-        fn get_type() -> String {
-            "another_fn_type".to_string()
+        fn get_type() -> HandlerType {
+            HandlerType {
+                name: "another_handler".to_string(),
+                signature: "() => number".to_string(),
+                dependencies: Vec::new(),
+            }
         }
     }
 
@@ -114,13 +152,13 @@ mod test {
     #[test]
     fn single_handler() {
         let router = Router::new().handler(sample_handler);
-        assert_eq!(router.get_type(), "{ fn_type }");
+        assert_eq!(router.get_type(), "{ sample_handler: () => void }");
     }
 
     #[test]
     fn namespaced_single_handler() {
         let router = Router::namespace("ns").handler(sample_handler);
-        assert_eq!(router.get_type(), "{ ns: { fn_type } }");
+        assert_eq!(router.get_type(), "{ ns: { sample_handler: () => void } }");
     }
 
     #[test]
@@ -128,7 +166,10 @@ mod test {
         let router = Router::new()
             .handler(sample_handler)
             .handler(another_handler);
-        assert_eq!(router.get_type(), "{ fn_type, another_fn_type }");
+        assert_eq!(
+            router.get_type(),
+            "{ sample_handler: () => void, another_handler: () => void }"
+        );
     }
 
     #[test]
@@ -136,6 +177,9 @@ mod test {
         let router = Router::namespace("ns")
             .handler(sample_handler)
             .handler(another_handler);
-        assert_eq!(router.get_type(), "{ ns: { fn_type, another_fn_type } }");
+        assert_eq!(
+            router.get_type(),
+            "{ ns: { sample_handler: () => void, another_handler: () => void } }"
+        );
     }
 }
