@@ -116,7 +116,7 @@ fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStream> {
                 }
             }
 
-            fn register(rpc_builder: RpcBuilder) -> RpcBuilder {
+            fn register(rpc_builder: rs_ts_api::RpcBuilder) -> rs_ts_api::RpcBuilder {
                 #handler_fn
 
                 #register_impl
