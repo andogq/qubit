@@ -15,15 +15,18 @@ fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStream> {
         return Err(Error::new_spanned(handler, "RPC handlers must be async"));
     }
 
+    // Clone the function implementation, in order to use it as the handler
     let handler_fn = {
         let mut f = handler.clone();
         f.sig.ident = Ident::new("handler", Span::call_site());
         f
     };
 
+    // Extract out the function name
     let function_name_str = handler.sig.ident.to_string();
-    let function_ident = handler.sig.ident.clone();
+    let function_ident = handler.sig.ident;
 
+    // Extract out the return type
     let return_type = match handler.sig.output.clone() {
         ReturnType::Default => quote!("void"),
         ReturnType::Type(_, ty) => {
@@ -31,13 +34,14 @@ fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStream> {
         }
     };
 
-    let (param_names, param_tys): (Vec<_>, Vec<_>) = handler
+    // Process parameters, to get the idents, string version of the idents, and the type
+    let ((param_names, param_name_strs), param_tys): ((Vec<_>, Vec<_>), Vec<_>) = handler
         .sig
         .inputs
         .iter()
         .map(|param| match param {
             FnArg::Typed(arg) => match arg.pat.as_ref() {
-                Pat::Ident(ident) => Ok((ident.clone(), arg.ty.clone())),
+                Pat::Ident(ident) => Ok(((ident.clone(), ident.ident.to_string()), arg.ty.clone())),
                 Pat::Struct(_) | Pat::Tuple(_) | Pat::TupleStruct(_) => Err(Error::new(
                     arg.span(),
                     "destructured arguments are not currently supported",
@@ -56,50 +60,6 @@ fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStream> {
         .into_iter()
         .unzip();
 
-    let get_type_impl = {
-        let parameters = handler
-            .sig
-            .inputs
-            .clone()
-            .iter()
-            .filter_map(|input| match input {
-                FnArg::Typed(pat) => Some(pat),
-                _ => None,
-            })
-            .map(|pat| {
-                if let Pat::Ident(ident) = *pat.pat.clone() {
-                    let param_name = ident.ident.to_string();
-                    let param_type = &pat.ty;
-
-                    Ok(quote! {
-                        (#param_name, <#param_type as ts_rs::TS>::name(), ts_rs::Dependency::from_ty::<#param_type>())
-                    })
-                } else {
-                    Err(Error::new(pat.span(), "unsupported parameter type"))
-                }
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        quote!(
-            let (parameters, mut dependencies): (std::vec::Vec<_>, std::vec::Vec<_>) = [#(#parameters),*]
-                .into_iter()
-                .map(|(param, ty, dependency)| {
-                    (format!("{param}: {ty}"), dependency)
-                })
-                .unzip();
-
-            let (return_type, return_dependency) = #return_type;
-
-            dependencies.push(return_dependency);
-
-            rs_ts_api::HandlerType {
-                name: #function_name_str.to_string(),
-                signature: format!("({}) => {}", parameters.join(", "), return_type),
-                dependencies: dependencies.into_iter().flatten().collect(),
-            }
-        )
-    };
-
     let run_handler_body = quote!(
         // Parse the parameters from the request
         let (#(#param_names,)*) = params.parse::<(#(#param_tys,)*)>().unwrap();
@@ -116,7 +76,24 @@ fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStream> {
         struct #function_ident;
         impl rs_ts_api::Handler for #function_ident {
             fn get_type() -> rs_ts_api::HandlerType {
-                #get_type_impl
+                let (parameters, mut dependencies): (std::vec::Vec<_>, std::vec::Vec<_>) = [
+                    #((#param_name_strs, <#param_tys as ts_rs::TS>::name(), ts_rs::Dependency::from_ty::<#param_tys>())),*
+                ]
+                    .into_iter()
+                    .map(|(param, ty, dependency)| {
+                        (format!("{param}: {ty}"), dependency)
+                    })
+                    .unzip();
+
+                let (return_type, return_dependency) = #return_type;
+
+                dependencies.push(return_dependency);
+
+                rs_ts_api::HandlerType {
+                    name: #function_name_str.to_string(),
+                    signature: format!("({}) => {}", parameters.join(", "), return_type),
+                    dependencies: dependencies.into_iter().flatten().collect(),
+                }
             }
 
             fn register(mut router: jsonrpsee::RpcModule<()>) -> jsonrpsee::RpcModule<()> {
