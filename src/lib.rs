@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use futures::{Future, FutureExt, Stream, StreamExt};
 use jsonrpsee::{server::StopHandle, types::Params, RpcModule, SubscriptionMessage};
 pub use rs_ts_api_macros::*;
@@ -149,7 +147,7 @@ impl Router {
         self
     }
 
-    pub fn get_type(&self) -> String {
+    pub fn get_type(&self) -> (String, Vec<Dependency>) {
         let (handlers, dependencies) = self
             .handler_types
             .iter()
@@ -166,21 +164,9 @@ impl Router {
         let router_type = format!("{{ {} }}", handlers.join(", "));
 
         // Merge all dependencies
-        let dependencies = dependencies
-            .into_iter()
-            .flatten()
-            .map(|dependency| {
-                format!(
-                    "import type {{ {} }} from \"./{}\";",
-                    dependency.ts_name,
-                    dependency.exported_to.trim_end_matches(".ts"),
-                )
-            })
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
+        let dependencies = dependencies.into_iter().flatten().collect::<Vec<_>>();
 
-        format!("{}\ntype Router = {router_type};", dependencies.join("\n"))
+        (router_type, dependencies)
     }
 
     pub fn build_rpc_module(self, namespace: Option<&'static str>) -> RpcModule<()> {
@@ -254,25 +240,16 @@ mod test {
     #[test]
     fn empty_router() {
         let router = Router::new();
-        assert_eq!(router.get_type(), "{  }");
-    }
-
-    #[test]
-    fn namespaced_empty_router() {
-        let router = Router::new();
-        assert_eq!(router.get_type(), "{ ns: {  } }");
+        assert_eq!(router.get_type(), ("{  }".to_string(), vec![]));
     }
 
     #[test]
     fn single_handler() {
         let router = Router::new().handler(sample_handler);
-        assert_eq!(router.get_type(), "{ sample_handler: () => void }");
-    }
-
-    #[test]
-    fn namespaced_single_handler() {
-        let router = Router::new().handler(sample_handler);
-        assert_eq!(router.get_type(), "{ ns: { sample_handler: () => void } }");
+        assert_eq!(
+            router.get_type(),
+            ("{ sample_handler: () => void }".to_string(), vec![])
+        );
     }
 
     #[test]
@@ -282,18 +259,10 @@ mod test {
             .handler(another_handler);
         assert_eq!(
             router.get_type(),
-            "{ sample_handler: () => void, another_handler: () => void }"
-        );
-    }
-
-    #[test]
-    fn namespaced_multiple_handlers() {
-        let router = Router::new()
-            .handler(sample_handler)
-            .handler(another_handler);
-        assert_eq!(
-            router.get_type(),
-            "{ ns: { sample_handler: () => void, another_handler: () => void } }"
+            (
+                "{ sample_handler: () => void, another_handler: () => number }".to_string(),
+                vec![]
+            )
         );
     }
 }
