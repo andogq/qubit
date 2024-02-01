@@ -20,10 +20,37 @@ pub trait Handler {
     fn get_type() -> HandlerType;
 }
 
-pub struct RpcBuilder(RpcModule<()>);
+pub struct RpcBuilder {
+    namespace: Option<&'static str>,
+    module: RpcModule<()>,
+}
+
 impl RpcBuilder {
     pub fn new() -> Self {
-        Self(RpcModule::new(()))
+        Self::with_namespace(None)
+    }
+
+    pub fn namespaced(namespace: &'static str) -> Self {
+        Self::with_namespace(Some(namespace))
+    }
+
+    pub fn with_namespace(namespace: Option<&'static str>) -> Self {
+        Self {
+            namespace,
+            module: RpcModule::new(()),
+        }
+    }
+
+    pub fn consume(self) -> RpcModule<()> {
+        self.module
+    }
+
+    fn namespace_str(&self, s: &'static str) -> &'static str {
+        if let Some(namespace) = self.namespace {
+            Box::leak(format!("{namespace}.{s}").into_boxed_str())
+        } else {
+            s
+        }
     }
 
     pub fn query<F, Fut>(mut self, name: &'static str, handler: F) -> Self
@@ -31,8 +58,8 @@ impl RpcBuilder {
         F: Fn(Params<'static>) -> Fut + Send + Sync + Clone + 'static,
         Fut: Future<Output = serde_json::Value> + Send + 'static,
     {
-        self.0
-            .register_async_method(name, move |params, _ctx| {
+        self.module
+            .register_async_method(self.namespace_str(name), move |params, _ctx| {
                 let handler = handler.clone();
 
                 async move {
@@ -55,11 +82,11 @@ impl RpcBuilder {
         F: Fn(Params<'static>) -> S + Send + Sync + Clone + 'static,
         S: Stream<Item = serde_json::Value> + Send + 'static,
     {
-        self.0
+        self.module
             .register_subscription(
-                name,
-                notification_name,
-                unsubscribe_name,
+                self.namespace_str(name),
+                self.namespace_str(notification_name),
+                self.namespace_str(unsubscribe_name),
                 move |params, subscription, _ctx| {
                     let handler = handler.clone();
 
@@ -98,37 +125,37 @@ impl RpcBuilder {
 
 pub struct Router {
     name: Option<String>,
-    handlers: Vec<fn() -> HandlerType>,
-    rpc_builder: RpcBuilder,
+    handler_types: Vec<fn() -> HandlerType>,
+    handler_builders: Vec<fn(RpcBuilder) -> RpcBuilder>,
 }
 
 impl Router {
     pub fn new() -> Self {
         Self {
             name: None,
-            handlers: Vec::new(),
-            rpc_builder: RpcBuilder::new(),
+            handler_types: Vec::new(),
+            handler_builders: Vec::new(),
         }
     }
 
     pub fn namespace(name: impl ToString) -> Self {
         Self {
             name: Some(name.to_string()),
-            handlers: Vec::new(),
-            rpc_builder: RpcBuilder::new(),
+            handler_types: Vec::new(),
+            handler_builders: Vec::new(),
         }
     }
 
     pub fn handler<H: Handler>(mut self, _: H) -> Self {
-        self.rpc_builder = H::register(self.rpc_builder);
-        self.handlers.push(H::get_type);
+        self.handler_builders.push(H::register);
+        self.handler_types.push(H::get_type);
 
         self
     }
 
     pub fn get_type(&self) -> String {
         let (handlers, dependencies) = self
-            .handlers
+            .handler_types
             .iter()
             .map(|get_type| get_type())
             .map(|handler_type| {
@@ -164,11 +191,24 @@ impl Router {
         format!("{}\ntype Router = {router_type};", dependencies.join("\n"))
     }
 
+    pub fn build_rpc_module(self, namespace: Option<&'static str>) -> RpcModule<()> {
+        self.handler_builders
+            .into_iter()
+            .fold(
+                RpcBuilder::with_namespace(namespace),
+                |rpc_builder, builder| builder(rpc_builder),
+            )
+            .consume()
+    }
+
     pub fn create_service(self, stop_handle: StopHandle) -> ServerService {
         let svc_builder = jsonrpsee::server::Server::builder().to_service_builder();
 
+        // Create a top level module
+        let rpc_module = self.build_rpc_module(None);
+
         ServerService {
-            service: svc_builder.build(self.rpc_builder.0, stop_handle),
+            service: svc_builder.build(rpc_module, stop_handle),
         }
     }
 }
