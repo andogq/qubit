@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use futures::{Future, FutureExt, Stream, StreamExt};
 use jsonrpsee::{server::StopHandle, types::Params, RpcModule, SubscriptionMessage};
 pub use rs_ts_api_macros::*;
@@ -5,6 +7,32 @@ use server::ServerService;
 use ts_rs::Dependency;
 
 pub mod server;
+
+pub struct ServerType {
+    ty: String,
+    dependencies: Vec<Dependency>,
+}
+
+impl ToString for ServerType {
+    fn to_string(&self) -> String {
+        let imports = self
+            .dependencies
+            .iter()
+            .map(|dep| {
+                format!(
+                    "import type  {{ {} }} from \"./{}\";",
+                    dep.ts_name,
+                    dep.exported_to.trim_end_matches(".ts")
+                )
+            })
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!("{imports}\n{}", self.ty)
+    }
+}
 
 pub struct HandlerType {
     pub name: String,
@@ -147,8 +175,8 @@ impl Router {
         self
     }
 
-    pub fn get_type(&self) -> (String, Vec<Dependency>) {
-        let (handlers, dependencies) = self
+    pub fn get_type(&self) -> ServerType {
+        let (mut handlers, mut dependencies) = self
             .handler_types
             .iter()
             .map(|get_type| get_type())
@@ -160,13 +188,32 @@ impl Router {
             })
             .unzip::<_, _, Vec<_>, Vec<_>>();
 
+        self.nested_routers
+            .iter()
+            .map(|(namespace, router)| (namespace, router.get_type()))
+            .for_each(
+                |(
+                    namespace,
+                    ServerType {
+                        ty: router_type,
+                        dependencies: router_deps,
+                    },
+                )| {
+                    handlers.push(format!("{namespace}: {router_type}"));
+                    dependencies.push(router_deps);
+                },
+            );
+
         // Generate the router type
         let router_type = format!("{{ {} }}", handlers.join(", "));
 
         // Merge all dependencies
         let dependencies = dependencies.into_iter().flatten().collect::<Vec<_>>();
 
-        (router_type, dependencies)
+        ServerType {
+            ty: router_type,
+            dependencies,
+        }
     }
 
     pub fn build_rpc_module(self, namespace: Option<&'static str>) -> RpcModule<()> {
@@ -240,16 +287,19 @@ mod test {
     #[test]
     fn empty_router() {
         let router = Router::new();
-        assert_eq!(router.get_type(), ("{  }".to_string(), vec![]));
+        let ty = router.get_type();
+
+        assert_eq!(ty.ty, "{  }");
+        assert_eq!(ty.dependencies, vec![]);
     }
 
     #[test]
     fn single_handler() {
         let router = Router::new().handler(sample_handler);
-        assert_eq!(
-            router.get_type(),
-            ("{ sample_handler: () => void }".to_string(), vec![])
-        );
+        let ty = router.get_type();
+
+        assert_eq!(ty.ty, "{ sample_handler: () => void }");
+        assert_eq!(ty.dependencies, vec![]);
     }
 
     #[test]
@@ -257,12 +307,12 @@ mod test {
         let router = Router::new()
             .handler(sample_handler)
             .handler(another_handler);
+        let ty = router.get_type();
+
         assert_eq!(
-            router.get_type(),
-            (
-                "{ sample_handler: () => void, another_handler: () => number }".to_string(),
-                vec![]
-            )
+            ty.ty,
+            "{ sample_handler: () => void, another_handler: () => number }"
         );
+        assert_eq!(ty.dependencies, vec![]);
     }
 }

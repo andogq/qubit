@@ -77,7 +77,7 @@ async fn main() {
         .handler(version)
         .nest("user", user::create_router());
 
-    println!("{}", app.get_type().0);
+    println!("{}", app.get_type().to_string());
 
     let (stop_handle, server_handle) = stop_channel();
 
