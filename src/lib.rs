@@ -62,9 +62,7 @@ impl RpcBuilder {
             .register_async_method(self.namespace_str(name), move |params, _ctx| {
                 let handler = handler.clone();
 
-                async move {
-                    handler(params).await;
-                }
+                async move { handler(params).await }
             })
             .unwrap();
 
@@ -124,31 +122,29 @@ impl RpcBuilder {
 }
 
 pub struct Router {
-    name: Option<String>,
     handler_types: Vec<fn() -> HandlerType>,
     handler_builders: Vec<fn(RpcBuilder) -> RpcBuilder>,
+    nested_routers: Vec<(&'static str, Router)>,
 }
 
 impl Router {
     pub fn new() -> Self {
         Self {
-            name: None,
             handler_types: Vec::new(),
             handler_builders: Vec::new(),
-        }
-    }
-
-    pub fn namespace(name: impl ToString) -> Self {
-        Self {
-            name: Some(name.to_string()),
-            handler_types: Vec::new(),
-            handler_builders: Vec::new(),
+            nested_routers: Vec::new(),
         }
     }
 
     pub fn handler<H: Handler>(mut self, _: H) -> Self {
         self.handler_builders.push(H::register);
         self.handler_types.push(H::get_type);
+
+        self
+    }
+
+    pub fn nest(mut self, namespace: &'static str, router: Router) -> Self {
+        self.nested_routers.push((namespace, router));
 
         self
     }
@@ -167,7 +163,7 @@ impl Router {
             .unzip::<_, _, Vec<_>, Vec<_>>();
 
         // Generate the router type
-        let mut router_type = format!("{{ {} }}", handlers.join(", "));
+        let router_type = format!("{{ {} }}", handlers.join(", "));
 
         // Merge all dependencies
         let dependencies = dependencies
@@ -184,21 +180,27 @@ impl Router {
             .into_iter()
             .collect::<Vec<_>>();
 
-        if let Some(name) = &self.name {
-            router_type = format!("{{ {name}: {router_type} }}");
-        }
-
         format!("{}\ntype Router = {router_type};", dependencies.join("\n"))
     }
 
     pub fn build_rpc_module(self, namespace: Option<&'static str>) -> RpcModule<()> {
-        self.handler_builders
+        let mut rpc_module = self
+            .handler_builders
             .into_iter()
             .fold(
                 RpcBuilder::with_namespace(namespace),
                 |rpc_builder, builder| builder(rpc_builder),
             )
-            .consume()
+            .consume();
+
+        self.nested_routers
+            .into_iter()
+            .map(|(namespace, router)| router.build_rpc_module(Some(namespace)))
+            .for_each(|router| {
+                rpc_module.merge(router).unwrap();
+            });
+
+        rpc_module
     }
 
     pub fn create_service(self, stop_handle: StopHandle) -> ServerService {
@@ -257,7 +259,7 @@ mod test {
 
     #[test]
     fn namespaced_empty_router() {
-        let router = Router::namespace("ns");
+        let router = Router::new();
         assert_eq!(router.get_type(), "{ ns: {  } }");
     }
 
@@ -269,7 +271,7 @@ mod test {
 
     #[test]
     fn namespaced_single_handler() {
-        let router = Router::namespace("ns").handler(sample_handler);
+        let router = Router::new().handler(sample_handler);
         assert_eq!(router.get_type(), "{ ns: { sample_handler: () => void } }");
     }
 
@@ -286,7 +288,7 @@ mod test {
 
     #[test]
     fn namespaced_multiple_handlers() {
-        let router = Router::namespace("ns")
+        let router = Router::new()
             .handler(sample_handler)
             .handler(another_handler);
         assert_eq!(

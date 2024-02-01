@@ -65,6 +65,7 @@ const constructors = {
 
 		const outstanding: Record<number, (response: RpcResponse<any>) => void> = {};
 		const send_request = (id: number, payload: any): Promise<RpcResponse<any>> => {
+			console.log(payload);
 			return new Promise((resolve) => {
 				outstanding[id] = resolve;
 
@@ -98,6 +99,7 @@ const constructors = {
 }
 
 const client = constructors.ws("ws://localhost:9944/rpc");
-client.get("test").then((user) => console.log(user));
+client.version(null).then((user) => console.log(user)).catch(console.error);
+client.user.get("test").then((user) => console.log(user)).catch(console.error);
 
 export default constructors;
