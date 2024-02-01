@@ -60,16 +60,36 @@ fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStream> {
         .into_iter()
         .unzip();
 
-    let run_handler_body = quote!(
-        // Parse the parameters from the request
+    let parse_params = quote! {
         let (#(#param_names,)*) = params.parse::<(#(#param_tys,)*)>().unwrap();
+    };
 
-        // Run the handler
-        let result = handler(#(#param_names,)*).await;
+    let register_impl = match kind {
+        HandlerKind::Query => quote! {
+            rpc_builder.query(#function_name_str, |params| async move {
+                #parse_params
 
-        // Serialise the resulte
-        serde_json::to_value(result).unwrap()
-    );
+                // Run the handler
+                let result = handler(#(#param_names,)*).await;
+
+                // Serialise the resulte
+                serde_json::to_value(result).unwrap()
+            })
+        },
+        HandlerKind::Subscription => {
+            let notification_name = format!("{function_name_str}_notif");
+            let unsubscribe_name = format!("{function_name_str}_unsub");
+
+            quote! {
+                rpc_builder.subscription(#function_name_str, #notification_name, #unsubscribe_name, |params| async move {
+                    #parse_params
+
+                    // Run the handler
+                    handler(#(#param_names,)*)
+                })
+            }
+        }
+    };
 
     Ok(quote! {
         #[allow(non_camel_case_types)]
@@ -96,15 +116,10 @@ fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStream> {
                 }
             }
 
-            fn register(mut router: jsonrpsee::RpcModule<()>) -> jsonrpsee::RpcModule<()> {
+            fn register(rpc_builder: RpcBuilder) -> RpcBuilder {
                 #handler_fn
 
-                router.register_async_method(#function_name_str, |params, _ctx| async move {
-                    #run_handler_body
-                })
-                .unwrap();
-
-                router
+                #register_impl
             }
         }
     })
