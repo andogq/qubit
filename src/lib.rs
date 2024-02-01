@@ -1,7 +1,8 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, env, fs, path::Path};
 
 use futures::{Future, FutureExt, Stream, StreamExt};
 use jsonrpsee::{server::StopHandle, types::Params, RpcModule, SubscriptionMessage};
+use pathdiff::diff_paths;
 pub use rs_ts_api_macros::*;
 use server::ServerService;
 use ts_rs::Dependency;
@@ -13,8 +14,14 @@ pub struct ServerType {
     dependencies: Vec<Dependency>,
 }
 
-impl ToString for ServerType {
-    fn to_string(&self) -> String {
+impl ServerType {
+    pub fn write_to_dir(&self, path: impl AsRef<Path>) {
+        let path = env::current_dir().unwrap().join(path);
+
+        fs::write(path.join("index.ts"), self.generate_type(path)).unwrap();
+    }
+
+    fn generate_type(&self, path: impl AsRef<Path>) -> String {
         let imports = self
             .dependencies
             .iter()
@@ -22,7 +29,18 @@ impl ToString for ServerType {
                 format!(
                     "import type  {{ {} }} from \"./{}\";",
                     dep.ts_name,
-                    dep.exported_to.trim_end_matches(".ts")
+                    diff_paths(
+                        env::current_dir()
+                            .unwrap()
+                            .join(dep.exported_to)
+                            .canonicalize()
+                            .unwrap(),
+                        path.as_ref().canonicalize().unwrap()
+                    )
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .trim_end_matches(".ts")
                 )
             })
             .collect::<HashSet<_>>()
