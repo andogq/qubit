@@ -20,4 +20,3 @@ tower = "0.4.13"
 ts-rs = "7.1.1"
 typeshare = "1.0.1"
 rs-ts-api-macros = { path = "./macros" }
-pathdiff = "0.2.1"

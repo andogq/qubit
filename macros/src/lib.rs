@@ -1,7 +1,8 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use syn::{
-    meta, parse_macro_input, spanned::Spanned, Error, FnArg, Item, ItemFn, Pat, Result, ReturnType,
+    meta, parse_macro_input, parse_quote, spanned::Spanned, token::Paren, Error, FnArg, Item,
+    ItemFn, Pat, Result, ReturnType, Type, TypeTuple,
 };
 
 enum HandlerKind {
@@ -30,7 +31,7 @@ fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStream> {
     let return_type = match handler.sig.output.clone() {
         ReturnType::Default => quote!("void"),
         ReturnType::Type(_, ty) => {
-            quote!((<#ty as ts_rs::TS>::name(), ts_rs::Dependency::from_ty::<#ty>()))
+            quote!(<#ty as ts_rs::TS>::name())
         }
     };
 
@@ -63,7 +64,6 @@ fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStream> {
     let parse_params = quote! {
         let (#(#param_names,)*) = params.parse::<(#(#param_tys,)*)>().unwrap();
     };
-
     let register_impl = match kind {
         HandlerKind::Query => quote! {
             rpc_builder.query(#function_name_str, |params| async move {
@@ -91,28 +91,28 @@ fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStream> {
         }
     };
 
+    let return_ty = match handler.sig.output.clone() {
+        ReturnType::Default => parse_quote!(()),
+        ReturnType::Type(_, ty) => ty,
+    };
+
     Ok(quote! {
         #[allow(non_camel_case_types)]
         struct #function_ident;
         impl rs_ts_api::Handler for #function_ident {
             fn get_type() -> rs_ts_api::HandlerType {
-                let (parameters, mut dependencies): (std::vec::Vec<_>, std::vec::Vec<_>) = [
-                    #((#param_name_strs, <#param_tys as ts_rs::TS>::name(), ts_rs::Dependency::from_ty::<#param_tys>())),*
+                let parameters = [
+                    #((#param_name_strs, <#param_tys as ts_rs::TS>::name())),*
                 ]
                     .into_iter()
-                    .map(|(param, ty, dependency)| {
-                        (format!("{param}: {ty}"), dependency)
+                    .map(|(param, ty): (&str, String)| {
+                        format!("{param}: {ty}")
                     })
-                    .unzip();
-
-                let (return_type, return_dependency) = #return_type;
-
-                dependencies.push(return_dependency);
+                    .collect::<Vec<_>>();
 
                 rs_ts_api::HandlerType {
                     name: #function_name_str.to_string(),
-                    signature: format!("({}) => {}", parameters.join(", "), return_type),
-                    dependencies: dependencies.into_iter().flatten().collect(),
+                    signature: format!("({}) => {}", parameters.join(", "), #return_type),
                 }
             }
 
@@ -120,6 +120,14 @@ fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStream> {
                 #handler_fn
 
                 #register_impl
+            }
+
+            fn add_dependencies(dependencies: &mut std::collections::BTreeMap<std::string::String, std::string::String>) {
+                // Add dependencies for the parameters
+                #(<#param_tys as rs_ts_api::TypeDependencies>::get_deps(dependencies);)*
+
+                // Add dependencies for the return type
+                <#return_ty as rs_ts_api::TypeDependencies>::get_deps(dependencies);
             }
         }
     })
@@ -162,4 +170,41 @@ pub fn handler(
         })
         .unwrap_or_else(Error::into_compile_error)
         .into()
+}
+
+#[proc_macro_attribute]
+pub fn exported_type(
+    _attrs: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let s = syn::parse::<Item>(input).unwrap();
+
+    let (target_struct, fields) = match s {
+        Item::Struct(ref s) => (
+            s.ident.clone(),
+            s.fields.iter().map(|field| field.ty.clone()),
+        ),
+        _ => unimplemented!(),
+    };
+
+    quote! {
+        #[derive(TS)]
+        #s
+
+        impl rs_ts_api::TypeDependencies for #target_struct {
+            fn get_deps(dependencies: &mut std::collections::BTreeMap<std::string::String, std::string::String>) {
+                // Short circuit if this type has already been added
+                if dependencies.contains_key(&Self::name()) {
+                    return;
+                }
+
+                // Insert this type
+                dependencies.insert(Self::name(), Self::inline());
+
+                // Insert field types
+                #(<#fields as rs_ts_api::TypeDependencies>::get_deps(dependencies);)*
+            }
+        }
+    }
+    .into()
 }

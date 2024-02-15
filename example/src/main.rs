@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{collections::BTreeMap, net::SocketAddr};
 
 use rs_ts_api::*;
 
@@ -7,17 +7,18 @@ use jsonrpsee::server::stop_channel;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-#[derive(TS, Serialize, Deserialize, Debug)]
-#[ts(export)]
+#[derive(Serialize, Deserialize, Debug)]
+#[exported_type]
 pub struct Metadata {
     param_a: String,
     param_b: u32,
     param_c: bool,
+
+    more_metadata: Option<Box<Metadata>>,
 }
 
-#[derive(TS, Serialize, Deserialize, Debug)]
-#[ts(export)]
-/// Test doc
+#[derive(Serialize, Deserialize, Debug)]
+#[exported_type]
 pub struct User {
     name: String,
     email: String,
@@ -45,6 +46,8 @@ mod user {
                 param_a: String::new(),
                 param_b: 123,
                 param_c: true,
+
+                more_metadata: None,
             },
         }
     }
@@ -61,13 +64,15 @@ mod user {
                 param_a: String::new(),
                 param_b: 123,
                 param_c: true,
+
+                more_metadata: None,
             },
         }
     }
 }
 
 #[handler]
-async fn version(_a: ()) -> String {
+async fn version() -> String {
     "v1.0.0".to_string()
 }
 
@@ -77,9 +82,13 @@ async fn main() {
         .handler(version)
         .nest("user", user::create_router());
 
-    app.get_type().write_to_dir("./bindings");
-
     let (stop_handle, server_handle) = stop_channel();
+
+    let mut dependencies = BTreeMap::new();
+    app.add_dependencies(&mut dependencies);
+    dbg!(dependencies);
+
+    dbg!(app.get_type());
 
     let router = axum::Router::<()>::new()
         .route("/", get(|| async { "working" }))

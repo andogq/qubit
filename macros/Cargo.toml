@@ -10,3 +10,4 @@ proc-macro = true
 proc-macro2 = "1.0.76"
 quote = "1.0.35"
 syn = "2.0.48"
+ts-rs = "7.1.1"

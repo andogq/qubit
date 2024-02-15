@@ -1,67 +1,24 @@
-use std::{collections::HashSet, env, fs, path::Path};
+use std::{collections::BTreeMap, path::Path};
 
 use futures::{Future, FutureExt, Stream, StreamExt};
 use jsonrpsee::{server::StopHandle, types::Params, RpcModule, SubscriptionMessage};
-use pathdiff::diff_paths;
 pub use rs_ts_api_macros::*;
 use server::ServerService;
-use ts_rs::Dependency;
 
 pub mod server;
 
-pub struct ServerType {
-    ty: String,
-    dependencies: Vec<Dependency>,
-}
-
-impl ServerType {
-    pub fn write_to_dir(&self, path: impl AsRef<Path>) {
-        let path = env::current_dir().unwrap().join(path);
-
-        fs::write(path.join("index.ts"), self.generate_type(path)).unwrap();
-    }
-
-    fn generate_type(&self, path: impl AsRef<Path>) -> String {
-        let imports = self
-            .dependencies
-            .iter()
-            .map(|dep| {
-                format!(
-                    "import type  {{ {} }} from \"./{}\";",
-                    dep.ts_name,
-                    diff_paths(
-                        env::current_dir()
-                            .unwrap()
-                            .join(dep.exported_to)
-                            .canonicalize()
-                            .unwrap(),
-                        path.as_ref().canonicalize().unwrap()
-                    )
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .trim_end_matches(".ts")
-                )
-            })
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        format!("{imports}\n{}", self.ty)
-    }
-}
-
+#[derive(Debug)]
 pub struct HandlerType {
     pub name: String,
     pub signature: String,
-    pub dependencies: Vec<Dependency>,
 }
 
 pub trait Handler {
     fn register(rpc_builder: RpcBuilder) -> RpcBuilder;
 
     fn get_type() -> HandlerType;
+
+    fn add_dependencies(dependencies: &mut BTreeMap<String, String>);
 }
 
 pub struct RpcBuilder {
@@ -169,6 +126,7 @@ pub struct Router {
     handler_types: Vec<fn() -> HandlerType>,
     handler_builders: Vec<fn(RpcBuilder) -> RpcBuilder>,
     nested_routers: Vec<(&'static str, Router)>,
+    handler_add_dependencies: Vec<fn(&mut BTreeMap<String, String>)>,
 }
 
 impl Router {
@@ -177,12 +135,14 @@ impl Router {
             handler_types: Vec::new(),
             handler_builders: Vec::new(),
             nested_routers: Vec::new(),
+            handler_add_dependencies: Vec::new(),
         }
     }
 
     pub fn handler<H: Handler>(mut self, _: H) -> Self {
         self.handler_builders.push(H::register);
         self.handler_types.push(H::get_type);
+        self.handler_add_dependencies.push(H::add_dependencies);
 
         self
     }
@@ -193,46 +153,40 @@ impl Router {
         self
     }
 
-    pub fn get_type(&self) -> ServerType {
-        let (mut handlers, mut dependencies) = self
+    pub fn add_dependencies(&self, dependencies: &mut BTreeMap<String, String>) {
+        // Add all handler dependencies
+        self.handler_add_dependencies
+            .iter()
+            .for_each(|add_deps| add_deps(dependencies));
+
+        // Add dependencies for nested routers
+        self.nested_routers
+            .iter()
+            .for_each(|(_, router)| router.add_dependencies(dependencies));
+    }
+
+    pub fn get_type(&self) -> String {
+        let mut handlers = self
             .handler_types
             .iter()
             .map(|get_type| get_type())
-            .map(|handler_type| {
-                (
-                    format!("{}: {}", handler_type.name, handler_type.signature),
-                    handler_type.dependencies,
-                )
-            })
-            .unzip::<_, _, Vec<_>, Vec<_>>();
+            .map(|handler_type| format!("{}: {}", handler_type.name, handler_type.signature))
+            .collect::<Vec<_>>();
 
         self.nested_routers
             .iter()
             .map(|(namespace, router)| (namespace, router.get_type()))
-            .for_each(
-                |(
-                    namespace,
-                    ServerType {
-                        ty: router_type,
-                        dependencies: router_deps,
-                    },
-                )| {
-                    handlers.push(format!("{namespace}: {router_type}"));
-                    dependencies.push(router_deps);
-                },
-            );
+            .for_each(|(namespace, router_type)| {
+                handlers.push(format!("{namespace}: {router_type}"));
+            });
 
         // Generate the router type
         let router_type = format!("{{ {} }}", handlers.join(", "));
 
-        // Merge all dependencies
-        let dependencies = dependencies.into_iter().flatten().collect::<Vec<_>>();
-
-        ServerType {
-            ty: router_type,
-            dependencies,
-        }
+        router_type
     }
+
+    pub fn write_type_to_file(&self, path: impl AsRef<Path>) {}
 
     pub fn build_rpc_module(self, namespace: Option<&'static str>) -> RpcModule<()> {
         let mut rpc_module = self
@@ -265,6 +219,16 @@ impl Router {
         }
     }
 }
+
+pub trait TypeDependencies {
+    fn get_deps(dependencies: &mut BTreeMap<String, String>) {}
+}
+
+impl TypeDependencies for u32 {}
+impl TypeDependencies for String {}
+impl TypeDependencies for bool {}
+impl TypeDependencies for () {}
+impl<T> TypeDependencies for Option<T> {}
 
 #[cfg(test)]
 mod test {
