@@ -1,15 +1,7 @@
 import { RpcResponse, create_payload, parse_response } from "./jsonrpc";
 import { WebSocket } from "ws";
 
-// Sample type generations
-export interface Metadata { param_a: string, param_b: number, param_c: boolean, }
-export interface User { name: string, email: string, age: number, metadata: Metadata, }
-
-// Sample server generation
-type Server = {
-	get: (p1: string) => Promise<User>,
-	create: (p1: string, p2: string, p3: number) => Promise<User>
-};
+import type { Server } from "./bindings";
 
 function build_client(do_request: (id: number, payload: any) => Promise<RpcResponse<any>>): Server {
 	let next_id = 0;
@@ -99,7 +91,9 @@ const constructors = {
 }
 
 const client = constructors.ws("ws://localhost:9944/rpc");
-client.version(null).then((user) => console.log(user)).catch(console.error);
+client.version().then((user) => console.log(user)).catch(console.error);
 client.user.get("test").then((user) => console.log(user)).catch(console.error);
+
+client.version();
 
 export default constructors;

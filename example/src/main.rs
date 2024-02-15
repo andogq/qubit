@@ -84,11 +84,7 @@ async fn main() {
 
     let (stop_handle, server_handle) = stop_channel();
 
-    let mut dependencies = BTreeMap::new();
-    app.add_dependencies(&mut dependencies);
-    dbg!(dependencies);
-
-    dbg!(app.get_type());
+    app.write_type_to_file("./bindings.ts");
 
     let router = axum::Router::<()>::new()
         .route("/", get(|| async { "working" }))

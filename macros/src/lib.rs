@@ -112,7 +112,7 @@ fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStream> {
 
                 rs_ts_api::HandlerType {
                     name: #function_name_str.to_string(),
-                    signature: format!("({}) => {}", parameters.join(", "), #return_type),
+                    signature: format!("({}) => Promise<{}>", parameters.join(", "), #return_type),
                 }
             }
 

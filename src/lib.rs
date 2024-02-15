@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, fs, path::Path};
 
 use futures::{Future, FutureExt, Stream, StreamExt};
 use jsonrpsee::{server::StopHandle, types::Params, RpcModule, SubscriptionMessage};
@@ -186,7 +186,20 @@ impl Router {
         router_type
     }
 
-    pub fn write_type_to_file(&self, path: impl AsRef<Path>) {}
+    pub fn write_type_to_file(&self, path: impl AsRef<Path>) {
+        let mut dependencies = BTreeMap::new();
+        self.add_dependencies(&mut dependencies);
+        let dependencies = dependencies
+            .into_iter()
+            .map(|(name, ty)| format!("type {name} = {ty};"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let router = self.get_type();
+        let router = format!("export type Server = {router};");
+
+        fs::write(path, format!("{dependencies}\n{router}")).unwrap();
+    }
 
     pub fn build_rpc_module(self, namespace: Option<&'static str>) -> RpcModule<()> {
         let mut rpc_module = self
