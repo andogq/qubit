@@ -3,32 +3,29 @@ use std::{collections::BTreeMap, fs, path::Path};
 use jsonrpsee::{server::StopHandle, RpcModule};
 
 use crate::{
-    handler::{Handler, HandlerType},
+    handler::{Handler, HandlerCallbacks},
     rpc_builder::RpcBuilder,
     server::ServerService,
 };
 
+/// Router for the RPC server. Can have different handlers attached to it, as well as nested
+/// routers in order to create a hierarchy. It is also capable of generating its own type, suitable
+/// for consumption by a TypeScript client.
 pub struct Router {
-    handler_types: Vec<fn() -> HandlerType>,
-    handler_builders: Vec<fn(RpcBuilder) -> RpcBuilder>,
     nested_routers: Vec<(&'static str, Router)>,
-    handler_add_dependencies: Vec<fn(&mut BTreeMap<String, String>)>,
+    handlers: Vec<HandlerCallbacks>,
 }
 
 impl Router {
     pub fn new() -> Self {
         Self {
-            handler_types: Vec::new(),
-            handler_builders: Vec::new(),
             nested_routers: Vec::new(),
-            handler_add_dependencies: Vec::new(),
+            handlers: Vec::new(),
         }
     }
 
-    pub fn handler<H: Handler>(mut self, _: H) -> Self {
-        self.handler_builders.push(H::register);
-        self.handler_types.push(H::get_type);
-        self.handler_add_dependencies.push(H::add_dependencies);
+    pub fn handler<H: Handler>(mut self, handler: H) -> Self {
+        self.handlers.push(handler.into());
 
         self
     }
@@ -41,9 +38,9 @@ impl Router {
 
     pub fn add_dependencies(&self, dependencies: &mut BTreeMap<String, String>) {
         // Add all handler dependencies
-        self.handler_add_dependencies
+        self.handlers
             .iter()
-            .for_each(|add_deps| add_deps(dependencies));
+            .for_each(|handler| (handler.add_dependencies)(dependencies));
 
         // Add dependencies for nested routers
         self.nested_routers
@@ -53,9 +50,9 @@ impl Router {
 
     pub fn get_type(&self) -> String {
         let mut handlers = self
-            .handler_types
+            .handlers
             .iter()
-            .map(|get_type| get_type())
+            .map(|handler| (handler.get_type)())
             .map(|handler_type| format!("{}: {}", handler_type.name, handler_type.signature))
             .collect::<Vec<_>>();
 
@@ -89,11 +86,11 @@ impl Router {
 
     pub fn build_rpc_module(self, namespace: Option<&'static str>) -> RpcModule<()> {
         let mut rpc_module = self
-            .handler_builders
+            .handlers
             .into_iter()
             .fold(
                 RpcBuilder::with_namespace(namespace),
-                |rpc_builder, builder| builder(rpc_builder),
+                |rpc_builder, handler| (handler.register)(rpc_builder),
             )
             .consume();
 
