@@ -35,6 +35,8 @@ impl HandlerKind {
 /// induced based on the return type of the handler (whether it retrusn a [`futures::Stream`]) or
 /// not), but that might cause problems.
 pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStream> {
+    let span = handler.span().clone();
+
     // Handlers must be async
     if handler.sig.asyncness.is_none() {
         return Err(Error::new_spanned(handler, "RPC handlers must be async"));
@@ -59,11 +61,16 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
         }
     };
 
+    let mut inputs = handler.sig.inputs.iter();
+
+    let ctx_ty = if let Some(FnArg::Typed(arg)) = inputs.next() {
+        arg.ty.clone()
+    } else {
+        return Err(syn::Error::new(span, "ctx type must be provided"));
+    };
+
     // Process parameters, to get the idents, string version of the idents, and the type
-    let ((param_names, param_name_strs), param_tys): ((Vec<_>, Vec<_>), Vec<_>) = handler
-        .sig
-        .inputs
-        .iter()
+    let ((param_names, param_name_strs), param_tys): ((Vec<_>, Vec<_>), Vec<_>) = inputs
         .map(|param| match param {
             FnArg::Typed(arg) => match arg.pat.as_ref() {
                 Pat::Ident(ident) => Ok(((ident.clone(), ident.ident.to_string()), arg.ty.clone())),
@@ -90,11 +97,11 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
     };
     let register_impl = match kind {
         HandlerKind::Query => quote! {
-            rpc_builder.query(#function_name_str, |params| async move {
+            rpc_builder.query(#function_name_str, |ctx, params| async move {
                 #parse_params
 
                 // Run the handler
-                let result = handler(#(#param_names,)*).await;
+                let result = handler(ctx, #(#param_names,)*).await;
 
                 // Serialise the resulte
                 serde_json::to_value(result).unwrap()
@@ -105,11 +112,11 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
             let unsubscribe_name = format!("{function_name_str}_unsub");
 
             quote! {
-                rpc_builder.subscription(#function_name_str, #notification_name, #unsubscribe_name, |params| async move {
+                rpc_builder.subscription(#function_name_str, #notification_name, #unsubscribe_name, |ctx, params| async move {
                     #parse_params
 
                     // Run the handler
-                    handler(#(#param_names,)*)
+                    handler(ctx, #(#param_names,)*)
                 })
             }
         }
@@ -123,7 +130,7 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
     Ok(quote! {
         #[allow(non_camel_case_types)]
         struct #function_ident;
-        impl rs_ts_api::Handler for #function_ident {
+        impl rs_ts_api::Handler<#ctx_ty> for #function_ident {
             fn get_type() -> rs_ts_api::HandlerType {
                 let parameters = [
                     #((#param_name_strs, <#param_tys as ts_rs::TS>::name())),*
@@ -140,7 +147,7 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
                 }
             }
 
-            fn register(rpc_builder: rs_ts_api::RpcBuilder) -> rs_ts_api::RpcBuilder {
+            fn register(rpc_builder: rs_ts_api::RpcBuilder<#ctx_ty>) -> rs_ts_api::RpcBuilder<#ctx_ty> {
                 #handler_fn
 
                 #register_impl

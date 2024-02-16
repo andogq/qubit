@@ -1,28 +1,33 @@
+use std::ops::Deref;
+
 use futures::{Future, FutureExt, Stream, StreamExt};
 use jsonrpsee::{types::Params, RpcModule, SubscriptionMessage};
 
-pub struct RpcBuilder {
+pub struct RpcBuilder<Ctx> {
     namespace: Option<&'static str>,
-    module: RpcModule<()>,
+    module: RpcModule<Ctx>,
 }
 
-impl RpcBuilder {
-    pub fn new() -> Self {
-        Self::with_namespace(None)
+impl<Ctx> RpcBuilder<Ctx>
+where
+    Ctx: Clone + Send + Sync + 'static,
+{
+    pub fn new(ctx: Ctx) -> Self {
+        Self::with_namespace(ctx, None)
     }
 
-    pub fn namespaced(namespace: &'static str) -> Self {
-        Self::with_namespace(Some(namespace))
+    pub fn namespaced(ctx: Ctx, namespace: &'static str) -> Self {
+        Self::with_namespace(ctx, Some(namespace))
     }
 
-    pub fn with_namespace(namespace: Option<&'static str>) -> Self {
+    pub fn with_namespace(ctx: Ctx, namespace: Option<&'static str>) -> Self {
         Self {
             namespace,
-            module: RpcModule::new(()),
+            module: RpcModule::new(ctx),
         }
     }
 
-    pub fn consume(self) -> RpcModule<()> {
+    pub fn consume(self) -> RpcModule<Ctx> {
         self.module
     }
 
@@ -36,14 +41,14 @@ impl RpcBuilder {
 
     pub fn query<F, Fut>(mut self, name: &'static str, handler: F) -> Self
     where
-        F: Fn(Params<'static>) -> Fut + Send + Sync + Clone + 'static,
+        F: Fn(Ctx, Params<'static>) -> Fut + Send + Sync + Clone + 'static,
         Fut: Future<Output = serde_json::Value> + Send + 'static,
     {
         self.module
-            .register_async_method(self.namespace_str(name), move |params, _ctx| {
+            .register_async_method(self.namespace_str(name), move |params, ctx| {
                 let handler = handler.clone();
 
-                async move { handler(params).await }
+                async move { handler(ctx.deref().clone(), params).await }
             })
             .unwrap();
 
@@ -58,7 +63,7 @@ impl RpcBuilder {
         handler: F,
     ) -> Self
     where
-        F: Fn(Params<'static>) -> S + Send + Sync + Clone + 'static,
+        F: Fn(Ctx, Params<'static>) -> S + Send + Sync + Clone + 'static,
         S: Stream<Item = serde_json::Value> + Send + 'static,
     {
         self.module
@@ -66,7 +71,7 @@ impl RpcBuilder {
                 self.namespace_str(name),
                 self.namespace_str(notification_name),
                 self.namespace_str(unsubscribe_name),
-                move |params, subscription, _ctx| {
+                move |params, subscription, ctx| {
                     let handler = handler.clone();
 
                     async move {
@@ -90,7 +95,7 @@ impl RpcBuilder {
 
                         // Run the handler, capturing each of the values sand forwarding it onwards
                         // to the channel
-                        handler(params)
+                        handler(ctx.deref().clone(), params)
                             .for_each(|value| tx.send(value).map(|result| result.unwrap()))
                             .await;
                     }

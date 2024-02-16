@@ -11,12 +11,15 @@ use crate::{
 /// Router for the RPC server. Can have different handlers attached to it, as well as nested
 /// routers in order to create a hierarchy. It is also capable of generating its own type, suitable
 /// for consumption by a TypeScript client.
-pub struct Router {
-    nested_routers: Vec<(&'static str, Router)>,
-    handlers: Vec<HandlerCallbacks>,
+pub struct Router<Ctx> {
+    nested_routers: Vec<(&'static str, Router<Ctx>)>,
+    handlers: Vec<HandlerCallbacks<Ctx>>,
 }
 
-impl Router {
+impl<Ctx> Router<Ctx>
+where
+    Ctx: Clone + Send + Sync + 'static,
+{
     pub fn new() -> Self {
         Self {
             nested_routers: Vec::new(),
@@ -24,13 +27,13 @@ impl Router {
         }
     }
 
-    pub fn handler<H: Handler>(mut self, handler: H) -> Self {
-        self.handlers.push(handler.into());
+    pub fn handler<H: Handler<Ctx>>(mut self, handler: H) -> Self {
+        self.handlers.push(HandlerCallbacks::from_handler(handler));
 
         self
     }
 
-    pub fn nest(mut self, namespace: &'static str, router: Router) -> Self {
+    pub fn nest(mut self, namespace: &'static str, router: Router<Ctx>) -> Self {
         self.nested_routers.push((namespace, router));
 
         self
@@ -84,19 +87,19 @@ impl Router {
         fs::write(path, format!("{dependencies}\n{router}")).unwrap();
     }
 
-    pub fn build_rpc_module(self, namespace: Option<&'static str>) -> RpcModule<()> {
+    pub fn build_rpc_module(self, ctx: Ctx, namespace: Option<&'static str>) -> RpcModule<Ctx> {
         let mut rpc_module = self
             .handlers
             .into_iter()
             .fold(
-                RpcBuilder::with_namespace(namespace),
+                RpcBuilder::with_namespace(ctx.clone(), namespace),
                 |rpc_builder, handler| (handler.register)(rpc_builder),
             )
             .consume();
 
         self.nested_routers
             .into_iter()
-            .map(|(namespace, router)| router.build_rpc_module(Some(namespace)))
+            .map(|(namespace, router)| router.build_rpc_module(ctx.clone(), Some(namespace)))
             .for_each(|router| {
                 rpc_module.merge(router).unwrap();
             });
@@ -104,11 +107,11 @@ impl Router {
         rpc_module
     }
 
-    pub fn create_service(self, stop_handle: StopHandle) -> ServerService {
+    pub fn create_service(self, ctx: Ctx, stop_handle: StopHandle) -> ServerService {
         let svc_builder = jsonrpsee::server::Server::builder().to_service_builder();
 
         // Create a top level module
-        let rpc_module = self.build_rpc_module(None);
+        let rpc_module = self.build_rpc_module(ctx, None);
 
         ServerService {
             service: svc_builder.build(rpc_module, stop_handle),

@@ -27,15 +27,21 @@ pub struct User {
     metadata: Metadata,
 }
 
+#[derive(Clone, Default)]
+pub struct AppCtx {
+    database: bool,
+    log: String,
+}
+
 mod user {
     use super::*;
 
-    pub fn create_router() -> Router {
+    pub fn create_router() -> Router<AppCtx> {
         Router::new().handler(get).handler(create)
     }
 
     #[handler]
-    async fn get(_id: String) -> User {
+    async fn get(_ctx: AppCtx, _id: String) -> User {
         println!("get user");
 
         User {
@@ -53,7 +59,7 @@ mod user {
     }
 
     #[handler]
-    async fn create(name: String, email: String, age: u32) -> User {
+    async fn create(_ctx: AppCtx, name: String, email: String, age: u32) -> User {
         println!("creating user: {name}");
 
         User {
@@ -72,7 +78,7 @@ mod user {
 }
 
 #[handler]
-async fn version() -> String {
+async fn version(_ctx: AppCtx) -> String {
     "v1.0.0".to_string()
 }
 
@@ -88,7 +94,7 @@ async fn main() {
 
     let router = axum::Router::<()>::new()
         .route("/", get(|| async { "working" }))
-        .nest_service("/rpc", app.create_service(stop_handle));
+        .nest_service("/rpc", app.create_service(AppCtx::default(), stop_handle));
 
     hyper::Server::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
         .serve(router.into_make_service())
