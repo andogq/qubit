@@ -59,7 +59,7 @@ where
         self
     }
 
-    pub fn subscription<C, F, S>(
+    pub fn subscription<C, F, Fut, S>(
         mut self,
         name: &'static str,
         notification_name: &'static str,
@@ -68,7 +68,8 @@ where
     ) -> Self
     where
         C: FromContext<Ctx>,
-        F: Fn(C, Params<'static>) -> S + Send + Sync + Clone + 'static,
+        F: Fn(C, Params<'static>) -> Fut + Send + Sync + Clone + 'static,
+        Fut: Future<Output = S> + Send + 'static,
         S: Stream<Item = serde_json::Value> + Send + 'static,
     {
         self.module
@@ -102,6 +103,7 @@ where
                         // to the channel
                         // TODO: Better error handling if ctx conversion fails
                         handler(C::from_app_ctx(ctx.deref().clone()).unwrap(), params)
+                            .await
                             .for_each(|value| tx.send(value).map(|result| result.unwrap()))
                             .await;
                     }

@@ -1,8 +1,8 @@
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{
     meta::ParseNestedMeta, parse_quote, spanned::Spanned, Error, FnArg, ItemFn, Pat, Result,
-    ReturnType,
+    ReturnType, Type, TypeImplTrait,
 };
 
 /// Handlers can have different variations depending on how they interact with the client.
@@ -55,10 +55,13 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
 
     // Extract out the return type
     let return_type = match handler.sig.output.clone() {
-        ReturnType::Default => quote!("void"),
-        ReturnType::Type(_, ty) => {
-            quote!(<#ty as ts_rs::TS>::name())
-        }
+        ReturnType::Default => None,
+        ReturnType::Type(_, ty) => Some(match *ty {
+            Type::ImplTrait(TypeImplTrait { bounds, .. }) => {
+                quote! { <dyn #bounds as futures::Stream>::Item }
+            }
+            ref return_type => return_type.to_token_stream(),
+        }),
     };
 
     let mut inputs = handler.sig.inputs.iter();
@@ -98,41 +101,70 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
         }
     });
 
-    let register_impl = match kind {
-        HandlerKind::Query => quote! {
-            rpc_builder.query(#function_name_str, |app_ctx, params| async move {
-                #parse_params
+    let (register_impl, signature) = match kind {
+        HandlerKind::Query => (
+            quote! {
+                rpc_builder.query(#function_name_str, |app_ctx, params| async move {
+                    #parse_params
 
-                // Convert app_ctx to ctx
-                let ctx = <#ctx_ty as rs_ts_api::FromContext<__internal_AppCtx>>::from_app_ctx(app_ctx).unwrap();
+                    // Convert app_ctx to ctx
+                    let ctx = <#ctx_ty as rs_ts_api::FromContext<__internal_AppCtx>>::from_app_ctx(app_ctx).unwrap();
 
-                // Run the handler
-                let result = handler(ctx, #(#param_names,)*).await;
+                    // Run the handler
+                    let result = handler(ctx, #(#param_names,)*).await;
 
-                // Serialise the resulte
-                serde_json::to_value(result).unwrap()
-            })
-        },
+                    // Serialise the resulte
+                    serde_json::to_value(result).unwrap()
+                })
+            },
+            {
+                let return_type = match return_type.as_ref() {
+                    Some(return_type) => {
+                        quote!(<#return_type as ts_rs::TS>::name())
+                    }
+                    None => quote!("void"),
+                };
+
+                quote! {
+                    format!("({}) => Promise<{}>", parameters.join(", "), #return_type)
+                }
+            },
+        ),
         HandlerKind::Subscription => {
             let notification_name = format!("{function_name_str}_notif");
             let unsubscribe_name = format!("{function_name_str}_unsub");
 
-            quote! {
-                rpc_builder.subscription(#function_name_str, #notification_name, #unsubscribe_name, |app_ctx, params| async move {
-                    #parse_params
+            (
+                quote! {
+                    rpc_builder.subscription(#function_name_str, #notification_name, #unsubscribe_name, |app_ctx, params| async move {
+                        #parse_params
 
-                    // Convert app_ctx to ctx
+                        // Convert app_ctx to ctx
+                        let ctx = <#ctx_ty as rs_ts_api::FromContext<__internal_AppCtx>>::from_app_ctx(app_ctx).unwrap();
 
-                    // Run the handler
-                    handler(ctx, #(#param_names,)*)
-                })
-            }
+                        // Run the handler
+                        let stream = handler(ctx, #(#param_names,)*).await;
+
+                        futures::StreamExt::map(
+                            stream,
+                            |value| serde_json::to_value(value).unwrap()
+                        )
+                    })
+                },
+                {
+                    let Some(return_type) = return_type.as_ref() else {
+                        return Err(syn::Error::new(
+                            span,
+                            "subscriptions must have a return type",
+                        ));
+                    };
+
+                    quote! {
+                        format!("({}) => Stream<{}>", parameters.join(", "), <#return_type as ts_rs::TS>::name())
+                    }
+                },
+            )
         }
-    };
-
-    let return_ty = match handler.sig.output.clone() {
-        ReturnType::Default => parse_quote!(()),
-        ReturnType::Type(_, ty) => ty,
     };
 
     Ok(quote! {
@@ -154,7 +186,7 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
 
                 rs_ts_api::HandlerType {
                     name: #function_name_str.to_string(),
-                    signature: format!("({}) => Promise<{}>", parameters.join(", "), #return_type),
+                    signature: #signature,
                 }
             }
 
@@ -169,7 +201,7 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
                 #(<#param_tys as rs_ts_api::TypeDependencies>::get_deps(dependencies);)*
 
                 // Add dependencies for the return type
-                <#return_ty as rs_ts_api::TypeDependencies>::get_deps(dependencies);
+                <#return_type as rs_ts_api::TypeDependencies>::get_deps(dependencies);
             }
         }
     })

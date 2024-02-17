@@ -77,6 +77,9 @@ where
     }
 
     pub fn write_type_to_file(&self, path: impl AsRef<Path>) {
+        // Imports to be included with all the bindings. Ideally should include from a package.
+        let imports = r#"import type { Stream } from "./stream";"#;
+
         let mut dependencies = BTreeMap::new();
         self.add_dependencies(&mut dependencies);
         let dependencies = dependencies
@@ -88,7 +91,7 @@ where
         let router = self.get_type();
         let router = format!("export type Server = {router};");
 
-        fs::write(path, format!("{dependencies}\n{router}")).unwrap();
+        fs::write(path, format!("{imports}\n{dependencies}\n{router}")).unwrap();
     }
 
     pub fn build_rpc_module(

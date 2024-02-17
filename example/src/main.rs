@@ -6,6 +6,7 @@ use std::{
     },
 };
 
+use futures::{stream, Stream, StreamExt};
 use rs_ts_api::*;
 
 use axum::routing::get;
@@ -117,8 +118,15 @@ async fn count(ctx: CountCtx) -> usize {
     ctx.count.fetch_add(1, Ordering::Relaxed)
 }
 
+#[handler(subscription)]
+async fn countdown(ctx: AppCtx, min: usize, max: usize) -> impl Stream<Item = usize> {
+    stream::iter(min..=max)
+}
+
 #[handler]
 async fn version(_ctx: AppCtx) -> String {
+    let a = <<dyn Stream<Item = usize> as Stream>::Item as ts_rs::TS>::name();
+
     "v1.0.0".to_string()
 }
 
@@ -127,6 +135,7 @@ async fn main() {
     let app = Router::new()
         .handler(version)
         .handler(count)
+        .handler(countdown)
         .nest("user", user::create_router());
 
     let (stop_handle, server_handle) = stop_channel();
