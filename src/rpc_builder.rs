@@ -3,7 +3,7 @@ use std::ops::Deref;
 use futures::{Future, FutureExt, Stream, StreamExt};
 use jsonrpsee::{types::Params, RpcModule, SubscriptionMessage};
 
-use crate::Context;
+use crate::FromContext;
 
 pub struct RpcBuilder<Ctx> {
     namespace: Option<&'static str>,
@@ -43,7 +43,7 @@ where
 
     pub fn query<C, F, Fut>(mut self, name: &'static str, handler: F) -> Self
     where
-        C: Context<Ctx>,
+        C: FromContext<Ctx>,
         F: Fn(C, Params<'static>) -> Fut + Send + Sync + Clone + 'static,
         Fut: Future<Output = serde_json::Value> + Send + 'static,
     {
@@ -67,7 +67,7 @@ where
         handler: F,
     ) -> Self
     where
-        C: Context<Ctx>,
+        C: FromContext<Ctx>,
         F: Fn(C, Params<'static>) -> S + Send + Sync + Clone + 'static,
         S: Stream<Item = serde_json::Value> + Send + 'static,
     {

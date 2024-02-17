@@ -50,7 +50,7 @@ mod user {
         user: u32,
     }
 
-    impl Context<AppCtx> for UserCtx {
+    impl FromContext<AppCtx> for UserCtx {
         fn from_app_ctx(ctx: AppCtx) -> Result<Self, jsonrpsee::types::ErrorObjectOwned> {
             Ok(UserCtx {
                 app_ctx: ctx,
@@ -104,7 +104,7 @@ struct CountCtx {
     count: Arc<AtomicUsize>,
 }
 
-impl Context<AppCtx> for CountCtx {
+impl FromContext<AppCtx> for CountCtx {
     fn from_app_ctx(ctx: AppCtx) -> Result<Self, jsonrpsee::types::ErrorObjectOwned> {
         Ok(Self {
             count: ctx.count.clone(),

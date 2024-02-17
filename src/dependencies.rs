@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 pub trait TypeDependencies {
+    #[allow(unused_variables)]
     fn get_deps(dependencies: &mut BTreeMap<String, String>) {}
 }
 

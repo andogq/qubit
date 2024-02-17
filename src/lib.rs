@@ -1,4 +1,4 @@
-pub use context::Context;
+pub use context::FromContext;
 pub use dependencies::TypeDependencies;
 pub use handler::{Handler, HandlerType};
 pub use router::Router;

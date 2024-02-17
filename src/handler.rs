@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::{rpc_builder::RpcBuilder, Context};
+use crate::rpc_builder::RpcBuilder;
 
 /// Components used to construct the client type for this handler.
 #[derive(Debug)]

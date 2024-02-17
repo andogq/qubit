@@ -9,7 +9,6 @@ use tower::Service;
 use crate::{
     handler::{Handler, HandlerCallbacks},
     rpc_builder::RpcBuilder,
-    Context,
 };
 
 /// Router for the RPC server. Can have different handlers attached to it, as well as nested
@@ -115,18 +114,6 @@ where
 
         rpc_module
     }
-
-    // pub fn create_service(self, ctx: Ctx, stop_handle: StopHandle) -> ServerService<Ctx> {
-    //     let svc_builder = jsonrpsee::server::Server::builder().to_service_builder();
-    //
-    //     // Create a top level module
-    //     let rpc_module = self.build_rpc_module(ctx, None);
-    //
-    //     ServerService {
-    //         rpc_module,
-    //         stop_handle,
-    //     }
-    // }
 
     pub fn to_service(
         self,

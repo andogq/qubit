@@ -104,7 +104,7 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
                 #parse_params
 
                 // Convert app_ctx to ctx
-                let ctx = <#ctx_ty as rs_ts_api::Context<__internal_AppCtx>>::from_app_ctx(app_ctx).unwrap();
+                let ctx = <#ctx_ty as rs_ts_api::FromContext<__internal_AppCtx>>::from_app_ctx(app_ctx).unwrap();
 
                 // Run the handler
                 let result = handler(ctx, #(#param_names,)*).await;
@@ -139,7 +139,7 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
         #[allow(non_camel_case_types)]
         struct #function_ident;
         impl<__internal_AppCtx> rs_ts_api::Handler<__internal_AppCtx> for #function_ident
-            where #ctx_ty: rs_ts_api::Context<__internal_AppCtx>,
+            where #ctx_ty: rs_ts_api::FromContext<__internal_AppCtx>,
                 __internal_AppCtx: 'static + Send + Sync + Clone
         {
             fn get_type() -> rs_ts_api::HandlerType {
