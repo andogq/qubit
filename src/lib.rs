@@ -8,4 +8,3 @@ mod dependencies;
 mod handler;
 mod router;
 mod rpc_builder;
-pub mod server;

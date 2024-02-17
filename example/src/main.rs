@@ -36,6 +36,12 @@ pub struct AppCtx {
 mod user {
     use super::*;
 
+    #[derive(Clone)]
+    pub struct UserCtx {
+        app_ctx: AppCtx,
+        user: u32,
+    }
+
     pub fn create_router() -> Router<AppCtx> {
         Router::new().handler(get).handler(create)
     }
@@ -92,9 +98,11 @@ async fn main() {
 
     app.write_type_to_file("./bindings.ts");
 
+    let ctx = AppCtx::default();
+
     let router = axum::Router::<()>::new()
         .route("/", get(|| async { "working" }))
-        .nest_service("/rpc", app.create_service(AppCtx::default(), stop_handle));
+        .nest_service("/rpc", app.to_service(move |_| ctx.clone(), stop_handle));
 
     hyper::Server::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
         .serve(router.into_make_service())

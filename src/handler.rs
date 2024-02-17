@@ -29,6 +29,7 @@ pub trait Handler<Ctx> {
 /// Wrapper struct to assist with erasure of concrete [`Handler`] type. Contains function pointers
 /// to all of the implementations required to process the handler, allowing different handler types
 /// to be contained together.
+#[derive(Clone)]
 pub(crate) struct HandlerCallbacks<Ctx> {
     /// Function pointer to the register implementation for the handler, which will register it
     /// against an RPC builder.

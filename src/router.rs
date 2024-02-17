@@ -1,16 +1,20 @@
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{ collections::BTreeMap, convert::Infallible, fs, path::Path};
 
+use futures::FutureExt;
+use http::Request;
+use hyper::{service::service_fn, Body};
 use jsonrpsee::{server::StopHandle, RpcModule};
+use tower::Service;
 
 use crate::{
     handler::{Handler, HandlerCallbacks},
     rpc_builder::RpcBuilder,
-    server::ServerService,
 };
 
 /// Router for the RPC server. Can have different handlers attached to it, as well as nested
 /// routers in order to create a hierarchy. It is also capable of generating its own type, suitable
 /// for consumption by a TypeScript client.
+#[derive(Clone)]
 pub struct Router<Ctx> {
     nested_routers: Vec<(&'static str, Router<Ctx>)>,
     handlers: Vec<HandlerCallbacks<Ctx>>,
@@ -107,14 +111,45 @@ where
         rpc_module
     }
 
-    pub fn create_service(self, ctx: Ctx, stop_handle: StopHandle) -> ServerService {
-        let svc_builder = jsonrpsee::server::Server::builder().to_service_builder();
+    // pub fn create_service(self, ctx: Ctx, stop_handle: StopHandle) -> ServerService<Ctx> {
+    //     let svc_builder = jsonrpsee::server::Server::builder().to_service_builder();
+    //
+    //     // Create a top level module
+    //     let rpc_module = self.build_rpc_module(ctx, None);
+    //
+    //     ServerService {
+    //         rpc_module,
+    //         stop_handle,
+    //     }
+    // }
 
-        // Create a top level module
-        let rpc_module = self.build_rpc_module(ctx, None);
+    pub fn to_service(
+        self,
+        build_ctx: impl (Fn(&Request<Body>) -> Ctx) + Clone,
+        stop_handle: StopHandle,
+    ) -> impl Service<
+        Request<Body>,
+        Response = impl axum::response::IntoResponse,
+        Error = Infallible,
+        Future = impl Send,
+    > + Clone {
+        service_fn(move |req| {
+            let ctx = build_ctx(&req);
 
-        ServerService {
-            service: svc_builder.build(rpc_module, stop_handle),
-        }
+            // WARN: Horrific amount of cloning
+            let rpc_module = self.clone().build_rpc_module(ctx, None);
+
+            let mut svc = jsonrpsee::server::Server::builder()
+                .to_service_builder()
+                .build(rpc_module.clone(), stop_handle.clone());
+
+            async move {
+                match svc.call(req).await {
+                    Ok(v) => Ok::<_, Infallible>(v),
+                    Err(_) => unreachable!(),
+                }
+            }
+            .boxed()
+        })
     }
 }
