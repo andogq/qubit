@@ -3,6 +3,8 @@ use std::ops::Deref;
 use futures::{Future, FutureExt, Stream, StreamExt};
 use jsonrpsee::{types::Params, RpcModule, SubscriptionMessage};
 
+use crate::Context;
+
 pub struct RpcBuilder<Ctx> {
     namespace: Option<&'static str>,
     module: RpcModule<Ctx>,
@@ -39,16 +41,17 @@ where
         }
     }
 
-    pub fn query<F, Fut>(mut self, name: &'static str, handler: F) -> Self
+    pub fn query<C, F, Fut>(mut self, name: &'static str, handler: F) -> Self
     where
-        F: Fn(Ctx, Params<'static>) -> Fut + Send + Sync + Clone + 'static,
+        C: Context<Ctx>,
+        F: Fn(C, Params<'static>) -> Fut + Send + Sync + Clone + 'static,
         Fut: Future<Output = serde_json::Value> + Send + 'static,
     {
         self.module
             .register_async_method(self.namespace_str(name), move |params, ctx| {
                 let handler = handler.clone();
 
-                async move { handler(ctx.deref().clone(), params).await }
+                async move { handler(C::from_app_ctx(ctx.deref().clone()).unwrap(), params).await }
             })
             .unwrap();
 

@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, net::SocketAddr};
+use std::net::SocketAddr;
 
 use rs_ts_api::*;
 
@@ -40,6 +40,17 @@ mod user {
     pub struct UserCtx {
         app_ctx: AppCtx,
         user: u32,
+    }
+
+    impl TryFrom<AppCtx> for UserCtx {
+        type Error = ();
+
+        fn try_from(ctx: AppCtx) -> Result<Self, Self::Error> {
+            Ok(UserCtx {
+                app_ctx: ctx,
+                user: 0,
+            })
+        }
     }
 
     pub fn create_router() -> Router<AppCtx> {
