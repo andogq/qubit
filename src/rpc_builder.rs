@@ -51,6 +51,7 @@ where
             .register_async_method(self.namespace_str(name), move |params, ctx| {
                 let handler = handler.clone();
 
+                // TODO: Better error handling if ctx conversion fails
                 async move { handler(C::from_app_ctx(ctx.deref().clone()).unwrap(), params).await }
             })
             .unwrap();
@@ -58,7 +59,7 @@ where
         self
     }
 
-    pub fn subscription<F, S>(
+    pub fn subscription<C, F, S>(
         mut self,
         name: &'static str,
         notification_name: &'static str,
@@ -66,7 +67,8 @@ where
         handler: F,
     ) -> Self
     where
-        F: Fn(Ctx, Params<'static>) -> S + Send + Sync + Clone + 'static,
+        C: Context<Ctx>,
+        F: Fn(C, Params<'static>) -> S + Send + Sync + Clone + 'static,
         S: Stream<Item = serde_json::Value> + Send + 'static,
     {
         self.module
@@ -98,7 +100,8 @@ where
 
                         // Run the handler, capturing each of the values sand forwarding it onwards
                         // to the channel
-                        handler(ctx.deref().clone(), params)
+                        // TODO: Better error handling if ctx conversion fails
+                        handler(C::from_app_ctx(ctx.deref().clone()).unwrap(), params)
                             .for_each(|value| tx.send(value).map(|result| result.unwrap()))
                             .await;
                     }
