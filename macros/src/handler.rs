@@ -92,9 +92,12 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
         .into_iter()
         .unzip();
 
-    let parse_params = quote! {
-        let (#(#param_names,)*) = params.parse::<(#(#param_tys,)*)>().unwrap();
-    };
+    let parse_params = (!param_names.is_empty()).then(|| {
+        quote! {
+            let (#(#param_names,)*) = params.parse::<(#(#param_tys,)*)>().unwrap();
+        }
+    });
+
     let register_impl = match kind {
         HandlerKind::Query => quote! {
             rpc_builder.query(#function_name_str, |ctx, params| async move {
