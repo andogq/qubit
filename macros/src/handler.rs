@@ -100,8 +100,11 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
 
     let register_impl = match kind {
         HandlerKind::Query => quote! {
-            rpc_builder.query(#function_name_str, |ctx, params| async move {
+            rpc_builder.query(#function_name_str, |app_ctx, params| async move {
                 #parse_params
+
+                // Convert app_ctx to ctx
+                let ctx = <#ctx_ty as rs_ts_api::Context<__internal_AppCtx>>::from_app_ctx(app_ctx).unwrap();
 
                 // Run the handler
                 let result = handler(ctx, #(#param_names,)*).await;
@@ -115,8 +118,10 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
             let unsubscribe_name = format!("{function_name_str}_unsub");
 
             quote! {
-                rpc_builder.subscription(#function_name_str, #notification_name, #unsubscribe_name, |ctx, params| async move {
+                rpc_builder.subscription(#function_name_str, #notification_name, #unsubscribe_name, |app_ctx, params| async move {
                     #parse_params
+
+                    // Convert app_ctx to ctx
 
                     // Run the handler
                     handler(ctx, #(#param_names,)*)
@@ -133,7 +138,10 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
     Ok(quote! {
         #[allow(non_camel_case_types)]
         struct #function_ident;
-        impl rs_ts_api::Handler<#ctx_ty> for #function_ident {
+        impl<__internal_AppCtx> rs_ts_api::Handler<__internal_AppCtx> for #function_ident
+            where #ctx_ty: rs_ts_api::Context<__internal_AppCtx>,
+                __internal_AppCtx: 'static + Send + Sync + Clone
+        {
             fn get_type() -> rs_ts_api::HandlerType {
                 let parameters = [
                     #((#param_name_strs, <#param_tys as ts_rs::TS>::name())),*
@@ -150,7 +158,7 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
                 }
             }
 
-            fn register(rpc_builder: rs_ts_api::RpcBuilder<#ctx_ty>) -> rs_ts_api::RpcBuilder<#ctx_ty> {
+            fn register(rpc_builder: rs_ts_api::RpcBuilder<__internal_AppCtx>) -> rs_ts_api::RpcBuilder<__internal_AppCtx> {
                 #handler_fn
 
                 #register_impl

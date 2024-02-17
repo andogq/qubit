@@ -1,4 +1,4 @@
-use std::{ collections::BTreeMap, convert::Infallible, fs, path::Path};
+use std::{collections::BTreeMap, convert::Infallible, fs, path::Path};
 
 use futures::FutureExt;
 use http::Request;
@@ -9,6 +9,7 @@ use tower::Service;
 use crate::{
     handler::{Handler, HandlerCallbacks},
     rpc_builder::RpcBuilder,
+    Context,
 };
 
 /// Router for the RPC server. Can have different handlers attached to it, as well as nested
@@ -20,9 +21,9 @@ pub struct Router<Ctx> {
     handlers: Vec<HandlerCallbacks<Ctx>>,
 }
 
-impl<Ctx> Router<Ctx>
+impl<AppCtx> Router<AppCtx>
 where
-    Ctx: Clone + Send + Sync + 'static,
+    AppCtx: Clone + Send + Sync + 'static,
 {
     pub fn new() -> Self {
         Self {
@@ -31,13 +32,13 @@ where
         }
     }
 
-    pub fn handler<H: Handler<Ctx>>(mut self, handler: H) -> Self {
+    pub fn handler<H: Handler<AppCtx>>(mut self, handler: H) -> Self {
         self.handlers.push(HandlerCallbacks::from_handler(handler));
 
         self
     }
 
-    pub fn nest(mut self, namespace: &'static str, router: Router<Ctx>) -> Self {
+    pub fn nest(mut self, namespace: &'static str, router: Router<AppCtx>) -> Self {
         self.nested_routers.push((namespace, router));
 
         self
@@ -91,7 +92,11 @@ where
         fs::write(path, format!("{dependencies}\n{router}")).unwrap();
     }
 
-    pub fn build_rpc_module(self, ctx: Ctx, namespace: Option<&'static str>) -> RpcModule<Ctx> {
+    pub fn build_rpc_module(
+        self,
+        ctx: AppCtx,
+        namespace: Option<&'static str>,
+    ) -> RpcModule<AppCtx> {
         let mut rpc_module = self
             .handlers
             .into_iter()
@@ -125,7 +130,7 @@ where
 
     pub fn to_service(
         self,
-        build_ctx: impl (Fn(&Request<Body>) -> Ctx) + Clone,
+        build_ctx: impl (Fn(&Request<Body>) -> AppCtx) + Clone,
         stop_handle: StopHandle,
     ) -> impl Service<
         Request<Body>,

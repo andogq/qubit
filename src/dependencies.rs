@@ -5,6 +5,7 @@ pub trait TypeDependencies {
 }
 
 impl TypeDependencies for u32 {}
+impl TypeDependencies for usize {}
 impl TypeDependencies for String {}
 impl TypeDependencies for bool {}
 impl TypeDependencies for () {}

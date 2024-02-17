@@ -1,4 +1,10 @@
-use std::net::SocketAddr;
+use std::{
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+};
 
 use rs_ts_api::*;
 
@@ -31,6 +37,8 @@ pub struct User {
 pub struct AppCtx {
     database: bool,
     log: String,
+
+    count: Arc<AtomicUsize>,
 }
 
 mod user {
@@ -42,10 +50,8 @@ mod user {
         user: u32,
     }
 
-    impl TryFrom<AppCtx> for UserCtx {
-        type Error = ();
-
-        fn try_from(ctx: AppCtx) -> Result<Self, Self::Error> {
+    impl Context<AppCtx> for UserCtx {
+        fn from_app_ctx(ctx: AppCtx) -> Result<Self, jsonrpsee::types::ErrorObjectOwned> {
             Ok(UserCtx {
                 app_ctx: ctx,
                 user: 0,
@@ -58,7 +64,7 @@ mod user {
     }
 
     #[handler]
-    async fn get(_ctx: AppCtx, _id: String) -> User {
+    async fn get(_ctx: UserCtx, _id: String) -> User {
         println!("get user");
 
         User {
@@ -76,7 +82,7 @@ mod user {
     }
 
     #[handler]
-    async fn create(_ctx: AppCtx, name: String, email: String, age: u32) -> User {
+    async fn create(_ctx: UserCtx, name: String, email: String, age: u32) -> User {
         println!("creating user: {name}");
 
         User {
@@ -94,6 +100,23 @@ mod user {
     }
 }
 
+struct CountCtx {
+    count: Arc<AtomicUsize>,
+}
+
+impl Context<AppCtx> for CountCtx {
+    fn from_app_ctx(ctx: AppCtx) -> Result<Self, jsonrpsee::types::ErrorObjectOwned> {
+        Ok(Self {
+            count: ctx.count.clone(),
+        })
+    }
+}
+
+#[handler]
+async fn count(ctx: CountCtx) -> usize {
+    ctx.count.fetch_add(1, Ordering::Relaxed)
+}
+
 #[handler]
 async fn version(_ctx: AppCtx) -> String {
     "v1.0.0".to_string()
@@ -103,6 +126,7 @@ async fn version(_ctx: AppCtx) -> String {
 async fn main() {
     let app = Router::new()
         .handler(version)
+        .handler(count)
         .nest("user", user::create_router());
 
     let (stop_handle, server_handle) = stop_channel();

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::rpc_builder::RpcBuilder;
+use crate::{rpc_builder::RpcBuilder, Context};
 
 /// Components used to construct the client type for this handler.
 #[derive(Debug)]
@@ -15,9 +15,9 @@ pub struct HandlerType {
 
 /// Handlers run for specific RPC requests. This trait will automatically be implemented if the
 /// [`crate::handler`] macro is attached to a function containing a handler implementation.
-pub trait Handler<Ctx> {
+pub trait Handler<AppCtx> {
     /// Register this handler against the provided RPC builder.
-    fn register(rpc_builder: RpcBuilder<Ctx>) -> RpcBuilder<Ctx>;
+    fn register(rpc_builder: RpcBuilder<AppCtx>) -> RpcBuilder<AppCtx>;
 
     /// Get the type of this handler, to generate the client.
     fn get_type() -> HandlerType;
@@ -44,7 +44,10 @@ pub(crate) struct HandlerCallbacks<Ctx> {
     pub add_dependencies: fn(&mut BTreeMap<String, String>),
 }
 
-impl<Ctx> HandlerCallbacks<Ctx> {
+impl<Ctx> HandlerCallbacks<Ctx>
+where
+    Ctx: 'static + Send + Sync + Clone,
+{
     /// Automatically implement the creation of [`HandlerCallbacks`] for anything that implements
     /// [`Handler`]. This is possible since the trait only contains static methods, which can simply
     /// be expressed as function pointers.
