@@ -3,6 +3,30 @@ import { WebSocket } from "ws";
 
 import type { Server } from "./bindings";
 
+function wrap_promise<T>(p: Promise<T>): Promise<T> {
+	return new Proxy(p, {
+		get(target, property, receiver) {
+			if (property === "subscribe") {
+				// Return subscription function
+				return () => {
+					console.log("subscription function");
+				}
+			} else {
+				// Get the property from the original handler
+				const value = Reflect.get(target, property, receiver);
+
+				if (typeof value === "function") {
+					// Make sure value is bounded to the original target
+					return value.bind(target);
+				} else {
+					// Return the value as-is
+					return value;
+				}
+			}
+		},
+	});
+}
+
 function build_client(do_request: (id: number, payload: any) => Promise<RpcResponse<any>>): Server {
 	let next_id = 0;
 
@@ -16,17 +40,21 @@ function build_client(do_request: (id: number, payload: any) => Promise<RpcRespo
 
 					return client;
 				},
-				apply: async (_target, _this, args) => {
+				apply: (_target, _this, args) => {
 					const id = next_id++;
 
-					const payload = create_payload(id, method.join("."), args);
-					const response = await do_request(id, payload);
+					const p = new Promise(async (resolve, reject) => {
+						const payload = create_payload(id, method.join("."), args);
+						const response = await do_request(id, payload);
 
-					if (response.type === "ok") {
-						return response.value;
-					} else {
-						throw response;
-					}
+						if (response.type === "ok") {
+							resolve(response.value);
+						} else {
+							reject(response);
+						}
+					});
+
+					return wrap_promise(p);
 				}
 			});
 		}
