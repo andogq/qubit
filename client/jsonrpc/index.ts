@@ -15,7 +15,8 @@ export type RpcError = {
 
 export type RpcResponse<T> = { type: "ok", id: number, value: T }
 	| { type: "error", id: number, value: RpcError }
-	| { type: "bad_response" };
+	| { type: "bad_response" }
+	| { type: "message", id: string, value: T };
 
 export function parse_response<T>(response: any): RpcResponse<T> {
 	try {
@@ -27,7 +28,11 @@ export function parse_response<T>(response: any): RpcResponse<T> {
 			throw new Error("invalid value for `jsonrpc`");
 		}
 
-		if (typeof response?.id !== "number" && response?.id !== null) {
+		if ("params" in response && "subscription" in response.params && "result" in response.params) {
+			return { type: "message", id: response.params.subscription, value: response.params.result };
+		}
+
+		if (typeof response?.id !== "number" && typeof response?.id !== "string" && response?.id !== null) {
 			throw new Error("missing `id` field from response");
 		}
 

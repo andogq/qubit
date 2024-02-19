@@ -1,7 +1,8 @@
 use std::ops::Deref;
 
 use futures::{Future, FutureExt, Stream, StreamExt};
-use jsonrpsee::{types::Params, RpcModule, SubscriptionMessage};
+use jsonrpsee::{types::Params, RpcModule, SubscriptionCloseResponse, SubscriptionMessage};
+use serde_json::json;
 
 use crate::FromContext;
 
@@ -87,6 +88,8 @@ where
                         // Set up a channel to avoid cloning the subscription
                         let (tx, mut rx) = tokio::sync::mpsc::channel(10);
 
+                        let mut count = 0;
+
                         // Recieve values on a new thread, sending them onwards to the subscription
                         tokio::spawn(async move {
                             while let Some(value) = rx.recv().await {
@@ -95,17 +98,32 @@ where
                                     .await
                                     .unwrap();
                             }
-                        })
-                        .await
-                        .unwrap();
+                        });
 
                         // Run the handler, capturing each of the values sand forwarding it onwards
                         // to the channel
                         // TODO: Better error handling if ctx conversion fails
                         handler(C::from_app_ctx(ctx.deref().clone()).unwrap(), params)
                             .await
-                            .for_each(|value| tx.send(value).map(|result| result.unwrap()))
+                            .for_each(|value| {
+                                count += 1;
+                                tx.send(value).map(|result| result.unwrap())
+                            })
                             .await;
+
+                        // Yield to run time, to properly allow message buffer to be cleared before
+                        // sending stream closed notification. This helps keep the stream closed
+                        // notification at the end of the stream.
+                        tokio::task::yield_now().await;
+
+                        // Notify that stream is closing
+                        // TODO: Properly close the stream
+                        SubscriptionCloseResponse::Notif(
+                            SubscriptionMessage::from_json(
+                                &json!({ "closed": true, "count": count }),
+                            )
+                            .unwrap(),
+                        )
                     }
                 },
             )

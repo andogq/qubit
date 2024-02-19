@@ -8,7 +8,7 @@ client.version().then((version) => console.log({ version })).catch(console.error
 client.user.get("test").then((user) => console.log(user)).catch(console.error);
 client.count().then((value) => console.log({ value })).catch(console.error);
 
-client.countdown(1, 4).subscribe({
+let unsubscribe = await client.countdown(1, 4).subscribe({
 	on_data: (data) => {
 		console.log("countdown: ", data);
 	},
@@ -16,3 +16,5 @@ client.countdown(1, 4).subscribe({
 		console.log("countdown done");
 	}
 });
+
+// unsubscribe();

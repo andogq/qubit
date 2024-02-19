@@ -4,6 +4,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
+    time::Duration,
 };
 
 use futures::{stream, Stream, StreamExt};
@@ -66,8 +67,6 @@ mod user {
 
     #[handler]
     async fn get(_ctx: UserCtx, _id: String) -> User {
-        println!("get user");
-
         User {
             name: "some user".to_string(),
             email: "email@example.com".to_string(),
@@ -120,13 +119,15 @@ async fn count(ctx: CountCtx) -> usize {
 
 #[handler(subscription)]
 async fn countdown(ctx: AppCtx, min: usize, max: usize) -> impl Stream<Item = usize> {
-    stream::iter(min..=max)
+    stream::iter(min..=max).then(|n| async move {
+        // tokio::time::sleep(Duration::from_secs(1)).await;
+
+        n
+    })
 }
 
 #[handler]
 async fn version(_ctx: AppCtx) -> String {
-    let a = <<dyn Stream<Item = usize> as Stream>::Item as ts_rs::TS>::name();
-
     "v1.0.0".to_string()
 }
 

@@ -1,11 +1,8 @@
-export function wrap_promise<T>(p: Promise<T>): Promise<T> {
+export function wrap_promise<T>(p: Promise<T>, extensions: Record<string, (args: any) => void>): Promise<T> {
 	return new Proxy(p, {
 		get(target, property, receiver) {
-			if (property === "subscribe") {
-				// Return subscription function
-				return () => {
-					console.log("subscription function");
-				}
+			if (typeof property === "string" && extensions[property]) {
+				return extensions[property];
 			} else {
 				// Get the property from the original handler
 				const value = Reflect.get(target, property, receiver);

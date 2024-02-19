@@ -1,6 +1,9 @@
+export type StreamSubscriber<T> = ({ on_data, on_error, on_end }: {
+	on_data?: (data: T) => void,
+	on_error?: (error: Error) => void,
+	on_end?: () => void,
+}) => Promise<(() => void)>;
+
 export type Stream<T> = {
-	subscribe: ({ on_data, on_end }: {
-		on_data?: (data: T) => void,
-		on_end?: () => void,
-	}) => void
+	subscribe: StreamSubscriber<T>,
 };
