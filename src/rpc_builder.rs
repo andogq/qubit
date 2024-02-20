@@ -89,6 +89,7 @@ where
                         let (tx, mut rx) = tokio::sync::mpsc::channel(10);
 
                         let mut count = 0;
+                        let subscription_id = subscription.subscription_id();
 
                         // Recieve values on a new thread, sending them onwards to the subscription
                         tokio::spawn(async move {
@@ -120,7 +121,7 @@ where
                         // TODO: Properly close the stream
                         SubscriptionCloseResponse::Notif(
                             SubscriptionMessage::from_json(
-                                &json!({ "closed": true, "count": count }),
+                                &json!({ "close_stream": subscription_id, "count": count }),
                             )
                             .unwrap(),
                         )

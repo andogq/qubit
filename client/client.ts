@@ -58,7 +58,14 @@ export function build_client<Server>(client: Client): Server {
 						}
 
 						// Subscribe to incomming requests
-						const unsubscribe = client.subscribe(subscription_id, on_data, on_end);
+						const unsubscribe = client.subscribe(subscription_id, (data) => {
+							if (typeof data === "object" && "close_stream" in data && data.close_stream === subscription_id) {
+								// Close the stream
+								unsubscribe();
+							} else if (on_data) {
+								on_data(data);
+							}
+						}, on_end);
 
 						return unsubscribe;
 					};
