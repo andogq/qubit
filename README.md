@@ -3,6 +3,9 @@
 Generate type-safe TypeScript clients for your Rust APIs, with Serde compatibility, subscriptions,
 and more!
 
+- [`npm`](https://www.npmjs.com/package/@rstrpc/client)
+- [`crates.io`](https://crates.io/crates/rstrpc)
+
 ## Features:
 
 - Context based middleware
