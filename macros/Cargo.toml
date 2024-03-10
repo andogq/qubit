@@ -1,5 +1,5 @@
 [package]
-name = "rs-ts-api-macros"
+name = "rstrpc-macros"
 version = "0.1.0"
 edition = "2021"
 

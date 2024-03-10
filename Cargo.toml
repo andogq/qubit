@@ -1,8 +1,8 @@
 workspace = { members = ["example", "macros"] }
 
 [package]
-name = "rs-ts-api"
-version = "0.1.0"
+name = "rstrpc"
+version = "0.0.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -19,4 +19,4 @@ tokio = { version = "1.35.1", features = ["rt", "rt-multi-thread"] }
 tower = "0.4.13"
 ts-rs = "7.1.1"
 typeshare = "1.0.1"
-rs-ts-api-macros = { path = "./macros" }
+rstrpc-macros = { path = "./macros" }

@@ -4,7 +4,7 @@ use futures::Stream;
 pub use handler::{Handler, HandlerType};
 pub use router::Router;
 pub use rpc_builder::RpcBuilder;
-pub use rs_ts_api_macros::*;
+pub use rstrpc_macros::*;
 use ts_rs::TS;
 
 mod context;

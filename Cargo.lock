@@ -235,7 +235,7 @@ dependencies = [
  "http",
  "hyper",
  "jsonrpsee",
- "rs-ts-api",
+ "rstrpc",
  "serde",
  "serde_json",
  "tokio",
@@ -814,15 +814,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "afab94fb28594581f62d981211a9a4d53cc8130bbcbbb89a0440d9b8e81a7746"
 
 [[package]]
-name = "rs-ts-api"
-version = "0.1.0"
+name = "rstrpc"
+version = "0.0.1"
 dependencies = [
  "axum",
  "futures",
  "http",
  "hyper",
  "jsonrpsee",
- "rs-ts-api-macros",
+ "rstrpc-macros",
  "serde",
  "serde_json",
  "tokio",
@@ -832,7 +832,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rs-ts-api-macros"
+name = "rstrpc-macros"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
