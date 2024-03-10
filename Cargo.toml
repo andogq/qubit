@@ -4,8 +4,10 @@ workspace = { members = ["example", "macros"] }
 name = "rstrpc"
 version = "0.0.1"
 edition = "2021"
+authors = ["Tom Anderson <tom@ando.gq>"]
+repository = "https://github.com/andogq/rstrpc"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+exclude = ["./client", "./example"]
 
 [dependencies]
 axum = "0.6.20"
@@ -19,4 +21,4 @@ tokio = { version = "1.35.1", features = ["rt", "rt-multi-thread"] }
 tower = "0.4.13"
 ts-rs = "7.1.1"
 typeshare = "1.0.1"
-rstrpc-macros = { path = "./macros" }
+rstrpc-macros = { version = "0.0.1", path = "./macros" }

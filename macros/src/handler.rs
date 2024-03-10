@@ -1,8 +1,8 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
-    meta::ParseNestedMeta, parse_quote, spanned::Spanned, Error, FnArg, ItemFn, Pat, Result,
-    ReturnType, Type, TypeImplTrait,
+    meta::ParseNestedMeta, spanned::Spanned, Error, FnArg, ItemFn, Pat, Result, ReturnType, Type,
+    TypeImplTrait,
 };
 
 /// Handlers can have different variations depending on how they interact with the client.
