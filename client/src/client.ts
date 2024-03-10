@@ -1,6 +1,6 @@
-import { RpcResponse, create_payload } from "./jsonrpc";
+import { type RpcResponse, create_payload } from "./jsonrpc";
 import { wrap_promise } from "./proxy";
-import { StreamSubscriber } from "./stream";
+import type { StreamSubscriber } from "./stream";
 
 export type Client = {
     request: (id: string | number, payload: any) => Promise<RpcResponse<any>>,
@@ -35,7 +35,7 @@ export function build_client<Server>(client: Client): Server {
                     });
 
                     const subscribe: StreamSubscriber<any> = async ({ on_data, on_end, on_error }) => {
-                        function error(e) {
+                        function error(e: Error) {
                             if (on_error) {
                                 on_error(e);
                             }
@@ -50,7 +50,7 @@ export function build_client<Server>(client: Client): Server {
                         // Get the response of the request
                         const subscription_id = await p;
                         let count = 0;
-                        let required_count = null;
+                        let required_count: number | null = null;
 
                         // Result should be a subscription ID
                         if (typeof subscription_id !== "string" && typeof subscription_id !== "number") {

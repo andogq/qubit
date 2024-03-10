@@ -1,5 +1,5 @@
 import { build_client } from "../client";
-import { RpcResponse, parse_response } from "../jsonrpc";
+import { type RpcResponse, parse_response } from "../jsonrpc";
 import { WebSocket } from "ws";
 
 export function ws<Server>(host: string): Server {
@@ -12,7 +12,7 @@ export function ws<Server>(host: string): Server {
 
 	let socket_open = false;
 
-	const outstanding: Record<number, (response: RpcResponse<any>) => void> = {};
+	const outstanding: Record<string | number, (response: RpcResponse<any>) => void> = {};
 	const send_request = (id: string | number, payload: any): Promise<RpcResponse<any>> => {
 		return new Promise((resolve) => {
 			outstanding[id] = resolve;
@@ -38,19 +38,26 @@ export function ws<Server>(host: string): Server {
 		const response = parse_response(e.data);
 
 		if (response.type === "message") {
-			if (subscriptions[response.id]) {
-				subscriptions[response.id](response.value);
+			const handler = subscriptions[response.id];
+			if (handler) {
+				handler(response.value);
 			} else {
+				let queue = subscription_queue[response.id];
+
 				// Initialise the queue if it doesn't exist
-				if (!subscription_queue[response.id]) {
-					subscription_queue[response.id] = [];
+				if (!queue) {
+					queue = [];
+					subscription_queue[response.id] = queue;
 				}
 
 				// Add the message to the queue
-				subscription_queue[response.id].push(response.value);
+				queue.push(response.value);
 			}
-		} else if ("id" in response && outstanding[response.id]) {
-			outstanding[response.id](response);
+		} else if ("id" in response) {
+			const handler = outstanding[response.id] ;
+			if (handler) {
+				handler(response);
+			}
 		}
 	});
 
