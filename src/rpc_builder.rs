@@ -112,13 +112,7 @@ where
                             })
                             .await;
 
-                        // Yield to run time, to properly allow message buffer to be cleared before
-                        // sending stream closed notification. This helps keep the stream closed
-                        // notification at the end of the stream.
-                        tokio::task::yield_now().await;
-
                         // Notify that stream is closing
-                        // TODO: Properly close the stream
                         SubscriptionCloseResponse::Notif(
                             SubscriptionMessage::from_json(
                                 &json!({ "close_stream": subscription_id, "count": count }),

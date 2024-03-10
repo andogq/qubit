@@ -35,7 +35,7 @@ export function build_client<Server>(client: Client): Server {
                     });
 
                     const subscribe: StreamSubscriber<any> = async ({ on_data, on_end, on_error }) => {
-                    function error(e) {
+                        function error(e) {
                             if (on_error) {
                                 on_error(e);
                             }
@@ -49,6 +49,8 @@ export function build_client<Server>(client: Client): Server {
 
                         // Get the response of the request
                         const subscription_id = await p;
+                        let count = 0;
+                        let required_count = null;
 
                         // Result should be a subscription ID
                         if (typeof subscription_id !== "string" && typeof subscription_id !== "number") {
@@ -60,10 +62,15 @@ export function build_client<Server>(client: Client): Server {
                         // Subscribe to incomming requests
                         const unsubscribe = client.subscribe(subscription_id, (data) => {
                             if (typeof data === "object" && "close_stream" in data && data.close_stream === subscription_id) {
-                                // Close the stream
-                                unsubscribe();
+                                required_count = data.count;
                             } else if (on_data) {
+                                count += 1;
                                 on_data(data);
+                            }
+
+                            if (count === required_count) {
+                                // The expected amount of messages have been recieved, so it is safe to terminate the connection
+                                unsubscribe();
                             }
                         }, on_end);
 
