@@ -23,7 +23,7 @@
     "email": "tom@ando.gq",
     "url": "https://ando.gq"
   },
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "tsup": "^8.0.1",
     "typescript": "^5.3.3"

@@ -2,6 +2,8 @@
 name = "rstrpc-macros"
 version = "0.0.1"
 edition = "2021"
+description = "Macros to accompany `rstrpc`."
+license = "MIT"
 
 [lib]
 proc-macro = true

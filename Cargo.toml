@@ -6,6 +6,8 @@ version = "0.0.1"
 edition = "2021"
 authors = ["Tom Anderson <tom@ando.gq>"]
 repository = "https://github.com/andogq/rstrpc"
+license = "MIT"
+description = "Type-safe framework for an JSONRPC server written in Rust with an automatically generated TypeScript client."
 
 exclude = ["./client", "./example"]
 
