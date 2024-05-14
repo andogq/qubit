@@ -1,8 +1,8 @@
 [package]
-name = "rstrpc-macros"
+name = "qubit-macros"
 version = "0.0.1"
 edition = "2021"
-description = "Macros to accompany `rstrpc`."
+description = "Macros to accompany `qubit`."
 license = "MIT"
 
 [lib]

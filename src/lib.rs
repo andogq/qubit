@@ -2,9 +2,9 @@ pub use context::FromContext;
 pub use dependencies::TypeDependencies;
 use futures::Stream;
 pub use handler::{Handler, HandlerType};
+pub use qubit_macros::*;
 pub use router::Router;
 pub use rpc_builder::RpcBuilder;
-pub use rstrpc_macros::*;
 use ts_rs::TS;
 
 mod context;

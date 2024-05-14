@@ -1,4 +1,4 @@
-# rstrpc - Rust/TypeScript RPC
+# Qubit - Rust/TypeScript RPC
 
 Generate type-safe TypeScript clients for your Rust APIs, with Serde compatibility, subscriptions,
 and more!

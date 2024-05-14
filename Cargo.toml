@@ -1,11 +1,11 @@
 workspace = { members = ["example", "macros"] }
 
 [package]
-name = "rstrpc"
+name = "qubit"
 version = "0.0.1"
 edition = "2021"
 authors = ["Tom Anderson <tom@ando.gq>"]
-repository = "https://github.com/andogq/rstrpc"
+repository = "https://github.com/andogq/qubit"
 license = "MIT"
 description = "Type-safe framework for an JSONRPC server written in Rust with an automatically generated TypeScript client."
 
@@ -23,4 +23,4 @@ tokio = { version = "1.35.1", features = ["rt", "rt-multi-thread"] }
 tower = "0.4.13"
 ts-rs = "7.1.1"
 typeshare = "1.0.1"
-rstrpc-macros = { version = "0.0.1", path = "./macros" }
+qubit-macros = { version = "0.0.1", path = "./macros" }

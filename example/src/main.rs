@@ -8,7 +8,7 @@ use std::{
 };
 
 use futures::{stream, Stream, StreamExt};
-use rstrpc::*;
+use qubit::*;
 
 use axum::routing::get;
 use jsonrpsee::server::stop_channel;

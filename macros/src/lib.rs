@@ -52,7 +52,7 @@ pub fn exported_type(
         #[derive(TS)]
         #s
 
-        impl rstrpc::TypeDependencies for #target_struct {
+        impl qubit::TypeDependencies for #target_struct {
             fn get_deps(dependencies: &mut std::collections::BTreeMap<std::string::String, std::string::String>) {
                 // Short circuit if this type has already been added
                 if dependencies.contains_key(&Self::name()) {
@@ -63,7 +63,7 @@ pub fn exported_type(
                 dependencies.insert(Self::name(), Self::inline());
 
                 // Insert field types
-                #(<#fields as rstrpc::TypeDependencies>::get_deps(dependencies);)*
+                #(<#fields as qubit::TypeDependencies>::get_deps(dependencies);)*
             }
         }
     }

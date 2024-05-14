@@ -30,7 +30,7 @@ impl HandlerKind {
     }
 }
 
-/// Generates the implementation for [`rstrpc::Handler`] for the provided handler function. The
+/// Generates the implementation for [`qubit::Handler`] for the provided handler function. The
 /// [`HandlerKind`] is required alter how the handler is applied to the router. This could be
 /// induced based on the return type of the handler (whether it retrusn a [`futures::Stream`]) or
 /// not), but that might cause problems.
@@ -108,7 +108,7 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
                     #parse_params
 
                     // Convert app_ctx to ctx
-                    let ctx = <#ctx_ty as rstrpc::FromContext<__internal_AppCtx>>::from_app_ctx(app_ctx).unwrap();
+                    let ctx = <#ctx_ty as qubit::FromContext<__internal_AppCtx>>::from_app_ctx(app_ctx).unwrap();
 
                     // Run the handler
                     let result = handler(ctx, #(#param_names,)*).await;
@@ -140,7 +140,7 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
                         #parse_params
 
                         // Convert app_ctx to ctx
-                        let ctx = <#ctx_ty as rstrpc::FromContext<__internal_AppCtx>>::from_app_ctx(app_ctx).unwrap();
+                        let ctx = <#ctx_ty as qubit::FromContext<__internal_AppCtx>>::from_app_ctx(app_ctx).unwrap();
 
                         // Run the handler
                         let stream = handler(ctx, #(#param_names,)*).await;
@@ -170,11 +170,11 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
     Ok(quote! {
         #[allow(non_camel_case_types)]
         struct #function_ident;
-        impl<__internal_AppCtx> rstrpc::Handler<__internal_AppCtx> for #function_ident
-            where #ctx_ty: rstrpc::FromContext<__internal_AppCtx>,
+        impl<__internal_AppCtx> qubit::Handler<__internal_AppCtx> for #function_ident
+            where #ctx_ty: qubit::FromContext<__internal_AppCtx>,
                 __internal_AppCtx: 'static + Send + Sync + Clone
         {
-            fn get_type() -> rstrpc::HandlerType {
+            fn get_type() -> qubit::HandlerType {
                 let parameters = [
                     #((#param_name_strs, <#param_tys as ts_rs::TS>::name())),*
                 ]
@@ -184,13 +184,13 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
                     })
                     .collect::<Vec<_>>();
 
-                rstrpc::HandlerType {
+                qubit::HandlerType {
                     name: #function_name_str.to_string(),
                     signature: #signature,
                 }
             }
 
-            fn register(rpc_builder: rstrpc::RpcBuilder<__internal_AppCtx>) -> rstrpc::RpcBuilder<__internal_AppCtx> {
+            fn register(rpc_builder: qubit::RpcBuilder<__internal_AppCtx>) -> qubit::RpcBuilder<__internal_AppCtx> {
                 #handler_fn
 
                 #register_impl
@@ -198,10 +198,10 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
 
             fn add_dependencies(dependencies: &mut std::collections::BTreeMap<std::string::String, std::string::String>) {
                 // Add dependencies for the parameters
-                #(<#param_tys as rstrpc::TypeDependencies>::get_deps(dependencies);)*
+                #(<#param_tys as qubit::TypeDependencies>::get_deps(dependencies);)*
 
                 // Add dependencies for the return type
-                <#return_type as rstrpc::TypeDependencies>::get_deps(dependencies);
+                <#return_type as qubit::TypeDependencies>::get_deps(dependencies);
             }
         }
     })

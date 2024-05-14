@@ -235,7 +235,7 @@ dependencies = [
  "http",
  "hyper",
  "jsonrpsee",
- "rstrpc",
+ "qubit",
  "serde",
  "serde_json",
  "tokio",
@@ -760,6 +760,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "qubit"
+version = "0.0.1"
+dependencies = [
+ "axum",
+ "futures",
+ "http",
+ "hyper",
+ "jsonrpsee",
+ "qubit-macros",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "ts-rs",
+ "typeshare",
+]
+
+[[package]]
+name = "qubit-macros"
+version = "0.0.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.48",
+ "ts-rs",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -812,34 +840,6 @@ name = "route-recognizer"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "afab94fb28594581f62d981211a9a4d53cc8130bbcbbb89a0440d9b8e81a7746"
-
-[[package]]
-name = "rstrpc"
-version = "0.0.1"
-dependencies = [
- "axum",
- "futures",
- "http",
- "hyper",
- "jsonrpsee",
- "rstrpc-macros",
- "serde",
- "serde_json",
- "tokio",
- "tower",
- "ts-rs",
- "typeshare",
-]
-
-[[package]]
-name = "rstrpc-macros"
-version = "0.0.1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.48",
- "ts-rs",
-]
 
 [[package]]
 name = "rustc-demangle"
