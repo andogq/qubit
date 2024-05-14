@@ -3,8 +3,8 @@
 Generate type-safe TypeScript clients for your Rust APIs, with Serde compatibility, subscriptions,
 and more!
 
-- [`npm`](https://www.npmjs.com/package/@rstrpc/client)
-- [`crates.io`](https://crates.io/crates/rstrpc)
+- [`npm`](https://www.npmjs.com/package/@qubit-rs/client)
+- [`crates.io`](https://crates.io/crates/qubit)
 
 ## Features:
 
@@ -94,7 +94,7 @@ async fn main() {
 ### TypeScript
 
 ```ts
-import { ws } from "@rstrpc/client";
+import { ws } from "@qubit-rs/client";
 
 // This type is automatically generated based on the Rust API
 import type { Server } from "./bindings.ts";

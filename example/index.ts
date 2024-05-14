@@ -1,4 +1,4 @@
-import { ws } from "@rstrpc/client";
+import { ws } from "@qubit-rs/client";
 import type { Server } from "./bindings.ts";
 
 const client = ws<Server>("ws://localhost:9944/rpc");

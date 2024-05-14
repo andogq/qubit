@@ -78,7 +78,7 @@ where
 
     pub fn write_type_to_file(&self, path: impl AsRef<Path>) {
         // Imports to be included with all the bindings. Ideally should include from a package.
-        let imports = r#"import type { Stream } from "@rstrpc/client";"#;
+        let imports = r#"import type { Stream } from "@qubit-rs/client";"#;
 
         let mut dependencies = BTreeMap::new();
         self.add_dependencies(&mut dependencies);
