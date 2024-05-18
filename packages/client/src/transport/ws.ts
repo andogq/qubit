@@ -1,7 +1,7 @@
 import { build_client } from "../client";
 import { type RpcResponse, parse_response } from "../jsonrpc";
 
-export function ws<Server>(host: string, { WebSocket = window.WebSocket }): Server {
+export function ws<Server>(host: string, { WebSocket = window.WebSocket } = {}): Server {
 	// Create a WS client
 	const socket = new WebSocket(host);
 	const queue: any[] = [];
