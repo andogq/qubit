@@ -49,18 +49,17 @@ pub fn exported_type(
     };
 
     quote! {
-        #[derive(TS)]
         #s
 
         impl qubit::TypeDependencies for #target_struct {
             fn get_deps(dependencies: &mut std::collections::BTreeMap<std::string::String, std::string::String>) {
                 // Short circuit if this type has already been added
-                if dependencies.contains_key(&Self::name()) {
+                if dependencies.contains_key(&<Self as ts_rs::TS>::name()) {
                     return;
                 }
 
                 // Insert this type
-                dependencies.insert(Self::name(), Self::inline());
+                dependencies.insert(<Self as ts_rs::TS>::name(), <Self as ts_rs::TS>::inline());
 
                 // Insert field types
                 #(<#fields as qubit::TypeDependencies>::get_deps(dependencies);)*

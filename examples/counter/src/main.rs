@@ -12,9 +12,8 @@ use qubit::*;
 
 use axum::routing::get;
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug)]
 #[exported_type]
 pub struct Metadata {
     param_a: String,
@@ -24,7 +23,7 @@ pub struct Metadata {
     more_metadata: Option<Box<Metadata>>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug)]
 #[exported_type]
 pub struct User {
     name: String,
@@ -130,6 +129,11 @@ async fn version(_ctx: AppCtx) -> String {
     "v1.0.0".to_string()
 }
 
+#[handler]
+async fn array(_ctx: AppCtx) -> Vec<String> {
+    vec!["a".to_string(), "b".to_string(), "c".to_string()]
+}
+
 #[tokio::main]
 async fn main() {
     // Build up the router
@@ -137,7 +141,10 @@ async fn main() {
         .handler(version)
         .handler(count)
         .handler(countdown)
+        .handler(array)
         .nest("user", user::create_router());
+
+    dbg!(array::get_type());
 
     // Save the router's bindings
     app.write_type_to_file("./bindings.ts");

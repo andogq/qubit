@@ -1,6 +1,6 @@
 [package]
 name = "qubit-macros"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 description = "Macros to accompany `qubit`."
 license = "MIT"
@@ -12,4 +12,4 @@ proc-macro = true
 proc-macro2 = "1.0.76"
 quote = "1.0.35"
 syn = "2.0.48"
-ts-rs = "7.1.1"
+ts-rs = "8.1.0"
