@@ -111,10 +111,7 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
                     let ctx = <#ctx_ty as qubit::FromContext<__internal_AppCtx>>::from_app_ctx(app_ctx).unwrap();
 
                     // Run the handler
-                    let result = handler(ctx, #(#param_names,)*).await;
-
-                    // Serialise the resulte
-                    serde_json::to_value(result).unwrap()
+                    handler(ctx, #(#param_names,)*).await
                 })
             },
             {

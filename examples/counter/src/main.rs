@@ -14,7 +14,7 @@ use axum::routing::get;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[exported_type]
 pub struct Metadata {
     param_a: String,
@@ -24,7 +24,7 @@ pub struct Metadata {
     more_metadata: Option<Box<Metadata>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[exported_type]
 pub struct User {
     name: String,
@@ -52,7 +52,7 @@ mod user {
     }
 
     impl FromContext<AppCtx> for UserCtx {
-        fn from_app_ctx(ctx: AppCtx) -> Result<Self, jsonrpsee::types::ErrorObjectOwned> {
+        fn from_app_ctx(ctx: AppCtx) -> Result<Self, RpcError> {
             Ok(UserCtx {
                 app_ctx: ctx,
                 user: 0,
@@ -65,8 +65,8 @@ mod user {
     }
 
     #[handler]
-    async fn get(_ctx: UserCtx, _id: String) -> User {
-        User {
+    async fn get(_ctx: UserCtx, _id: String) -> Option<User> {
+        Some(User {
             name: "some user".to_string(),
             email: "email@example.com".to_string(),
             age: 100,
@@ -77,14 +77,14 @@ mod user {
 
                 more_metadata: None,
             },
-        }
+        })
     }
 
     #[handler]
-    async fn create(_ctx: UserCtx, name: String, email: String, age: u32) -> User {
+    async fn create(_ctx: UserCtx, name: String, email: String, age: u32) -> Option<User> {
         println!("creating user: {name}");
 
-        User {
+        Some(User {
             name,
             email,
             age,
@@ -95,7 +95,7 @@ mod user {
 
                 more_metadata: None,
             },
-        }
+        })
     }
 }
 
@@ -104,7 +104,7 @@ struct CountCtx {
 }
 
 impl FromContext<AppCtx> for CountCtx {
-    fn from_app_ctx(ctx: AppCtx) -> Result<Self, jsonrpsee::types::ErrorObjectOwned> {
+    fn from_app_ctx(ctx: AppCtx) -> Result<Self, RpcError> {
         Ok(Self {
             count: ctx.count.clone(),
         })

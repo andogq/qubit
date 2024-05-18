@@ -234,7 +234,6 @@ dependencies = [
  "futures",
  "http",
  "hyper",
- "jsonrpsee",
  "qubit",
  "serde",
  "serde_json",

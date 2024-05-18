@@ -11,7 +11,6 @@ axum = "0.6.20"
 futures = "0.3.30"
 http = "0.2.9"
 hyper = { version = "0.14.10", features = ["server"] }
-jsonrpsee = { version = "0.21.0", features = ["server"] }
 serde = { version = "1.0.195", features = ["derive"] }
 serde_json = "1.0.111"
 tokio = { version = "1.35.1", features = ["rt", "rt-multi-thread"] }
