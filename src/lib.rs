@@ -3,7 +3,7 @@ pub use dependencies::TypeDependencies;
 use futures::Stream;
 pub use handler::{Handler, HandlerType};
 pub use qubit_macros::*;
-pub use router::Router;
+pub use router::{Router, ServerHandle};
 pub use rpc_builder::RpcBuilder;
 use ts_rs::TS;
 

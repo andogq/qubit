@@ -11,7 +11,6 @@ use futures::{stream, Stream, StreamExt};
 use qubit::*;
 
 use axum::routing::get;
-use jsonrpsee::server::stop_channel;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -118,9 +117,9 @@ async fn count(ctx: CountCtx) -> usize {
 }
 
 #[handler(subscription)]
-async fn countdown(ctx: AppCtx, min: usize, max: usize) -> impl Stream<Item = usize> {
+async fn countdown(_ctx: AppCtx, min: usize, max: usize) -> impl Stream<Item = usize> {
     stream::iter(min..=max).then(|n| async move {
-        // tokio::time::sleep(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
         n
     })
@@ -133,26 +132,33 @@ async fn version(_ctx: AppCtx) -> String {
 
 #[tokio::main]
 async fn main() {
+    // Build up the router
     let app = Router::new()
         .handler(version)
         .handler(count)
         .handler(countdown)
         .nest("user", user::create_router());
 
-    let (stop_handle, server_handle) = stop_channel();
-
+    // Save the router's bindings
     app.write_type_to_file("./bindings.ts");
 
+    // Set up the context for the app
     let ctx = AppCtx::default();
 
+    // Create a service and handle for the app
+    let (app_service, app_handle) = app.to_service(move |_| ctx.clone());
+
+    // Set up the axum router
     let router = axum::Router::<()>::new()
         .route("/", get(|| async { "working" }))
-        .nest_service("/rpc", app.to_service(move |_| ctx.clone(), stop_handle));
+        .nest_service("/rpc", app_service);
 
+    // Start the server
     hyper::Server::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
         .serve(router.into_make_service())
         .await
         .unwrap();
 
-    server_handle.stop().unwrap();
+    // Once the server has stopped, ensure that the app is shutdown
+    app_handle.stop().unwrap();
 }

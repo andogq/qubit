@@ -3,7 +3,8 @@ use std::{collections::BTreeMap, convert::Infallible, fs, path::Path};
 use futures::FutureExt;
 use http::Request;
 use hyper::{service::service_fn, Body};
-use jsonrpsee::{server::StopHandle, RpcModule};
+pub use jsonrpsee::server::ServerHandle;
+use jsonrpsee::RpcModule;
 use tower::Service;
 
 use crate::{
@@ -121,30 +122,37 @@ where
     pub fn to_service(
         self,
         build_ctx: impl (Fn(&Request<Body>) -> AppCtx) + Clone,
-        stop_handle: StopHandle,
-    ) -> impl Service<
-        Request<Body>,
-        Response = impl axum::response::IntoResponse,
-        Error = Infallible,
-        Future = impl Send,
-    > + Clone {
-        service_fn(move |req| {
-            let ctx = build_ctx(&req);
+    ) -> (
+        impl Service<
+                Request<Body>,
+                Response = impl axum::response::IntoResponse,
+                Error = Infallible,
+                Future = impl Send,
+            > + Clone,
+        ServerHandle,
+    ) {
+        let (stop_handle, server_handle) = jsonrpsee::server::stop_channel();
 
-            // WARN: Horrific amount of cloning
-            let rpc_module = self.clone().build_rpc_module(ctx, None);
+        (
+            service_fn(move |req| {
+                let ctx = build_ctx(&req);
 
-            let mut svc = jsonrpsee::server::Server::builder()
-                .to_service_builder()
-                .build(rpc_module.clone(), stop_handle.clone());
+                // WARN: Horrific amount of cloning
+                let rpc_module = self.clone().build_rpc_module(ctx, None);
 
-            async move {
-                match svc.call(req).await {
-                    Ok(v) => Ok::<_, Infallible>(v),
-                    Err(_) => unreachable!(),
+                let mut svc = jsonrpsee::server::Server::builder()
+                    .to_service_builder()
+                    .build(rpc_module.clone(), stop_handle.clone());
+
+                async move {
+                    match svc.call(req).await {
+                        Ok(v) => Ok::<_, Infallible>(v),
+                        Err(_) => unreachable!(),
+                    }
                 }
-            }
-            .boxed()
-        })
+                .boxed()
+            }),
+            server_handle,
+        )
     }
 }
