@@ -78,7 +78,7 @@ where
         self
     }
 
-    pub fn subscription<C, F, Fut, S>(
+    pub fn subscription<T, C, F, Fut, S>(
         mut self,
         name: &'static str,
         notification_name: &'static str,
@@ -86,10 +86,11 @@ where
         handler: F,
     ) -> Self
     where
+        T: Serialize + Send + Clone + 'static,
         C: FromContext<Ctx>,
         F: Fn(C, Params<'static>) -> Fut + Send + Sync + Clone + 'static,
         Fut: Future<Output = S> + Send + 'static,
-        S: Stream<Item = serde_json::Value> + Send + 'static,
+        S: Stream<Item = T> + Send + 'static,
     {
         self.module
             .register_subscription(
@@ -119,10 +120,21 @@ where
                             }
                         });
 
+                        // Build the context
+                        let ctx = match C::from_app_ctx(ctx.deref().clone()) {
+                            Ok(ctx) => ctx,
+                            Err(e) => {
+                                // Handle any error building the context by turning it into a
+                                // subscriptions close response
+                                return SubscriptionCloseResponse::NotifErr(
+                                    SubscriptionMessage::from_json(&e).unwrap(),
+                                );
+                            }
+                        };
+
                         // Run the handler, capturing each of the values sand forwarding it onwards
                         // to the channel
-                        // TODO: Better error handling if ctx conversion fails
-                        handler(C::from_app_ctx(ctx.deref().clone()).unwrap(), params)
+                        handler(ctx, params)
                             .await
                             .for_each(|value| {
                                 count += 1;

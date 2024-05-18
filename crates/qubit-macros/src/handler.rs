@@ -130,19 +130,11 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
 
             (
                 quote! {
-                    rpc_builder.subscription(#function_name_str, #notification_name, #unsubscribe_name, |app_ctx, params| async move {
+                    rpc_builder.subscription(#function_name_str, #notification_name, #unsubscribe_name, |ctx, params| async move {
                         #parse_params
 
-                        // Convert app_ctx to ctx
-                        let ctx = <#ctx_ty as qubit::FromContext<__internal_AppCtx>>::from_app_ctx(app_ctx).unwrap();
-
                         // Run the handler
-                        let stream = handler(ctx, #(#param_names,)*).await;
-
-                        futures::StreamExt::map(
-                            stream,
-                            |value| serde_json::to_value(value).unwrap()
-                        )
+                        handler(ctx, #(#param_names,)*).await
                     })
                 },
                 {
