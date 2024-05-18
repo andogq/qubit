@@ -3,7 +3,7 @@ use std::ops::Deref;
 use futures::{Future, FutureExt, Stream, StreamExt};
 use jsonrpsee::{
     types::{Params, ResponsePayload},
-    IntoResponse, RpcModule, SubscriptionCloseResponse, SubscriptionMessage,
+    RpcModule, SubscriptionCloseResponse, SubscriptionMessage,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -46,13 +46,12 @@ where
         }
     }
 
-    pub fn query<T, R, C, F, Fut>(mut self, name: &'static str, handler: F) -> Self
+    pub fn query<T, C, F, Fut>(mut self, name: &'static str, handler: F) -> Self
     where
         T: Serialize + Clone + 'static,
-        R: IntoResponse<Output = T> + 'static,
         C: FromContext<Ctx>,
         F: Fn(C, Params<'static>) -> Fut + Send + Sync + Clone + 'static,
-        Fut: Future<Output = R> + Send + 'static,
+        Fut: Future<Output = T> + Send + 'static,
     {
         self.module
             .register_async_method(self.namespace_str(name), move |params, ctx| {
@@ -70,7 +69,7 @@ where
                     };
 
                     // Run the actual handler
-                    handler(ctx, params).await.into_response()
+                    ResponsePayload::result(handler(ctx, params).await)
                 }
             })
             .unwrap();

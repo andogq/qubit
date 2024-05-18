@@ -65,8 +65,8 @@ mod user {
     }
 
     #[handler]
-    async fn get(_ctx: UserCtx, _id: String) -> Option<User> {
-        Some(User {
+    async fn get(_ctx: UserCtx, _id: String) -> User {
+        User {
             name: "some user".to_string(),
             email: "email@example.com".to_string(),
             age: 100,
@@ -77,14 +77,14 @@ mod user {
 
                 more_metadata: None,
             },
-        })
+        }
     }
 
     #[handler]
-    async fn create(_ctx: UserCtx, name: String, email: String, age: u32) -> Option<User> {
+    async fn create(_ctx: UserCtx, name: String, email: String, age: u32) -> User {
         println!("creating user: {name}");
 
-        Some(User {
+        User {
             name,
             email,
             age,
@@ -95,7 +95,7 @@ mod user {
 
                 more_metadata: None,
             },
-        })
+        }
     }
 }
 
