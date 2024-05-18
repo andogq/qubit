@@ -104,11 +104,8 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
     let (register_impl, signature) = match kind {
         HandlerKind::Query => (
             quote! {
-                rpc_builder.query(#function_name_str, |app_ctx, params| async move {
+                rpc_builder.query(#function_name_str, |ctx, params| async move {
                     #parse_params
-
-                    // Convert app_ctx to ctx
-                    let ctx = <#ctx_ty as qubit::FromContext<__internal_AppCtx>>::from_app_ctx(app_ctx).unwrap();
 
                     // Run the handler
                     handler(ctx, #(#param_names,)*).await
