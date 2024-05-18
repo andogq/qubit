@@ -760,7 +760,7 @@ dependencies = [
 
 [[package]]
 name = "qubit"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "axum",
  "futures",

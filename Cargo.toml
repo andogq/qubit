@@ -2,7 +2,7 @@ workspace = { members = ["./crates/*", "./examples/*"] }
 
 [package]
 name = "qubit"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2021"
 authors = ["Tom Anderson <tom@ando.gq>"]
 repository = "https://github.com/andogq/qubit"
