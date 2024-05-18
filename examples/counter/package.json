@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@qubit-rs/client": "../client"
+    "@qubit-rs/client": "file:../../packages/client"
   },
   "devDependencies": {
     "@types/node": "^20.11.25"
