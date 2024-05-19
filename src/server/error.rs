@@ -17,12 +17,14 @@ pub struct RpcError {
     pub data: Option<Value>,
 }
 
+/// Convert into [`jsonrpsee::types::ErrorObjectOwned`].
 impl From<RpcError> for ErrorObjectOwned {
     fn from(rpc_error: RpcError) -> Self {
         Self::from(&rpc_error)
     }
 }
 
+/// Convert into [`jsonrpsee::types::ErrorObjectOwned`].
 impl From<&RpcError> for ErrorObjectOwned {
     fn from(rpc_error: &RpcError) -> Self {
         Self::owned(
@@ -33,6 +35,7 @@ impl From<&RpcError> for ErrorObjectOwned {
     }
 }
 
+/// Allow for [`RpcError`] to directly be returned from handlers.
 impl IntoResponse for RpcError {
     type Output = <ErrorObjectOwned as IntoResponse>::Output;
 
