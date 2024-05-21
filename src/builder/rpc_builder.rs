@@ -10,8 +10,17 @@ use serde_json::json;
 
 use crate::FromContext;
 
+/// Builder to construct the RPC module. Handlers can be registered using the [`RpcBuilder::query`]
+/// and [`RpcBuilder::subscription`] methods. It tracks an internally mutable [`RpcModule`] and
+/// it's namespace, ensuring that handlers names are correctly created.
+///
+/// For the most part, this should not be used manually, but rather with the [`qubit_macros::handler`]
+/// macro.
 pub struct RpcBuilder<Ctx> {
+    /// The namespace for this module, which will be prepended onto handler names (if present).
     namespace: Option<&'static str>,
+
+    /// The actual [`RpcModule`] that is being constructed.
     module: RpcModule<Ctx>,
 }
 
@@ -19,33 +28,23 @@ impl<Ctx> RpcBuilder<Ctx>
 where
     Ctx: Clone + Send + Sync + 'static,
 {
-    pub fn new(ctx: Ctx) -> Self {
-        Self::with_namespace(ctx, None)
-    }
-
-    pub fn namespaced(ctx: Ctx, namespace: &'static str) -> Self {
-        Self::with_namespace(ctx, Some(namespace))
-    }
-
-    pub fn with_namespace(ctx: Ctx, namespace: Option<&'static str>) -> Self {
+    /// Create a builder with the provided namespace.
+    pub(crate) fn with_namespace(ctx: Ctx, namespace: Option<&'static str>) -> Self {
         Self {
             namespace,
             module: RpcModule::new(ctx),
         }
     }
 
-    pub fn consume(self) -> RpcModule<Ctx> {
+    /// Consume the builder to produce the internal [`RpcModule`], ready to be used.
+    pub(crate) fn build(self) -> RpcModule<Ctx> {
         self.module
     }
 
-    fn namespace_str(&self, s: &'static str) -> &'static str {
-        if let Some(namespace) = self.namespace {
-            Box::leak(format!("{namespace}.{s}").into_boxed_str())
-        } else {
-            s
-        }
-    }
-
+    /// Register a new query handler with the provided name.
+    ///
+    /// The `handler` can take its own `Ctx`, so long as it implements [`FromContext`]. It must
+    /// return a future which outputs a serializable value.
     pub fn query<T, C, F, Fut>(mut self, name: &'static str, handler: F) -> Self
     where
         T: Serialize + Clone + 'static,
@@ -55,6 +54,8 @@ where
     {
         self.module
             .register_async_method(self.namespace_str(name), move |params, ctx| {
+                // NOTE: Handler has to be cloned in since `register_async_method` takes `Fn`, not
+                // `FnOnce`. Not sure if it's better to be an `Rc`/leaked/???
                 let handler = handler.clone();
 
                 async move {
@@ -77,6 +78,10 @@ where
         self
     }
 
+    /// Register a new subscription handler with the provided name.
+    ///
+    /// The `handler` can take its own `Ctx`, so long as it implements [`FromContext`]. It must
+    /// return a future that outputs a stream of serializable values.
     pub fn subscription<T, C, F, Fut, S>(
         mut self,
         name: &'static str,
@@ -97,6 +102,7 @@ where
                 self.namespace_str(notification_name),
                 self.namespace_str(unsubscribe_name),
                 move |params, subscription, ctx| {
+                    // NOTE: Same deal here with cloning the handler as in the query registration.
                     let handler = handler.clone();
 
                     async move {
@@ -106,6 +112,7 @@ where
                         // Set up a channel to avoid cloning the subscription
                         let (tx, mut rx) = tokio::sync::mpsc::channel(10);
 
+                        // Track the number of items emitted through the subscription
                         let mut count = 0;
                         let subscription_id = subscription.subscription_id();
 
@@ -120,6 +127,8 @@ where
                         });
 
                         // Build the context
+                        // NOTE: It won't be held across await so that `C` doesn't have to be
+                        // `Send`
                         let ctx = match C::from_app_ctx(ctx.deref().clone()) {
                             Ok(ctx) => ctx,
                             Err(e) => {
@@ -154,5 +163,14 @@ where
             .unwrap();
 
         self
+    }
+
+    /// Helper to 'resolve' some string with the namespace of this module (if it's present)
+    fn namespace_str(&self, s: &'static str) -> &'static str {
+        if let Some(namespace) = self.namespace {
+            Box::leak(format!("{namespace}.{s}").into_boxed_str())
+        } else {
+            s
+        }
     }
 }

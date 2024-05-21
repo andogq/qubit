@@ -7,10 +7,7 @@ pub use jsonrpsee::server::ServerHandle;
 use jsonrpsee::RpcModule;
 use tower::Service;
 
-use crate::{
-    handler::{Handler, HandlerCallbacks},
-    rpc_builder::RpcBuilder,
-};
+use crate::builder::*;
 
 /// Router for the RPC server. Can have different handlers attached to it, as well as nested
 /// routers in order to create a hierarchy. It is also capable of generating its own type, suitable
@@ -159,6 +156,10 @@ where
     }
 
     /// Generate a [`jsonrpsee::RpcModule`] from this router, with an optional namespace.
+    ///
+    /// Uses an [`RpcBuilder`] to incrementally add query and subcription handlers, passing the
+    /// instance through to the [`HandlerCallbacks`] attached to this router, so they can register
+    /// against the [`RpcModule`] (including namespacing).
     fn build_rpc_module(self, ctx: Ctx, namespace: Option<&'static str>) -> RpcModule<Ctx> {
         let rpc_module = self
             .handlers
@@ -167,7 +168,7 @@ where
                 RpcBuilder::with_namespace(ctx.clone(), namespace),
                 |rpc_builder, handler| (handler.register)(rpc_builder),
             )
-            .consume();
+            .build();
 
         // Generate modules for nested routers, and merge them with the existing router
         self.nested_routers

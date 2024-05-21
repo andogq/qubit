@@ -4,6 +4,7 @@ use syn::{meta, parse_macro_input, spanned::Spanned, Error, Item};
 
 mod handler;
 
+/// See [`qubit::builder::handler`] for more information.
 #[proc_macro_attribute]
 pub fn handler(
     attr: proc_macro::TokenStream,

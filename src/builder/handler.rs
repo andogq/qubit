@@ -1,17 +1,27 @@
+//! Handlers appear to be regular functions, however [`qubit_macros::handler`] expands them into
+//! structs that implement the [`Handler`] trait. This expansion assists with both the run-time
+//! [`crate::Router`] type generation, as well as other ergonomic features like parameter
+//! deserialization from requests.
+//!
+//! There are two primary features that a handler must implement:
+//!
+//! - Normalisation and registration: The handlers must register themselves against a
+//! [`RpcBuilder`] instance in a uniform manner, so any parameters for this handler must be
+//! transformed from the parameters provided by the server.
+//!
+//! - Type specification: The handlers must emit both the signature of the handler
+//! ([`Handler::get_type`]), as well as any dependencies that they rely on
+//! ([`Handler::add_dependencies`]).
+//!
+//! # Handler Erasure
+//!
+//! In an effort to cut down on dynamic dispatch, [`HandlerCallbacks`] is a grab-bag of function
+//! pointers to the methods of [`Handler`]. This is possible since none of these methods reference
+//! `self`. This is what is actually stored on [`crate::Router`].
+
 use std::collections::BTreeMap;
 
-use crate::rpc_builder::RpcBuilder;
-
-/// Components used to construct the client type for this handler.
-#[derive(Debug)]
-pub struct HandlerType {
-    /// Unique name of the handler. This will automatically be namespaced as appropriate when the
-    /// attached router is nested.
-    pub name: String,
-
-    /// Signature of this handler.
-    pub signature: String,
-}
+use crate::{builder::RpcBuilder, HandlerType};
 
 /// Handlers run for specific RPC requests. This trait will automatically be implemented if the
 /// [`crate::handler`] macro is attached to a function containing a handler implementation.
@@ -51,7 +61,7 @@ where
     /// Automatically implement the creation of [`HandlerCallbacks`] for anything that implements
     /// [`Handler`]. This is possible since the trait only contains static methods, which can simply
     /// be expressed as function pointers.
-    pub(crate) fn from_handler<H: Handler<Ctx>>(_handler: H) -> Self {
+    pub fn from_handler<H: Handler<Ctx>>(_handler: H) -> Self {
         Self {
             register: H::register,
             get_type: H::get_type,
