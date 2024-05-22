@@ -54,14 +54,14 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
     let function_ident = handler.sig.ident;
 
     // Extract out the return type
-    let return_type = match handler.sig.output.clone() {
-        ReturnType::Default => None,
-        ReturnType::Type(_, ty) => Some(match *ty {
+    let (return_type, stream_item) = match handler.sig.output.clone() {
+        ReturnType::Default => (quote! { () }, false),
+        ReturnType::Type(_, ty) => match *ty {
             Type::ImplTrait(TypeImplTrait { bounds, .. }) => {
-                quote! { <dyn #bounds as futures::Stream>::Item }
+                (quote! { <dyn #bounds as futures::Stream>::Item }, true)
             }
-            ref return_type => return_type.to_token_stream(),
-        }),
+            ref return_type => (return_type.to_token_stream(), false),
+        },
     };
 
     let mut inputs = handler.sig.inputs.iter();
@@ -111,17 +111,8 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
                     handler(ctx, #(#param_names,)*).await
                 })
             },
-            {
-                let return_type = match return_type.as_ref() {
-                    Some(return_type) => {
-                        quote!(<#return_type as ts_rs::TS>::name())
-                    }
-                    None => quote!("void"),
-                };
-
-                quote! {
-                    format!("({}) => Promise<{}>", parameters.join(", "), #return_type)
-                }
+            quote! {
+                format!("({}) => Promise<{}>", parameters.join(", "), <#return_type as ts_rs::TS>::name())
             },
         ),
         HandlerKind::Subscription => {
@@ -138,7 +129,7 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
                     })
                 },
                 {
-                    let Some(return_type) = return_type.as_ref() else {
+                    if !stream_item {
                         return Err(syn::Error::new(
                             span,
                             "subscriptions must have a return type",
