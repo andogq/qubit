@@ -1,10 +1,19 @@
 # Qubit - Rust/TypeScript RPC
 
+<div align="center">
+    <a href="https://crates.io/crates/qubit">
+        <img src="https://img.shields.io/crates/v/qubit" alt="crates.io" />
+    </a>
+    <a href="https://docs.rs/qubit/latest/qubit">
+        <img src="https://img.shields.io/docsrs/qubit" alt="docs.rs" />
+    </a>
+    <a href="https://www.npmjs.com/package/@qubit-rs/client">
+        <img src="https://img.shields.io/npm/v/%40qubit-rs%2Fclient" alt="npm" />
+    </a>
+</div>
+
 Generate type-safe TypeScript clients for your Rust APIs, with Serde compatibility, subscriptions,
 and more!
-
-- [`npm`](https://www.npmjs.com/package/@qubit-rs/client)
-- [`crates.io`](https://crates.io/crates/qubit)
 
 ## Features:
 
