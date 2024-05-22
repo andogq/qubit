@@ -1,4 +1,4 @@
-//! Type generatoin specific functionality. There is no real need for this to be directly used,
+//! Type generation specific functionality. There is no real need for this to be directly used,
 //! [`qubit_macros::handler`] should handle it all.
 
 mod dependencies;
