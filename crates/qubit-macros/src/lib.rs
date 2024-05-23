@@ -34,11 +34,8 @@ pub fn handler(
         .into()
 }
 
-#[proc_macro_attribute]
-pub fn exported_type(
-    _attrs: proc_macro::TokenStream,
-    input: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
+#[proc_macro_derive(TypeDependencies)]
+pub fn exported_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let s = syn::parse::<Item>(input).unwrap();
 
     let (target_struct, fields) = match s {
@@ -50,8 +47,6 @@ pub fn exported_type(
     };
 
     quote! {
-        #s
-
         impl qubit::TypeDependencies for #target_struct {
             fn get_deps(dependencies: &mut std::collections::BTreeMap<std::string::String, std::string::String>) {
                 // Short circuit if this type has already been added

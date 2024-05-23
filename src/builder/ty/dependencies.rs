@@ -1,5 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
 
+// TODO: Document this better
+/// Since macros cannot lookup other items in the source code, any user types must 'register'
+/// themselves into a central repository so that their types can be collated, ensuring that they're
+/// only inserted into the generated types once.
 pub trait TypeDependencies {
     #[allow(unused_variables)]
     fn get_deps(dependencies: &mut BTreeMap<String, String>) {}
