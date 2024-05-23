@@ -35,7 +35,7 @@ pub fn handler(
 }
 
 #[proc_macro_derive(TypeDependencies)]
-pub fn exported_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn derive_type_dependencies(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let s = syn::parse::<Item>(input).unwrap();
 
     let (target_struct, fields) = match s {
