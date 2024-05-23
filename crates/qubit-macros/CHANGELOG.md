@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.7](https://github.com/andogq/qubit/compare/qubit-macros-v0.0.6...qubit-macros-v0.0.7) - 2024-05-23
+
+### Other
+- rename proc macro implementation for `TypeDependencies`
+- turn `exported_type` into a proc macro
+
 ## [0.0.6](https://github.com/andogq/qubit/compare/qubit-macros-v0.0.5...qubit-macros-v0.0.6) - 2024-05-22
 
 ### Fixed
