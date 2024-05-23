@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.9](https://github.com/andogq/qubit/compare/qubit-v0.0.8...qubit-v0.0.9) - 2024-05-23
+
+### Other
+- bump client version
+- synchronously return unsubscribe function from client
+- improve build script for client lib
+- rename proc macro implementation for `TypeDependencies`
+- turn `exported_type` into a proc macro
+- properly generate `TypeDependencies` trait for built-in generic types
+
 ## [0.0.8](https://github.com/andogq/qubit/compare/qubit-v0.0.7...qubit-v0.0.8) - 2024-05-22
 
 ### Fixed
