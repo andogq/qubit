@@ -58,7 +58,7 @@ where
             // Convert into TypeScript
             dependencies
                 .into_iter()
-                .map(|(name, ty)| format!("type {name} = {ty};"))
+                .map(|(name, ty)| format!("export type {name} = {ty};"))
                 .collect::<Vec<_>>()
                 .join("\n")
         };
