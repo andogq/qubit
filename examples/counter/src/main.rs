@@ -13,8 +13,7 @@ use qubit::*;
 use axum::routing::get;
 use serde::{Deserialize, Serialize};
 
-#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug)]
-#[exported_type]
+#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug, TypeDependencies)]
 pub struct Metadata {
     param_a: String,
     param_b: u32,
@@ -23,14 +22,19 @@ pub struct Metadata {
     more_metadata: Option<Box<Metadata>>,
 }
 
-#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug)]
-#[exported_type]
+#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug, TypeDependencies)]
 pub struct User {
     name: String,
     email: String,
     age: u32,
 
     metadata: Metadata,
+}
+
+#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug, TypeDependencies)]
+pub struct Test {
+    a: usize,
+    b: bool,
 }
 
 #[derive(Clone, Default)]
@@ -60,7 +64,7 @@ mod user {
     }
 
     pub fn create_router() -> Router<AppCtx> {
-        Router::new().handler(get).handler(create)
+        Router::new().handler(get).handler(create).handler(list)
     }
 
     #[handler]
@@ -95,6 +99,11 @@ mod user {
                 more_metadata: None,
             },
         }
+    }
+
+    #[handler]
+    async fn list(_ctx: AppCtx) -> Vec<Test> {
+        todo!()
     }
 }
 

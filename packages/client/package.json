@@ -1,21 +1,27 @@
 {
   "name": "@qubit-rs/client",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "",
   "type": "module",
   "scripts": {
     "lint": "tsc",
-    "build": "tsup ./src --format esm,cjs,iife --dts"
+    "build": "tsup ./src/index.ts"
   },
   "files": [
     "dist"
   ],
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.cts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "default": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      },
+      "require": {
+        "default": "./dist/index.cjs",
+        "types": "./dist/index.d.cts"
+      }
     }
   },
   "author": {
@@ -27,5 +33,13 @@
   "devDependencies": {
     "tsup": "^8.0.1",
     "typescript": "^5.3.3"
+  },
+  "tsup": {
+    "format": [
+      "esm",
+      "cjs"
+    ],
+    "splitting": true,
+    "dts": true
   }
 }
