@@ -1,6 +1,8 @@
-use handler::{generate_handler, HandlerKind};
+use handler::generate_handler;
 use quote::quote;
 use syn::{meta, parse_macro_input, spanned::Spanned, Error, Item};
+
+use crate::handler::HandlerOptions;
 
 mod handler;
 
@@ -11,21 +13,21 @@ pub fn handler(
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     // Extract information from the attribute
-    let kind = {
-        let mut kind = HandlerKind::Query;
+    let options = {
+        let mut options = HandlerOptions::default();
 
-        let attribute_parser = meta::parser(|meta| kind.parse(meta));
+        let attribute_parser = meta::parser(|meta| options.parse(meta));
 
         parse_macro_input!(attr with attribute_parser);
 
-        kind
+        options
     };
 
     // Attempt to match as a function
     syn::parse::<Item>(input)
         .and_then(|item| {
             if let Item::Fn(handler) = item {
-                generate_handler(handler, kind)
+                generate_handler(handler, options)
             } else {
                 Err(Error::new(item.span(), "handlers must be a method"))
             }

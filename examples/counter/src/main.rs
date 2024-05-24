@@ -65,13 +65,13 @@ mod user {
 
     pub fn create_router() -> Router<AppCtx> {
         Router::new()
-            .handler(get)
+            .handler(someHandler)
             .handler(create)
             .handler(list)
             .handler(nested::asdf)
     }
 
-    #[handler]
+    #[handler(name = "someHandler")]
     async fn get(_ctx: UserCtx, _id: String) -> User {
         User {
             name: "some user".to_string(),

@@ -1,8 +1,8 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
-    meta::ParseNestedMeta, spanned::Spanned, Error, FnArg, ItemFn, Pat, Result, ReturnType, Type,
-    TypeImplTrait,
+    meta::ParseNestedMeta, spanned::Spanned, Error, FnArg, ItemFn, LitStr, Pat, Result, ReturnType,
+    Type, TypeImplTrait,
 };
 
 /// Handlers can have different variations depending on how they interact with the client.
@@ -15,14 +15,33 @@ pub enum HandlerKind {
     Subscription,
 }
 
-impl HandlerKind {
+/// Options that may be attached to a handler.
+#[derive(Default)]
+pub struct HandlerOptions {
+    /// The kind of handler.
+    pub kind: Option<HandlerKind>,
+
+    /// Overridden name for the handler.
+    pub name: Option<Ident>,
+}
+
+impl HandlerOptions {
     /// Attempt to parse the handler kind from [`ParseNestedMeta`].
     pub fn parse(&mut self, meta: ParseNestedMeta) -> Result<()> {
         if meta.path.is_ident("query") {
-            *self = Self::Query;
+            self.kind = Some(HandlerKind::Query);
             Ok(())
         } else if meta.path.is_ident("subscription") {
-            *self = Self::Subscription;
+            self.kind = Some(HandlerKind::Subscription);
+            Ok(())
+        } else if meta.path.is_ident("name") {
+            // Extract name from the attribute
+            let name = meta.value()?.parse::<LitStr>()?.value();
+
+            // Create the ident for the handler name
+            let ident = Ident::new(&name, meta.input.span());
+
+            self.name = Some(ident);
             Ok(())
         } else {
             Err(meta.error("unsupported handler property"))
@@ -34,7 +53,7 @@ impl HandlerKind {
 /// [`HandlerKind`] is required alter how the handler is applied to the router. This could be
 /// induced based on the return type of the handler (whether it retrusn a [`futures::Stream`]) or
 /// not), but that might cause problems.
-pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStream> {
+pub fn generate_handler(handler: ItemFn, options: HandlerOptions) -> Result<TokenStream> {
     let span = handler.span().clone();
 
     // Handlers must be async
@@ -50,8 +69,8 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
     };
 
     // Extract out the function name
-    let function_name_str = handler.sig.ident.to_string();
-    let function_ident = handler.sig.ident;
+    let function_ident = options.name.unwrap_or(handler.sig.ident);
+    let function_name_str = function_ident.to_string();
     let function_visibility = handler.vis;
 
     // Extract out the return type
@@ -102,7 +121,7 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
         }
     });
 
-    let (register_impl, signature) = match kind {
+    let (register_impl, signature) = match options.kind.unwrap_or(HandlerKind::Query) {
         HandlerKind::Query => (
             quote! {
                 rpc_builder.query(#function_name_str, |ctx, params| async move {
