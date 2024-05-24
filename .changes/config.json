@@ -1,0 +1,36 @@
+{
+  "gitSiteUrl": "https://github.com/andogq/qubit/",
+  "pkgManagers": {
+    "javascript": {
+      "version": true,
+      "getPublishedVersion": "npm view ${ pkgFile.pkg.name } version",
+      "publish": [
+        "npm publish --access public"
+      ]
+    },
+    "rust": {
+      "version": true,
+      "getPublishedVersion": "cargo search ${ pkg.pkg } --limit 1 | sed -nE 's/^[^\"]*\"//; s/\".*//1p'",
+      "publish": [
+        "cargo publish"
+      ]
+    }
+  },
+  "packages": {
+    "@qubit-rs/client": {
+      "path": "./packages/client",
+      "manager": "javascript"
+    },
+    "qubit": {
+      "path": ".",
+      "manager": "rust",
+      "dependencies": [
+        "qubit-macros"
+      ]
+    },
+    "qubit-macros": {
+      "path": "./crates/qubit-macros",
+      "manager": "rust"
+    }
+  }
+}
