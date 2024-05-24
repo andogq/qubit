@@ -1,121 +1,202 @@
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::{quote, ToTokens};
-use syn::{spanned::Spanned, Error, FnArg, ItemFn, Pat, Result, ReturnType, Type, TypeImplTrait};
+use quote::quote;
+use syn::{
+    parse_quote, spanned::Spanned, Error, FnArg, ItemFn, Pat, Result, ReturnType, Type,
+    TypeImplTrait, Visibility,
+};
 
 mod options;
 
 pub use options::*;
+
+/// Kind of return value from a handler.
+enum HandlerReturn {
+    /// Handler returns a stream of the provided type.
+    Stream(Type),
+
+    /// Handle returns a single instance of the provided type.
+    Return(Type),
+}
+
+impl HandlerReturn {
+    pub fn ty(&self) -> Type {
+        match self {
+            Self::Stream(ty) | Self::Return(ty) => ty.clone(),
+        }
+    }
+}
+
+/// All relevant information about the handler extracted from the macro.
+struct Handler {
+    /// Visibility of the handler.
+    visibility: Visibility,
+
+    /// Name of the handler.
+    name: Ident,
+
+    /// Type of the context used in the handler.
+    ctx_ty: Type,
+
+    /// Inputs for the handler. Currently does not support any kind of destructuring.
+    inputs: Vec<(Ident, Type)>,
+
+    /// Return type of the handler.
+    return_type: HandlerReturn,
+
+    /// The actual handler implementation.
+    implementation: ItemFn,
+}
+
+impl Handler {
+    pub fn parse(handler: ItemFn, options: HandlerOptions) -> Result<Self> {
+        let span = handler.span();
+
+        // TODO: Could this be relaxed?
+        if handler.sig.asyncness.is_none() {
+            return Err(Error::new(span, "handlers must be async"));
+        }
+
+        let implementation = {
+            // Create the implementation by cloning the original function, and changing the
+            // name to be `handler`.
+            let mut implementation = handler.clone();
+            implementation.sig.ident = Ident::new("handler", Span::call_site());
+            implementation
+        };
+
+        let mut inputs = handler
+            .sig
+            .inputs
+            .into_iter()
+            .map(|arg| {
+                let FnArg::Typed(arg) = arg else {
+                    return Err(Error::new(span, "handlers cannot take `self` parameter"));
+                };
+
+                let Pat::Ident(ident) = *arg.pat else {
+                    return Err(Error::new(
+                        span,
+                        "destructured parameters are not supported in handlers",
+                    ));
+                };
+
+                let ty = *arg.ty;
+
+                Ok((ident.ident, ty))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        // TODO: Remove this restriction, allow handlers to accept no parameters
+        if inputs.is_empty() {
+            return Err(Error::new(
+                span,
+                "handlers must accept atleast one argument (the ctx)",
+            ));
+        }
+
+        let (_, ctx_ty) = inputs.remove(0);
+
+        Ok(Self {
+            implementation,
+            visibility: handler.vis,
+            name: options.name.unwrap_or(handler.sig.ident),
+            ctx_ty,
+            inputs,
+            return_type: {
+                let return_type = match handler.sig.output {
+                    ReturnType::Default => HandlerReturn::Return(parse_quote! { () }),
+                    ReturnType::Type(_, ty) => match *ty {
+                        // BUG: Assuming that any trait implementation is a stream, which definitely isn't
+                        // the case.
+                        Type::ImplTrait(TypeImplTrait { bounds, .. }) => HandlerReturn::Stream(
+                            parse_quote! { <dyn #bounds as futures::Stream>::Item },
+                        ),
+                        // All other return types will be treated as a regular return type.
+                        return_type => HandlerReturn::Return(return_type),
+                    },
+                };
+
+                match (&return_type, options.kind) {
+                    // Valid case, return type matches with handler annotation
+                    (HandlerReturn::Stream(_), Some(HandlerKind::Subscription))
+                    | (HandlerReturn::Return(_), Some(HandlerKind::Query) | None) => return_type,
+
+                    // Mismatches
+                    (HandlerReturn::Stream(_), Some(HandlerKind::Query) | None) => {
+                        return Err(Error::new(
+                            span,
+                            "handler indicated to be a query, however a stream was returned",
+                        ));
+                    }
+                    (HandlerReturn::Return(_), Some(HandlerKind::Subscription)) => {
+                        return Err(Error::new(
+                            span,
+                            "handler indicated to be a subscription, however a stream was not returned",
+                        ));
+                    }
+                }
+            },
+        })
+    }
+}
 
 /// Generates the implementation for [`qubit::Handler`] for the provided handler function. The
 /// [`HandlerKind`] is required alter how the handler is applied to the router. This could be
 /// induced based on the return type of the handler (whether it retrusn a [`futures::Stream`]) or
 /// not), but that might cause problems.
 pub fn generate_handler(handler: ItemFn, options: HandlerOptions) -> Result<TokenStream> {
-    let span = handler.span().clone();
+    let handler = Handler::parse(handler, options)?;
 
-    // Handlers must be async
-    if handler.sig.asyncness.is_none() {
-        return Err(Error::new_spanned(handler, "RPC handlers must be async"));
-    }
+    let handler_impl = handler.implementation;
+    let handler_name = handler.name;
+    let handler_name_str = handler_name.to_string();
+    let (param_names, param_tys): (Vec<_>, Vec<_>) = handler.inputs.iter().cloned().unzip();
+    let param_names_str = param_names
+        .iter()
+        .map(|name| name.to_string())
+        .collect::<Vec<_>>();
+    let visibility = handler.visibility;
+    let ctx_ty = handler.ctx_ty;
+    let return_type = handler.return_type.ty();
 
-    // Clone the function implementation, in order to use it as the handler
-    let handler_fn = {
-        let mut f = handler.clone();
-        f.sig.ident = Ident::new("handler", Span::call_site());
-        f
-    };
-
-    // Extract out the function name
-    let function_ident = options.name.unwrap_or(handler.sig.ident);
-    let function_name_str = function_ident.to_string();
-    let function_visibility = handler.vis;
-
-    // Extract out the return type
-    let (return_type, stream_item) = match handler.sig.output.clone() {
-        ReturnType::Default => (quote! { () }, false),
-        ReturnType::Type(_, ty) => match *ty {
-            Type::ImplTrait(TypeImplTrait { bounds, .. }) => {
-                (quote! { <dyn #bounds as futures::Stream>::Item }, true)
-            }
-            ref return_type => (return_type.to_token_stream(), false),
-        },
-    };
-
-    let mut inputs = handler.sig.inputs.iter();
-
-    let ctx_ty = if let Some(FnArg::Typed(arg)) = inputs.next() {
-        arg.ty.clone()
-    } else {
-        return Err(syn::Error::new(span, "ctx type must be provided"));
-    };
-
-    // Process parameters, to get the idents, string version of the idents, and the type
-    let ((param_names, param_name_strs), param_tys): ((Vec<_>, Vec<_>), Vec<_>) = inputs
-        .map(|param| match param {
-            FnArg::Typed(arg) => match arg.pat.as_ref() {
-                Pat::Ident(ident) => Ok(((ident.clone(), ident.ident.to_string()), arg.ty.clone())),
-                Pat::Struct(_) | Pat::Tuple(_) | Pat::TupleStruct(_) => Err(Error::new(
-                    arg.span(),
-                    "destructured arguments are not currently supported",
-                )),
-                _ => Err(Error::new(
-                    arg.span(),
-                    "unable to process this argument type",
-                )),
-            },
-            FnArg::Receiver(_) => Err(Error::new(
-                param.span(),
-                "handlers cannot have `self` as a parameter",
-            )),
-        })
-        .collect::<Result<Vec<_>>>()?
-        .into_iter()
-        .unzip();
-
-    let parse_params = (!param_names.is_empty()).then(|| {
+    // Generate the parameter parsing implementation
+    let parse_params = (!handler.inputs.is_empty()).then(|| {
         quote! {
             let (#(#param_names,)*) = params.parse::<(#(#param_tys,)*)>().unwrap();
         }
     });
 
-    let (register_impl, signature) = match options.kind.unwrap_or(HandlerKind::Query) {
-        HandlerKind::Query => (
-            quote! {
-                rpc_builder.query(#function_name_str, |ctx, params| async move {
-                    #parse_params
-
-                    // Run the handler
-                    handler(ctx, #(#param_names,)*).await
-                })
-            },
-            quote! {
-                format!("({}) => Promise<{}>", parameters.join(", "), <#return_type as ts_rs::TS>::name())
-            },
-        ),
-        HandlerKind::Subscription => {
-            let notification_name = format!("{function_name_str}_notif");
-            let unsubscribe_name = format!("{function_name_str}_unsub");
-
+    let (register_impl, signature) = match handler.return_type {
+        HandlerReturn::Return(return_type) => {
             (
                 quote! {
-                    rpc_builder.subscription(#function_name_str, #notification_name, #unsubscribe_name, |ctx, params| async move {
+                    rpc_builder.query(#handler_name_str, |ctx, params| async move {
                         #parse_params
 
                         // Run the handler
                         handler(ctx, #(#param_names,)*).await
                     })
                 },
-                {
-                    if !stream_item {
-                        return Err(syn::Error::new(
-                            span,
-                            "subscriptions must have a return type",
-                        ));
-                    };
+                quote! {
+                    format!("({}) => Promise<{}>", parameters.join(", "), <#return_type as ts_rs::TS>::name())
+                },
+            )
+        }
+        HandlerReturn::Stream(return_type) => {
+            let notification_name = format!("{handler_name_str}_notif");
+            let unsubscribe_name = format!("{handler_name_str}_unsub");
 
-                    quote! {
-                        format!("({}) => Stream<{}>", parameters.join(", "), <#return_type as ts_rs::TS>::name())
-                    }
+            (
+                quote! {
+                    rpc_builder.subscription(#handler_name_str, #notification_name, #unsubscribe_name, |ctx, params| async move {
+                        #parse_params
+
+                        // Run the handler
+                        handler(ctx, #(#param_names,)*).await
+                    })
+                },
+                quote! {
+                    format!("({}) => Stream<{}>", parameters.join(", "), <#return_type as ts_rs::TS>::name())
                 },
             )
         }
@@ -123,14 +204,14 @@ pub fn generate_handler(handler: ItemFn, options: HandlerOptions) -> Result<Toke
 
     Ok(quote! {
         #[allow(non_camel_case_types)]
-        #function_visibility struct #function_ident;
-        impl<__internal_AppCtx> qubit::Handler<__internal_AppCtx> for #function_ident
+        #visibility struct #handler_name;
+        impl<__internal_AppCtx> qubit::Handler<__internal_AppCtx> for #handler_name
             where #ctx_ty: qubit::FromContext<__internal_AppCtx>,
                 __internal_AppCtx: 'static + Send + Sync + Clone
         {
             fn get_type() -> qubit::HandlerType {
                 let parameters = [
-                    #((#param_name_strs, <#param_tys as ts_rs::TS>::name())),*
+                    #((#param_names_str, <#param_tys as ts_rs::TS>::name())),*
                 ]
                     .into_iter()
                     .map(|(param, ty): (&str, String)| {
@@ -139,13 +220,13 @@ pub fn generate_handler(handler: ItemFn, options: HandlerOptions) -> Result<Toke
                     .collect::<Vec<_>>();
 
                 qubit::HandlerType {
-                    name: #function_name_str.to_string(),
+                    name: #handler_name_str.to_string(),
                     signature: #signature,
                 }
             }
 
             fn register(rpc_builder: qubit::RpcBuilder<__internal_AppCtx>) -> qubit::RpcBuilder<__internal_AppCtx> {
-                #handler_fn
+                #handler_impl
 
                 #register_impl
             }
