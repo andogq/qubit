@@ -6,6 +6,11 @@
       "getPublishedVersion": "npm view ${ pkgFile.pkg.name } version",
       "publish": [
         "npm publish --access public"
+      ],
+      "postpublish": [
+        "git tag ${ pkg.pkg }-v${ pkgFile.versionMajor } -f",
+        "git tag ${ pkg.pkg }-v${ pkgFile.versionMajor }.${ pkgFile.versionMinor } -f",
+        "git push --tags -f"
       ]
     },
     "rust": {
@@ -13,6 +18,11 @@
       "getPublishedVersion": "cargo search ${ pkg.pkg } --limit 1 | sed -nE 's/^[^\"]*\"//; s/\".*//1p'",
       "publish": [
         "cargo publish"
+      ],
+      "postpublish": [
+        "git tag ${ pkg.pkg }-v${ pkgFile.versionMajor } -f",
+        "git tag ${ pkg.pkg }-v${ pkgFile.versionMajor }.${ pkgFile.versionMinor } -f",
+        "git push --tags -f"
       ]
     }
   },
