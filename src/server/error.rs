@@ -39,7 +39,7 @@ impl From<&RpcError> for ErrorObjectOwned {
 impl IntoResponse for RpcError {
     type Output = <ErrorObjectOwned as IntoResponse>::Output;
 
-    fn into_response(self) -> jsonrpsee::types::ResponsePayload<'static, Self::Output> {
+    fn into_response(self) -> jsonrpsee::ResponsePayload<'static, Self::Output> {
         ErrorObjectOwned::from(self).into_response()
     }
 }
