@@ -64,7 +64,11 @@ mod user {
     }
 
     pub fn create_router() -> Router<AppCtx> {
-        Router::new().handler(get).handler(create).handler(list)
+        Router::new()
+            .handler(get)
+            .handler(create)
+            .handler(list)
+            .handler(nested::asdf)
     }
 
     #[handler]
@@ -80,6 +84,15 @@ mod user {
 
                 more_metadata: None,
             },
+        }
+    }
+
+    mod nested {
+        use super::*;
+
+        #[handler]
+        pub async fn asdf(_ctx: UserCtx) {
+            todo!()
         }
     }
 

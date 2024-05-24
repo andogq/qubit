@@ -52,6 +52,7 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
     // Extract out the function name
     let function_name_str = handler.sig.ident.to_string();
     let function_ident = handler.sig.ident;
+    let function_visibility = handler.vis;
 
     // Extract out the return type
     let (return_type, stream_item) = match handler.sig.output.clone() {
@@ -146,7 +147,7 @@ pub fn generate_handler(handler: ItemFn, kind: HandlerKind) -> Result<TokenStrea
 
     Ok(quote! {
         #[allow(non_camel_case_types)]
-        struct #function_ident;
+        #function_visibility struct #function_ident;
         impl<__internal_AppCtx> qubit::Handler<__internal_AppCtx> for #function_ident
             where #ctx_ty: qubit::FromContext<__internal_AppCtx>,
                 __internal_AppCtx: 'static + Send + Sync + Clone
