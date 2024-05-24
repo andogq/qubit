@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use futures::{Future, FutureExt, Stream, StreamExt};
+use futures::{Future, Stream, StreamExt};
 use jsonrpsee::{
     types::{Params, ResponsePayload},
     RpcModule, SubscriptionCloseResponse, SubscriptionMessage,
@@ -70,7 +70,7 @@ where
                     };
 
                     // Run the actual handler
-                    ResponsePayload::result(handler(ctx, params).await)
+                    ResponsePayload::success(handler(ctx, params).await)
                 }
             })
             .unwrap();
