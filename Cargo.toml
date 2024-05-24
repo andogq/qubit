@@ -1,25 +1,24 @@
-workspace = { members = ["./crates/*", "./examples/*"] }
+workspace = { members = [ "./crates/*", "./examples/*" ] }
 
 [package]
 name = "qubit"
-version = "0.0.9"
+version = "0.0.10"
 edition = "2021"
-authors = ["Tom Anderson <tom@ando.gq>"]
+authors = [ "Tom Anderson <tom@ando.gq>" ]
 repository = "https://github.com/andogq/qubit"
 license = "MIT"
 description = "Type-safe framework for an JSONRPC server written in Rust with an automatically generated TypeScript client."
-
-exclude = ["./client", "./example"]
+exclude = [ "./client", "./example" ]
 
 [dependencies]
 axum = "0.6.20"
 futures = "0.3.30"
 http = "0.2.9"
-hyper = { version = "0.14.10", features = ["server"] }
-jsonrpsee = { version = "0.21.0", features = ["server"] }
-serde = { version = "1.0.195", features = ["derive"] }
+hyper = { version = "0.14.10", features = [ "server" ] }
+jsonrpsee = { version = "0.21.0", features = [ "server" ] }
+serde = { version = "1.0.195", features = [ "derive" ] }
 serde_json = "1.0.111"
-tokio = { version = "1.35.1", features = ["rt", "rt-multi-thread"] }
+tokio = { version = "1.35.1", features = [ "rt", "rt-multi-thread" ] }
 tower = "0.4.13"
 ts-rs = "8.1.0"
 qubit-macros = { version = "0.0.7", path = "./crates/qubit-macros" }
