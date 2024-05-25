@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, convert::Infallible, fs, path::Path};
+use std::{convert::Infallible, fs, path::Path};
 
 use futures::FutureExt;
 use http::Request;
@@ -47,27 +47,18 @@ where
     /// Write this router's type to the provided path, often a path that is reachable from the
     /// TypeScript client.
     pub fn write_type_to_file(&self, path: impl AsRef<Path>) {
-        // TODO: Modify import depending on if `Stream` is actually provided
-        let imports = r#"import type { Stream } from "@qubit-rs/client";"#;
-
         // Generate all dependencies for this router
         let dependencies = {
-            let mut dependencies = BTreeMap::new();
-            self.add_dependencies(&mut dependencies);
-
-            // Convert into TypeScript
-            dependencies
-                .into_iter()
-                .map(|(name, ty)| format!("export type {name} = {ty};"))
-                .collect::<Vec<_>>()
-                .join("\n")
+            let mut registry = TypeRegistry::default();
+            self.add_dependencies(&mut registry);
+            registry
         };
 
         // Generate the type for this router
         let router = format!("export type Server = {};", self.get_type());
 
         // Build the file contents
-        let content = format!("{imports}\n{dependencies}\n{router}");
+        let content = format!("{dependencies}\n{router}");
 
         // Write out
         fs::write(path, content).unwrap();
@@ -119,7 +110,7 @@ where
     }
 
     /// Adds all of the dependencies for this router to the provided dependency list.
-    fn add_dependencies(&self, dependencies: &mut BTreeMap<String, String>) {
+    fn add_dependencies(&self, dependencies: &mut TypeRegistry) {
         // Add all handler dependencies
         self.handlers
             .iter()

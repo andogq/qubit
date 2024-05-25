@@ -1,13 +1,15 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use ts_rs::TS;
+
+use super::registry::TypeRegistry;
 
 /// Since macros cannot lookup other items in the source code, any user types must 'register'
 /// themselves into a central repository so that their types can be collated, ensuring that they're
 /// only inserted into the generated types once.
 pub trait ExportType: TS {
     #[allow(unused_variables)]
-    fn export(registry: &mut BTreeMap<String, String>) {}
+    fn export(registry: &mut TypeRegistry) {}
 }
 
 macro_rules! impl_export_type {
@@ -15,7 +17,7 @@ macro_rules! impl_export_type {
         $(impl<$($generic),*> ExportType for $t<$($generic),*>
             where $($generic: ts_rs::TS + crate::ExportType),*
             {
-            fn export(register: &mut BTreeMap<String, String>) {
+            fn export(register: &mut TypeRegistry) {
                 $(impl_export_type!(generic: $generic, register);)*
             }
         })*
@@ -29,7 +31,7 @@ macro_rules! impl_export_type {
         impl<$t> ExportType for ($t,)
             where $t: ts_rs::TS + crate::ExportType,
         {
-            fn export(register: &mut BTreeMap<String, String>) {
+            fn export(register: &mut TypeRegistry) {
                 impl_export_type!(generic: $t, register);
             }
         }
@@ -40,7 +42,7 @@ macro_rules! impl_export_type {
             where $t: ts_rs::TS + crate::ExportType,
             $($t_other: ts_rs::TS + crate::ExportType),*
         {
-            fn export(register: &mut BTreeMap<String, String>) {
+            fn export(register: &mut TypeRegistry) {
                 impl_export_type!(generic: $t, register);
                 $(impl_export_type!(generic: $t_other, register);)*
             }

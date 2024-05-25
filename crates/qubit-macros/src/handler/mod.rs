@@ -26,6 +26,16 @@ impl HandlerReturn {
             Self::Return(_) => "Promise".to_string(),
         }
     }
+
+    /// Register any required inbuilt types.
+    fn register_inbuilt(&self, registry: &Ident) -> TokenStream {
+        match self {
+            HandlerReturn::Stream(_) => {
+                quote! { #registry.inbuilt(qubit::builder::ty::InbuiltType::Stream); }
+            }
+            HandlerReturn::Return(_) => TokenStream::new(),
+        }
+    }
 }
 
 impl ToTokens for HandlerReturn {
@@ -262,6 +272,9 @@ impl From<Handler> for TokenStream {
         // Must be a collision-free ident to use as a generic within the handler
         let inner_ctx_ty = quote! { __internal_AppCtx };
 
+        let registry_ident = parse_quote! { registry };
+        let inbuilt_return_type = return_type.register_inbuilt(&registry_ident);
+
         quote! {
             #[allow(non_camel_case_types)]
             #visibility struct #name;
@@ -282,12 +295,14 @@ impl From<Handler> for TokenStream {
                     #register_impl
                 }
 
-                fn export_types(registry: &mut std::collections::BTreeMap<std::string::String, std::string::String>) {
+                fn export_types(#registry_ident: &mut qubit::builder::ty::TypeRegistry) {
+                    #inbuilt_return_type
+
                     // Add dependencies for the parameters
-                    #(<#param_tys as qubit::ExportType>::export(registry);)*
+                    #(<#param_tys as qubit::ExportType>::export(#registry_ident);)*
 
                     // Add dependencies for the return type
-                    <#return_type as qubit::ExportType>::export(registry);
+                    <#return_type as qubit::ExportType>::export(#registry_ident);
                 }
             }
         }.into()

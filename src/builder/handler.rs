@@ -19,9 +19,7 @@
 //! pointers to the methods of [`Handler`]. This is possible since none of these methods reference
 //! `self`. This is what is actually stored on [`crate::Router`].
 
-use std::collections::BTreeMap;
-
-use crate::{builder::RpcBuilder, HandlerType};
+use crate::{builder::RpcBuilder, HandlerType, TypeRegistry};
 
 /// Handlers run for specific RPC requests. This trait will automatically be implemented if the
 /// [`crate::handler`] macro is attached to a function containing a handler implementation.
@@ -33,7 +31,7 @@ pub trait Handler<AppCtx> {
     fn get_type() -> HandlerType;
 
     /// Export any types required to use this [`HandlerType`] in the client.
-    fn export_types(registry: &mut BTreeMap<String, String>);
+    fn export_types(registry: &mut TypeRegistry);
 }
 
 /// Wrapper struct to assist with erasure of concrete [`Handler`] type. Contains function pointers
@@ -51,7 +49,7 @@ pub(crate) struct HandlerCallbacks<Ctx> {
 
     /// Function pointer to the implementation that will add any type dependencies for the handler
     /// to the provided collection.
-    pub export_types: fn(&mut BTreeMap<String, String>),
+    pub export_types: fn(&mut TypeRegistry),
 }
 
 impl<Ctx> HandlerCallbacks<Ctx>
