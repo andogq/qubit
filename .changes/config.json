@@ -31,16 +31,16 @@
       "path": "./packages/client",
       "manager": "javascript"
     },
+    "qubit-macros": {
+      "path": "./crates/qubit-macros",
+      "manager": "rust"
+    },
     "qubit": {
       "path": ".",
       "manager": "rust",
       "dependencies": [
         "qubit-macros"
       ]
-    },
-    "qubit-macros": {
-      "path": "./crates/qubit-macros",
-      "manager": "rust"
     }
   }
 }
