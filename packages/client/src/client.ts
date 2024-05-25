@@ -34,16 +34,28 @@ export function build_client<Server>(client: Client): Server {
                         }
                     });
 
-                    const subscribe: StreamSubscriber<any> = ({ on_data, on_end, on_error }) => {
-                        function error(e: Error) {
-                            if (on_error) {
-                                on_error(e);
+                    const subscribe: StreamSubscriber<any> = (handler) => {
+                        let on_data = (_: unknown) => {};
+                        let on_error = (_: Error) => {};
+                        let on_end = () => {};
+
+                        if (typeof handler === "function") {
+                            on_data = handler;
+                        } else {
+                            if (handler?.on_data) {
+                                on_data = handler.on_data;
+                            }
+                            if (handler?.on_error) {
+                                on_error = handler.on_error;
+                            }
+                            if (handler?.on_end) {
+                                on_end = handler.on_end;
                             }
                         }
 
                         // Make sure the client can handle susbcriptions
                         if (!client.subscribe) {
-                            error(new Error("client does not support subscriptions"));
+                            on_error(new Error("client does not support subscriptions"));
                             return () => {};
                         }
                         const subscribe = client.subscribe;
@@ -68,7 +80,7 @@ export function build_client<Server>(client: Client): Server {
                             // Result should be a subscription ID
                             if (typeof subscription_id !== "string" && typeof subscription_id !== "number") {
                                 // TODO: Throw an error
-                                error(new Error("cannot subscribe to subscription"));
+                                on_error(new Error("cannot subscribe to subscription"));
                                 return () => {};
                             }
 
