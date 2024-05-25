@@ -166,8 +166,6 @@ async fn main() {
         .handler(array)
         .nest("user", user::create_router());
 
-    dbg!(array::get_type());
-
     // Save the router's bindings
     app.write_type_to_file("./bindings.ts");
 

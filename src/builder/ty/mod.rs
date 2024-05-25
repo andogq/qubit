@@ -2,8 +2,10 @@
 //! [`qubit_macros::handler`] should handle it all.
 
 mod export_type;
+mod registry;
 
 pub use export_type::*;
+pub use registry::*;
 
 /// Components used to construct the client type for this handler.
 #[derive(Debug)]
