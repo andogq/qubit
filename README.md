@@ -1,4 +1,4 @@
-# Qubit - Rust/TypeScript RPC
+# Qubit: Seamless RPC For Rust & TypeScript
 
 <div align="center">
     <a href="https://crates.io/crates/qubit"><img src="https://img.shields.io/crates/v/qubit" alt="crates.io" /></a>
@@ -6,130 +6,121 @@
     <a href="https://www.npmjs.com/package/@qubit-rs/client"><img src="https://img.shields.io/npm/v/%40qubit-rs%2Fclient" alt="npm" /></a>
 </div>
 
-Generate type-safe TypeScript clients for your Rust APIs, with Serde compatibility, subscriptions,
-and more!
+Tired of wrestling with RPC boilerplate? Qubit simplifies communication between your Rust services
+and TypeScript clients, offering a type-safe and feature-rich development experience, so you can
+focus on building amazing applications.
 
 ## Features:
 
-- Context based middleware
+- **Generated Type-Safe Clients**: Say goodbye to manual type definitions, Qubit automatically
+  generates TypeScript clients based on your Rust API, ensuring a smooth development experience.
 
-- Subscriptions
+- **Subscriptions**: Build real-time, data-driven applications with subscriptions, allowing for
+  your Rust server to push data directly to connected TypeScript clients.
 
-- Nested routers
+- **Build Modular APIs**: Organise your API handlers into nested routers, ensuring simplicity and
+  maintainability as your service grows.
 
-- Serde compatibility for serialising and deserialising parameters and return values
+- **Serde Compatibility**: Leverage Serde for seamless data serialisation and deserialisation
+  between Rust and TypeScript.
 
-- Standardised JSONRPC 2.0 implementation, including `ws` and `http` transport layers
+- **Built on JSONRPC 2.0**: Need a non-TypeScript client? Use any JSONRPC client in any language
+  over WebSockets or HTTP.
 
-- Built using [`ts-rs`](https://github.com/Aleph-Alpha/ts-rs) and
-[`jsonrpsee`](https://github.com/paritytech/jsonrpsee)
+- **Proven Base**: Built on established libraries like
+  [`ts-rs`](https://github.com/Aleph-Alpha/ts-rs) for type generation and
+  [`jsonrpsee`](https://github.com/paritytech/jsonrpsee) as the JSONRPC implementation.
 
-## Example
+## Getting Started
 
-Check out the `example` directory for a full example.
+1. Add the required dependencies
 
-### Rust Server
+```toml
+# Cargo.toml
+[dependencies]
+qubit = "latest"
+
+ts-rs = "8.1.0" # Required to generate TS types
+serde = { version = "1.0", features = ["derive"] } # Required for seraialisable types
+futures = "0.3.30" # Required for streaming functionality
+
+tokio = { version = "1.35", features = ["full"] }
+axum = "0.6"
+hyper = { version = "0.14", features = ["server"] }
+```
+
+```jsonc
+// package.json
+{
+    "dependencies": {
+        "@qubit-rs/client": "latest"
+    }
+}
+```
+
+2. Setup a Qubit router, and save the generated types
 
 ```rs
-#[derive(Clone, Default)]
-pub struct Ctx {
-    count: Arc<AtomicUsize>,
-}
-
-// Handlers are defined as functions, where the function name will be the name of the handler
 #[handler]
-async fn hello_world(_ctx: Ctx) -> String {
+async fn hello_world(_ctx: ()) -> String {
     "Hello, world!".to_string()
 }
 
-// Handlers have access to the app state
-#[handler]
-async fn count(ctx: Ctx) -> usize {
-    ctx.count.fetch_add(1, Ordering::Relaxed)
-}
+let router = Router::new()
+    .handler(hello_world);
 
-// Handlers can accept parameters
-#[handler]
-async fn count_by(ctx: Ctx, amount: usize) -> usize {
-    ctx.count.fetch_add(amount, Ordering::Relaxed)
-}
-
-// Handlers can return a stream, in order to act as a subscription
-#[handler(subscription)]
-async fn countdown(ctx: AppCtx, min: usize, max: usize) -> impl Stream<Item = usize> {
-    stream::iter(min..=max).then(|n| async move {
-        n
-    })
-}
-
-#[tokio::main]
-async fn main() {
-    // Build the app, attaching handlers as required
-    let app = Router::new()
-        .handler(hello_world)
-        .handler(count);
-
-    // Create a stop channel so that the server can be programatically terminated
-    let (stop_handle, server_handle) = stop_channel();
-
-    // Global app context
-    let ctx = Ctx::default();
-
-    // Create or nest app into an existing axum server
-    let router = axum::Router::<()>::new()
-        .route("/", get(|| async { "another endpoint!" }))
-        .nest_service("/rpc", app.to_service(move |_| {
-            // For each request that comes in, clone the context so that it can be shared around
-            ctx.clone()
-        }, stop_handle));
-
-    // Start the axum rounter as normal
-    hyper::Server::bind(&SocketAddr::from([127, 0, 0, 1], 9944))
-        .serve(router.into_make_service())
-        .await
-        .unwrap();
-
-    // Upon termination of the hyper server, properly shutdown the RPC server
-    server_handle.stop().unwrap();
-}
+router.write_type_to_file("./bindings.ts");
 ```
 
-### TypeScript
+3. Attach the Qubit router to an Axum router, and start it
+
+```rs
+// Create a service and handle
+let (qubit_service, _qubit_handle) = router.to_service(|_| ());
+
+// Nest into an Axum router
+let axum_router = axum::Router::<()>::new()
+    .nest_service("/rpc", qubit_service);
+
+// Start a Hyper server
+hyper::Server::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
+    .serve(axum_router.into_make_service())
+    .await
+    .unwrap();
+```
+
+4. Make requests from the TypeScript client
 
 ```ts
+// Import transport from client, and generated server type
 import { ws } from "@qubit-rs/client";
-
-// This type is automatically generated based on the Rust API
 import type { Server } from "./bindings.ts";
 
-// Start a new client, passing the type as a generic parameter
-const client = ws<Server>("ws://localhost:9944/rpc");
+// Connect with the API
+const api = ws<Server>("ws://localhost:9944/rpc");
 
-// Handlers can be accessed from the client just by calling the method!
-const message = await client.hello_world();
-console.log(message); // "Hello, world!"
-
-for (let i = 0; i < 5; i++) {
-    const count = await client.count();
-    console.log(`The count is: ${count}`);
-}
-
-// Parameters are typed, and are passed as if it were a regular function
-await client.count_by(10);
-
-// Subscriptions are just like regular handlers, except they also accept life-cycle handlers for
-// data, errors, and subcription end
-await client.countdown(1, 4).subscribe({
-	on_data: (data) => {
-		console.log(`Countdown: ${data}`);
-	},
-	on_end: () => {
-		console.log("Countdown done!");
-	}
-});
+// Call the handlers
+const message = await api.hello_world();
+console.log("recieved from server:", message);
 ```
 
-## Acknowledgements
+## Examples
+
+Checkout all the examples in the [`examples`](./examples) directory.
+
+## Hyper 1.0
+
+Unfortunately, this crate is blocked by upstream dependencies before it can upgrade to Hyper 1.0
+(and other associated packages like Axum 0.7). This is actively being worked on by the upstream
+dependencies, so will be arriving soon.
+
+## Qubit?
+
+The term "Qubit" refers to the fundamental unit of quantum information. Just as a qubit can exist
+in a superposition of states, Qubit bridges the gap between Rust and TypeScript, empowering
+developers to create truly exceptional applications.
+
+## Prior Art
 
 - [`rspc`](https://github.com/oscartbeaumont/rspc): Similar concept, however uses a bespoke
 solution for generating TypeScript types from Rust structs, which isn't completely compatible with
