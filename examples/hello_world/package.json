@@ -1,16 +1,15 @@
 {
-  "name": "counter",
+  "name": "hello_world",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
     "start": "ts-node ./index.ts"
   },
-  "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@qubit-rs/client": "^0.0.5",
+    "@qubit-rs/client": "file:../../packages/client",
     "ws": "^8.17.0"
   },
   "devDependencies": {
