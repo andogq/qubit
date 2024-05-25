@@ -1,20 +1,44 @@
+// Import transport from client, and generated server type
 import { ws } from "@qubit-rs/client";
 import type { Server } from "./bindings.ts";
 
-const client = ws<Server>("ws://localhost:9944/rpc");
+// Polyfill only required for running in NodeJS
+import { WebSocket } from "ws";
 
-client.version().then((version) => console.log({ version })).catch(console.error);
-client.user.someHandler("test").then((user) => console.log(user)).catch(console.error);
-client.count().then((value) => console.log({ value })).catch(console.error);
+async function main() {
+    // Connect with the API
+    const api = ws<Server>(
+        "ws://localhost:9944/rpc",
+        // @ts-ignore mis-matching WebSocket definitions
+        { WebSocket },
+    );
 
-client.countdown(1, 4).subscribe({
-	on_data: (data) => {
-		console.log("countdown: ", data);
-	},
-	on_end: () => {
-		console.log("countdown done");
-	}
-});
+    // Do some maths
+    for (let i = 0; i < 5; i++) {
+        await api.increment();
+    }
+    console.log("The value is", await api.get());
 
-client.countdown(1, 4)
-	.subscribe((n) => console.log("number is", n))
+    for (let i = 0; i < 3; i++) {
+        await api.decrement();
+    }
+    console.log("The value is", await api.get());
+
+    await api.add(10);
+    console.log("The value is", await api.get());
+
+    console.log("=== Beginning Countdown ===");
+    await new Promise<void>((resolve) => {
+        api.countdown().subscribe({
+            on_data: (n) => {
+                console.log(`${n}...`);
+            },
+            on_end: () => {
+                resolve();
+            }
+        })
+    });
+    console.log("=== Lift Off! ===");
+}
+
+main();

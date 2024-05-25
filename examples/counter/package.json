@@ -1,17 +1,20 @@
 {
-  "name": "example",
+  "name": "counter",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "ts-node ./index.ts"
   },
+  "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@qubit-rs/client": "file:../../packages/client"
+    "@qubit-rs/client": "^0.0.5",
+    "ws": "^8.17.0"
   },
   "devDependencies": {
-    "@types/node": "^20.11.25"
+    "@types/ws": "^8.5.10",
+    "ts-node": "^10.9.2"
   }
 }

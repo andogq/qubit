@@ -1,18 +1,15 @@
 [package]
-name = "example"
+name = "counter"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 qubit = { path = "../../" }
-axum = "0.6.20"
-futures = "0.3.30"
-http = "0.2.9"
-hyper = { version = "0.14.10", features = ["server"] }
-serde = { version = "1.0.195", features = ["derive"] }
-serde_json = "1.0.111"
-tokio = { version = "1.35.1", features = ["rt", "rt-multi-thread"] }
-tower = "0.4.13"
+
 ts-rs = "8.1.0"
+serde = { version = "1.0", features = ["derive"] }
+futures = "0.3.30"
+
+tokio = { version = "1.35", features = ["full"] }
+axum = "0.6"
+hyper = { version = "0.14", features = ["server"] }
