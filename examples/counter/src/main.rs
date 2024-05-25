@@ -13,7 +13,7 @@ use qubit::*;
 use axum::routing::get;
 use serde::{Deserialize, Serialize};
 
-#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug, TypeDependencies)]
+#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug, ExportType)]
 pub struct Metadata {
     param_a: String,
     param_b: u32,
@@ -22,7 +22,7 @@ pub struct Metadata {
     more_metadata: Option<Box<Metadata>>,
 }
 
-#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug, TypeDependencies)]
+#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug, ExportType)]
 pub struct User {
     name: String,
     email: String,
@@ -31,7 +31,7 @@ pub struct User {
     metadata: Metadata,
 }
 
-#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug, TypeDependencies)]
+#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug, ExportType)]
 pub struct Test {
     a: usize,
     b: bool,
