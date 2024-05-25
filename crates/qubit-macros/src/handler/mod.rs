@@ -1,5 +1,5 @@
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{
     parse_quote, spanned::Spanned, Error, FnArg, ItemFn, Pat, Result, ReturnType, Type,
     TypeImplTrait, Visibility,
@@ -18,10 +18,10 @@ enum HandlerReturn {
     Return(Type),
 }
 
-impl HandlerReturn {
-    pub fn ty(&self) -> Type {
+impl ToTokens for HandlerReturn {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
-            Self::Stream(ty) | Self::Return(ty) => ty.clone(),
+            Self::Stream(ty) | Self::Return(ty) => ty.to_tokens(tokens),
         }
     }
 }
@@ -48,6 +48,8 @@ struct Handler {
 }
 
 impl Handler {
+    /// Parse a handler from an [`ItemFn`] and some options. This will return [`syn::Error`]s if
+    /// parsing cannot take place.
     pub fn parse(handler: ItemFn, options: HandlerOptions) -> Result<Self> {
         let span = handler.span();
 
@@ -145,28 +147,30 @@ impl Handler {
 /// induced based on the return type of the handler (whether it retrusn a [`futures::Stream`]) or
 /// not), but that might cause problems.
 pub fn generate_handler(handler: ItemFn, options: HandlerOptions) -> Result<TokenStream> {
-    let handler = Handler::parse(handler, options)?;
+    let Handler {
+        visibility,
+        name,
+        ctx_ty,
+        inputs,
+        return_type,
+        implementation,
+    } = Handler::parse(handler, options)?;
 
-    let handler_impl = handler.implementation;
-    let handler_name = handler.name;
-    let handler_name_str = handler_name.to_string();
-    let (param_names, param_tys): (Vec<_>, Vec<_>) = handler.inputs.iter().cloned().unzip();
+    let handler_name_str = name.to_string();
+    let (param_names, param_tys): (Vec<_>, Vec<_>) = inputs.iter().cloned().unzip();
     let param_names_str = param_names
         .iter()
         .map(|name| name.to_string())
         .collect::<Vec<_>>();
-    let visibility = handler.visibility;
-    let ctx_ty = handler.ctx_ty;
-    let return_type = handler.return_type.ty();
 
     // Generate the parameter parsing implementation
-    let parse_params = (!handler.inputs.is_empty()).then(|| {
+    let parse_params = (!inputs.is_empty()).then(|| {
         quote! {
             let (#(#param_names,)*) = params.parse::<(#(#param_tys,)*)>().unwrap();
         }
     });
 
-    let (register_impl, signature) = match handler.return_type {
+    let (register_impl, signature) = match &return_type {
         HandlerReturn::Return(return_type) => {
             (
                 quote! {
@@ -204,8 +208,8 @@ pub fn generate_handler(handler: ItemFn, options: HandlerOptions) -> Result<Toke
 
     Ok(quote! {
         #[allow(non_camel_case_types)]
-        #visibility struct #handler_name;
-        impl<__internal_AppCtx> qubit::Handler<__internal_AppCtx> for #handler_name
+        #visibility struct #name;
+        impl<__internal_AppCtx> qubit::Handler<__internal_AppCtx> for #name
             where #ctx_ty: qubit::FromContext<__internal_AppCtx>,
                 __internal_AppCtx: 'static + Send + Sync + Clone
         {
@@ -226,7 +230,7 @@ pub fn generate_handler(handler: ItemFn, options: HandlerOptions) -> Result<Toke
             }
 
             fn register(rpc_builder: qubit::RpcBuilder<__internal_AppCtx>) -> qubit::RpcBuilder<__internal_AppCtx> {
-                #handler_impl
+                #implementation
 
                 #register_impl
             }
