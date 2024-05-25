@@ -282,12 +282,12 @@ impl From<Handler> for TokenStream {
                     #register_impl
                 }
 
-                fn add_dependencies(dependencies: &mut std::collections::BTreeMap<std::string::String, std::string::String>) {
+                fn export_types(registry: &mut std::collections::BTreeMap<std::string::String, std::string::String>) {
                     // Add dependencies for the parameters
-                    #(<#param_tys as qubit::TypeDependencies>::get_deps(dependencies);)*
+                    #(<#param_tys as qubit::ExportType>::export(registry);)*
 
                     // Add dependencies for the return type
-                    <#return_type as qubit::TypeDependencies>::get_deps(dependencies);
+                    <#return_type as qubit::ExportType>::export(registry);
                 }
             }
         }.into()

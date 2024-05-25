@@ -123,7 +123,7 @@ where
         // Add all handler dependencies
         self.handlers
             .iter()
-            .for_each(|handler| (handler.add_dependencies)(dependencies));
+            .for_each(|handler| (handler.export_types)(dependencies));
 
         // Add dependencies for nested routers
         self.nested_routers

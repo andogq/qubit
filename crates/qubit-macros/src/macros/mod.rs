@@ -1,5 +1,5 @@
-mod derive_type_dependencies;
+mod derive_export_type;
 mod handler;
 
-pub use derive_type_dependencies::derive_type_dependencies;
+pub use derive_export_type::derive_export_type;
 pub use handler::handler;

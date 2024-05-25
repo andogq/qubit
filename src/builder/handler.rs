@@ -32,8 +32,8 @@ pub trait Handler<AppCtx> {
     /// Get the type of this handler, to generate the client.
     fn get_type() -> HandlerType;
 
-    /// Get any dependencies required to use this [`HandlerType`] in the client.
-    fn add_dependencies(dependencies: &mut BTreeMap<String, String>);
+    /// Export any types required to use this [`HandlerType`] in the client.
+    fn export_types(registry: &mut BTreeMap<String, String>);
 }
 
 /// Wrapper struct to assist with erasure of concrete [`Handler`] type. Contains function pointers
@@ -51,7 +51,7 @@ pub(crate) struct HandlerCallbacks<Ctx> {
 
     /// Function pointer to the implementation that will add any type dependencies for the handler
     /// to the provided collection.
-    pub add_dependencies: fn(&mut BTreeMap<String, String>),
+    pub export_types: fn(&mut BTreeMap<String, String>),
 }
 
 impl<Ctx> HandlerCallbacks<Ctx>
@@ -65,7 +65,7 @@ where
         Self {
             register: H::register,
             get_type: H::get_type,
-            add_dependencies: H::add_dependencies,
+            export_types: H::export_types,
         }
     }
 }
