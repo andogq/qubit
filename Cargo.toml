@@ -1,4 +1,4 @@
-workspace = { members = ["./crates/*", "./examples/*"] }
+workspace = { members = ["./crates/*", "./examples/*", "examples/hello_world"] }
 
 [package]
 name = "qubit"
