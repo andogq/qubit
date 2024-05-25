@@ -18,6 +18,16 @@ enum HandlerReturn {
     Return(Type),
 }
 
+impl HandlerReturn {
+    /// Get the equivalent TS type for this return type.
+    fn ts_container(&self) -> String {
+        match self {
+            Self::Stream(_) => "Stream".to_string(),
+            Self::Return(_) => "Promise".to_string(),
+        }
+    }
+}
+
 impl ToTokens for HandlerReturn {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
@@ -27,7 +37,7 @@ impl ToTokens for HandlerReturn {
 }
 
 /// All relevant information about the handler extracted from the macro.
-struct Handler {
+pub struct Handler {
     /// Visibility of the handler.
     visibility: Visibility,
 
@@ -140,80 +150,35 @@ impl Handler {
             },
         })
     }
-}
 
-/// Generates the implementation for [`qubit::Handler`] for the provided handler function. The
-/// [`HandlerKind`] is required alter how the handler is applied to the router. This could be
-/// induced based on the return type of the handler (whether it retrusn a [`futures::Stream`]) or
-/// not), but that might cause problems.
-pub fn generate_handler(handler: ItemFn, options: HandlerOptions) -> Result<TokenStream> {
-    let Handler {
-        visibility,
-        name,
-        ctx_ty,
-        inputs,
-        return_type,
-        implementation,
-    } = Handler::parse(handler, options)?;
+    /// Produce a list of parameter names as idents that this handler accepts.
+    fn parameter_names(&self) -> Vec<Ident> {
+        self.inputs.iter().map(|(name, _)| name).cloned().collect()
+    }
 
-    let handler_name_str = name.to_string();
-    let (param_names, param_tys): (Vec<_>, Vec<_>) = inputs.iter().cloned().unzip();
-    let param_names_str = param_names
-        .iter()
-        .map(|name| name.to_string())
-        .collect::<Vec<_>>();
+    /// Produce a list of parameter names as strings that this handler accepts.
+    fn parameter_names_str(&self) -> Vec<String> {
+        self.parameter_names()
+            .iter()
+            .map(|name| name.to_string())
+            .collect()
+    }
 
-    // Generate the parameter parsing implementation
-    let parse_params = (!inputs.is_empty()).then(|| {
+    /// Produce a list of parameter types that this handler accepts.
+    fn parameter_tys(&self) -> Vec<Type> {
+        self.inputs.iter().map(|(_, ty)| ty).cloned().collect()
+    }
+
+    /// Produce a token stream that will generate the TS signature of this handler.
+    fn get_signature(&self) -> TokenStream {
+        let return_type = &self.return_type;
+        let container = return_type.ts_container();
+
+        let param_names_str = self.parameter_names_str();
+        let param_tys = self.parameter_tys();
+
         quote! {
-            let (#(#param_names,)*) = params.parse::<(#(#param_tys,)*)>().unwrap();
-        }
-    });
-
-    let (register_impl, signature) = match &return_type {
-        HandlerReturn::Return(return_type) => {
-            (
-                quote! {
-                    rpc_builder.query(#handler_name_str, |ctx, params| async move {
-                        #parse_params
-
-                        // Run the handler
-                        handler(ctx, #(#param_names,)*).await
-                    })
-                },
-                quote! {
-                    format!("({}) => Promise<{}>", parameters.join(", "), <#return_type as ts_rs::TS>::name())
-                },
-            )
-        }
-        HandlerReturn::Stream(return_type) => {
-            let notification_name = format!("{handler_name_str}_notif");
-            let unsubscribe_name = format!("{handler_name_str}_unsub");
-
-            (
-                quote! {
-                    rpc_builder.subscription(#handler_name_str, #notification_name, #unsubscribe_name, |ctx, params| async move {
-                        #parse_params
-
-                        // Run the handler
-                        handler(ctx, #(#param_names,)*).await
-                    })
-                },
-                quote! {
-                    format!("({}) => Stream<{}>", parameters.join(", "), <#return_type as ts_rs::TS>::name())
-                },
-            )
-        }
-    };
-
-    Ok(quote! {
-        #[allow(non_camel_case_types)]
-        #visibility struct #name;
-        impl<__internal_AppCtx> qubit::Handler<__internal_AppCtx> for #name
-            where #ctx_ty: qubit::FromContext<__internal_AppCtx>,
-                __internal_AppCtx: 'static + Send + Sync + Clone
-        {
-            fn get_type() -> qubit::HandlerType {
+            {
                 let parameters = [
                     #((#param_names_str, <#param_tys as ts_rs::TS>::name())),*
                 ]
@@ -221,27 +186,110 @@ pub fn generate_handler(handler: ItemFn, options: HandlerOptions) -> Result<Toke
                     .map(|(param, ty): (&str, String)| {
                         format!("{param}: {ty}")
                     })
-                    .collect::<Vec<_>>();
+                    .collect::<Vec<_>>()
+                    .join(", ");
 
-                qubit::HandlerType {
-                    name: #handler_name_str.to_string(),
-                    signature: #signature,
-                }
-            }
-
-            fn register(rpc_builder: qubit::RpcBuilder<__internal_AppCtx>) -> qubit::RpcBuilder<__internal_AppCtx> {
-                #implementation
-
-                #register_impl
-            }
-
-            fn add_dependencies(dependencies: &mut std::collections::BTreeMap<std::string::String, std::string::String>) {
-                // Add dependencies for the parameters
-                #(<#param_tys as qubit::TypeDependencies>::get_deps(dependencies);)*
-
-                // Add dependencies for the return type
-                <#return_type as qubit::TypeDependencies>::get_deps(dependencies);
+                format!("({}) => {}<{}>", parameters, #container, <#return_type as ts_rs::TS>::name())
             }
         }
-    })
+    }
+}
+
+impl From<Handler> for TokenStream {
+    fn from(handler: Handler) -> Self {
+        // Generate the signature
+        let param_names = handler.parameter_names();
+        let param_tys = handler.parameter_tys();
+        let signature = handler.get_signature();
+
+        // Extract required elements from handler
+        let Handler {
+            visibility,
+            name,
+            ctx_ty,
+            inputs,
+            return_type,
+            implementation,
+        } = handler;
+
+        let handler_name_str = name.to_string();
+
+        let register_impl = {
+            // Define idents in one place, so they will be checked by the compiler
+            let ctx_ident = quote! { ctx };
+            let params_ident = quote! { params };
+
+            // Generate the parameter parsing implementation
+            let parse_params = (!inputs.is_empty()).then(|| {
+                quote! {
+                    let (#(#param_names,)*) = #params_ident.parse::<(#(#param_tys,)*)>().unwrap();
+                }
+            });
+
+            // Body of the handler registration implementation
+            let register_inner = quote! {
+                #parse_params
+
+                handler(#ctx_ident, #(#param_names,)*).await
+            };
+
+            match &return_type {
+                HandlerReturn::Return(_) => {
+                    quote! {
+                        rpc_builder.query(#handler_name_str, |#ctx_ident, #params_ident| async move {
+                            #register_inner
+                        })
+                    }
+                }
+                HandlerReturn::Stream(_) => {
+                    let notification_name = format!("{handler_name_str}_notif");
+                    let unsubscribe_name = format!("{handler_name_str}_unsub");
+
+                    quote! {
+                        rpc_builder.subscription(
+                            #handler_name_str,
+                            #notification_name,
+                            #unsubscribe_name,
+                            |#ctx_ident, #params_ident| async move {
+                                #register_inner
+                            }
+                        )
+                    }
+                }
+            }
+        };
+
+        // Must be a collision-free ident to use as a generic within the handler
+        let inner_ctx_ty = quote! { __internal_AppCtx };
+
+        quote! {
+            #[allow(non_camel_case_types)]
+            #visibility struct #name;
+            impl<#inner_ctx_ty> qubit::Handler<#inner_ctx_ty> for #name
+                where #ctx_ty: qubit::FromContext<#inner_ctx_ty>,
+                    #inner_ctx_ty: 'static + Send + Sync + Clone
+            {
+                fn get_type() -> qubit::HandlerType {
+                    qubit::HandlerType {
+                        name: #handler_name_str.to_string(),
+                        signature: #signature,
+                    }
+                }
+
+                fn register(rpc_builder: qubit::RpcBuilder<#inner_ctx_ty>) -> qubit::RpcBuilder<#inner_ctx_ty> {
+                    #implementation
+
+                    #register_impl
+                }
+
+                fn add_dependencies(dependencies: &mut std::collections::BTreeMap<std::string::String, std::string::String>) {
+                    // Add dependencies for the parameters
+                    #(<#param_tys as qubit::TypeDependencies>::get_deps(dependencies);)*
+
+                    // Add dependencies for the return type
+                    <#return_type as qubit::TypeDependencies>::get_deps(dependencies);
+                }
+            }
+        }.into()
+    }
 }

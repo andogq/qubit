@@ -1,10 +1,8 @@
-use handler::generate_handler;
 use quote::quote;
-use syn::{meta, parse_macro_input, spanned::Spanned, Error, Item};
-
-use crate::handler::HandlerOptions;
+use syn::Item;
 
 mod handler;
+mod macros;
 
 /// See [`qubit::builder::handler`] for more information.
 #[proc_macro_attribute]
@@ -12,28 +10,7 @@ pub fn handler(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    // Extract information from the attribute
-    let options = {
-        let mut options = HandlerOptions::default();
-
-        let attribute_parser = meta::parser(|meta| options.parse(meta));
-
-        parse_macro_input!(attr with attribute_parser);
-
-        options
-    };
-
-    // Attempt to match as a function
-    syn::parse::<Item>(input)
-        .and_then(|item| {
-            if let Item::Fn(handler) = item {
-                generate_handler(handler, options)
-            } else {
-                Err(Error::new(item.span(), "handlers must be a method"))
-            }
-        })
-        .unwrap_or_else(Error::into_compile_error)
-        .into()
+    macros::handler(attr, input)
 }
 
 #[proc_macro_derive(TypeDependencies)]
