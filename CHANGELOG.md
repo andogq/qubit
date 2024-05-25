@@ -1,5 +1,20 @@
 # Changelog
 
+## \[0.1.0]
+
+### Dependencies
+
+- Upgraded to `qubit-macros@0.1.0`
+- [`a5f8e49`](https://github.com/andogq/qubit/commit/a5f8e49c70a1e82a983f4841482671ec16eab765) update dependencies
+
+### refactor
+
+- [`99c8fd3`](https://github.com/andogq/qubit/commit/99c8fd3d5cfa4e2e662adf72ed7d410aee6bf73c) refactor `TypeDependencies` trait into `ExportType` trait
+
+### feat
+
+- [`2aafe80`](https://github.com/andogq/qubit/commit/2aafe80cc0e3ad74f9182da20e8ea9bb8110fcad) switch over to `TypeRegistry` to export client, and now optionally export `Stream` as required
+
 ## \[0.0.10]
 
 ### fix

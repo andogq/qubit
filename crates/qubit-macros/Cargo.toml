@@ -1,6 +1,6 @@
 [package]
 name = "qubit-macros"
-version = "0.0.7"
+version = "0.1.0"
 edition = "2021"
 description = "Macros to accompany `qubit`."
 license = "MIT"
