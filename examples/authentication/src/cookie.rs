@@ -62,7 +62,7 @@ struct AuthCtx {
 impl FromContext<ReqCtx> for AuthCtx {
     /// Implementation to generate the [`AuthCtx`] from the [`ReqCtx`]. Is falliable, so requests
     /// can be blocked at this point.
-    fn from_app_ctx(ctx: ReqCtx) -> Result<Self, qubit::RpcError> {
+    async fn from_app_ctx(ctx: ReqCtx) -> Result<Self, qubit::RpcError> {
         // Enforce that the auth cookie is present
         let Some(cookie) = ctx.auth_cookie else {
             // Return an error to cancel the request if it's not
@@ -78,6 +78,7 @@ impl FromContext<ReqCtx> for AuthCtx {
     }
 }
 
+/// Handler takes in [`ReqCtx`], so will run regardless of authentication status.
 #[handler]
 async fn echo_cookie(ctx: ReqCtx) -> String {
     if let Some(cookie) = ctx.auth_cookie {
@@ -87,6 +88,7 @@ async fn echo_cookie(ctx: ReqCtx) -> String {
     }
 }
 
+/// Handler takes in [`AuthCtx`], so will only run if the middleware can be properly constructed.
 #[handler]
 async fn secret_endpoint(ctx: AuthCtx) -> String {
     format!("Welcome {}. The secret is: `super_secret`", ctx.user)
@@ -111,7 +113,8 @@ pub fn init() -> axum::Router<()> {
         ReqCtx { auth_cookie }
     });
 
-    // TODO: Properly handle this
+    // Once the handle is dropped the server will automatically shutdown, so leak it to keep it
+    // running. Don't actually do this.
     Box::leak(Box::new(handle));
 
     axum::Router::new()

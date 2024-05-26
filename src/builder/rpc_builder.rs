@@ -60,7 +60,7 @@ where
 
                 async move {
                     // Build the context
-                    let ctx = match C::from_app_ctx(ctx.deref().clone()) {
+                    let ctx = match C::from_app_ctx(ctx.deref().clone()).await {
                         Ok(ctx) => ctx,
                         Err(e) => {
                             // Handle any error building the context by turning it into a response
@@ -135,7 +135,7 @@ where
                         // Build the context
                         // NOTE: It won't be held across await so that `C` doesn't have to be
                         // `Send`
-                        let ctx = match C::from_app_ctx(ctx.deref().clone()) {
+                        let ctx = match C::from_app_ctx(ctx.deref().clone()).await {
                             Ok(ctx) => ctx,
                             Err(e) => {
                                 // Handle any error building the context by turning it into a
