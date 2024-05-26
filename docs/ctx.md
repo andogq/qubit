@@ -26,3 +26,14 @@ every consecutive request. There are some limitations for this method:
 - The cookie must be present before the Qubit client connects. This is especially important for the
   WebSocket client where the connection is persisted.
 
+This authentication method is best suited for clients that are serviced over HTTP.
+
+See the sample at [`cookie.rs`](../examples/authentication/src/cookie.rs).
+
+### Mutable Context
+
+An alternate option is to perform the authentication over the connection, although this only works
+with the WebSocket client as the context must be persisted between queries. This method is
+therefore best suited for clients communicating over WebSockets.
+
+See the sample at [`mutable_ctx.rs`](../examples/authentication/src/mutable_ctx.rs).
