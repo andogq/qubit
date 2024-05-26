@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.2.0]
+
+### feat
+
+- [`0758fe3`](https://github.com/andogq/qubit/commit/0758fe32bcf6b702177b88e3dbf7158acaf42523) alter `FromContext` trait to be `async`
+
 ## \[0.1.0]
 
 ### feat
