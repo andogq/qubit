@@ -55,7 +55,7 @@ mod user {
     }
 
     impl FromContext<AppCtx> for UserCtx {
-        fn from_app_ctx(ctx: AppCtx) -> Result<Self, RpcError> {
+        async fn from_app_ctx(ctx: AppCtx) -> Result<Self, RpcError> {
             Ok(UserCtx {
                 app_ctx: ctx,
                 user: 0,
@@ -125,7 +125,7 @@ struct CountCtx {
 }
 
 impl FromContext<AppCtx> for CountCtx {
-    fn from_app_ctx(ctx: AppCtx) -> Result<Self, RpcError> {
+    async fn from_app_ctx(ctx: AppCtx) -> Result<Self, RpcError> {
         Ok(Self {
             count: ctx.count.clone(),
         })

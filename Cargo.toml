@@ -1,6 +1,6 @@
 workspace = { members = [
   "./crates/*",
-  "./examples/*",
+  "./examples/*", "examples/authentication",
   "examples/counter",
   "examples/hello_world"
 ] }
@@ -27,3 +27,4 @@ tokio = { version = "1.37.0", features = [ "rt", "rt-multi-thread" ] }
 tower = "0.4.13"
 ts-rs = "8.1.0"
 qubit-macros = { version = "0.1.0", path = "./crates/qubit-macros" }
+trait-variant = "0.1.2"
