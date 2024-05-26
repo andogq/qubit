@@ -1,0 +1,17 @@
+[package]
+name = "authentication"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qubit = { path = "../../" }
+
+ts-rs = "8.1.0"
+serde = { version = "1.0", features = ["derive"] }
+futures = "0.3.30"
+
+tokio = { version = "1.35", features = ["full"] }
+axum = "0.6"
+hyper = { version = "0.14", features = ["server"] }
+
+cookie = "0.18"

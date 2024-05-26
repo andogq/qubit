@@ -1,6 +1,6 @@
 workspace = { members = [
   "./crates/*",
-  "./examples/*",
+  "./examples/*", "examples/authentication",
   "examples/counter",
   "examples/hello_world"
 ] }
