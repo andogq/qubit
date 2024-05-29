@@ -12,6 +12,7 @@ use qubit::*;
 
 use axum::routing::get;
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 #[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug, ExportType)]
 pub struct Metadata {
@@ -156,6 +157,24 @@ async fn array(_ctx: AppCtx) -> Vec<String> {
     vec!["a".to_string(), "b".to_string(), "c".to_string()]
 }
 
+#[derive(Clone, Serialize, ExportType, TS)]
+struct NestedStruct {
+    a: f32,
+    b: bool,
+}
+
+#[derive(Clone, Serialize, ExportType, TS)]
+enum MyEnum {
+    A,
+    B(u8),
+    C { field: u8 },
+    D(NestedStruct),
+}
+#[handler]
+async fn enum_test(_ctx: AppCtx) -> MyEnum {
+    MyEnum::B(10)
+}
+
 #[tokio::main]
 async fn main() {
     // Build up the router
@@ -164,6 +183,7 @@ async fn main() {
         .handler(count)
         .handler(countdown)
         .handler(array)
+        .handler(enum_test)
         .nest("user", user::create_router());
 
     // Save the router's bindings

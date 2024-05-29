@@ -7,7 +7,18 @@ pub fn derive_export_type(input: proc_macro::TokenStream) -> proc_macro::TokenSt
     let (target_struct, fields) = match s {
         Item::Struct(ref s) => (
             s.ident.clone(),
-            s.fields.iter().map(|field| field.ty.clone()),
+            s.fields
+                .iter()
+                .map(|field| field.ty.clone())
+                .collect::<Vec<_>>(),
+        ),
+        Item::Enum(ref e) => (
+            e.ident.clone(),
+            e.variants
+                .iter()
+                .flat_map(|variant| variant.fields.iter())
+                .map(|field| field.ty.clone())
+                .collect::<Vec<_>>(),
         ),
         _ => unimplemented!(),
     };
