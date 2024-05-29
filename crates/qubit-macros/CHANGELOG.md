@@ -1,5 +1,9 @@
 # Changelog
 
+## \[0.2.1]
+
+- [`d2bf039`](https://github.com/andogq/qubit/commit/d2bf03992c9ea1b160497e371882b51377f4c2ec) implement `ExportType` derive for enums (close #20)
+
 ## \[0.2.0]
 
 ### feat

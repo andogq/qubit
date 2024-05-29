@@ -1,5 +1,13 @@
 # Changelog
 
+## \[0.2.1]
+
+- [`3840c3b`](https://github.com/andogq/qubit/commit/3840c3b0854e59626410b15fb5eb57739fbd1902) automatically dervie `ExportType` for `f32` and `f64`
+
+### Dependencies
+
+- Upgraded to `qubit-macros@0.2.1`
+
 ## \[0.2.0]
 
 ### Dependencies
