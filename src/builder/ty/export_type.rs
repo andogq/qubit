@@ -69,6 +69,8 @@ impl_export_type!(
     i64,
     i128,
     isize,
+    f32,
+    f64,
     String,
     &'static str,
     bool,
