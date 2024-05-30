@@ -1,2 +1,2 @@
 
-export type Server = { hello_world: () => Promise<string> };
+export type QubitServer = { hello_world: () => Promise<string> };

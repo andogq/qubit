@@ -1,4 +1,4 @@
 import { ws } from "@qubit-rs/client";
-import type { Server } from "./bindings";
+import type { QubitServer } from "./bindings";
 
-export const api = ws<Server>("ws://localhost:9944/rpc");
+export const api = ws<QubitServer>("ws://localhost:9944/rpc");

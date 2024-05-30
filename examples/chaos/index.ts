@@ -1,7 +1,7 @@
 import { ws } from "@qubit-rs/client";
-import type { Server } from "./bindings.ts";
+import type { QubitServer } from "./bindings.ts";
 
-const client = ws<Server>("ws://localhost:9944/rpc");
+const client = ws<QubitServer>("ws://localhost:9944/rpc");
 
 client
   .version()

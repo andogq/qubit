@@ -1,6 +1,6 @@
 import { ws } from "@qubit-rs/client";
-import type { Server as CookieServer } from "./cookie-auth";
-import type { Server as MutableCtxServer } from "./mutable-ctx";
+import type { QubitServer as CookieServer } from "./cookie-auth";
+import type { QubitServer as MutableCtxServer } from "./mutable-ctx";
 
 async function cookie_flow() {
   console.log("----- Beginning Cookie Flow -----");
@@ -46,7 +46,9 @@ async function cookie_flow() {
 async function mutable_ctx_flow() {
   console.log("----- Beginning Mutable Ctx Flow -----");
 
-  const api = ws<MutableCtxServer>(`ws://${window.location.host}/mutable-ctx/rpc`);
+  const api = ws<MutableCtxServer>(
+    `ws://${window.location.host}/mutable-ctx/rpc`,
+  );
 
   // Attempt to get the secret without authentication
   await api.secret_endpoint().catch((e) => {

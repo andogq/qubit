@@ -55,7 +55,7 @@ where
         };
 
         // Generate the type for this router
-        let router = format!("export type Server = {};", self.get_type());
+        let router = format!("export type QubitServer = {};", self.get_type());
 
         // Build the file contents
         let content = format!("{dependencies}\n{router}");
