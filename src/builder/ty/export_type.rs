@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use ts_rs::TS;
 
@@ -82,6 +82,9 @@ impl_export_type!(
     Box<T>,
     Option<T>,
     Result<T, E>,
-    HashMap<K, V>
+    HashSet<T>,
+    HashMap<K, V>,
+    BTreeSet<T>,
+    BTreeMap<K, V>
 );
 impl_export_type!(tuple: T0, T1, T2, T3, T4, T5, T6, T7, T8, T9);
