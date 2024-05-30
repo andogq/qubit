@@ -108,13 +108,15 @@ console.log("recieved from server:", message);
 
 Checkout all the examples in the [`examples`](./examples) directory.
 
-## Hyper 1.0
+## FAQs
+
+### Hyper 1.0
 
 Unfortunately, this crate is blocked by upstream dependencies before it can upgrade to Hyper 1.0
 (and other associated packages like Axum 0.7). This is actively being worked on by the upstream
 dependencies, so will be arriving soon.
 
-## Qubit?
+### Qubit?
 
 The term "Qubit" refers to the fundamental unit of quantum information. Just as a qubit can exist
 in a superposition of states, Qubit bridges the gap between Rust and TypeScript, empowering
