@@ -1,0 +1,66 @@
+name: checks
+
+on: push
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable pnpm
+      - uses: actions/setup-node@v4
+      - run: pnpm i
+      - run: pnpm lint --error-on-warnings
+
+  typecheck:
+    strategy:
+      fail-fast: false
+      matrix:
+        dir:
+          - packages/client
+          - examples/authentication/auth-demo
+          - examples/chaos
+          - examples/chat-room-react
+          - examples/counter
+          - examples/hello-world
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable pnpm
+      - uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          cache-dependency-path: '**/pnpm-lock.yaml'
+      - name: Build client package
+        run: pnpm i && pnpm build
+        working-directory: packages/client
+        if: ${{ matrix.dir != 'packages/client' }}
+      - run: pnpm i
+        working-directory: ${{ matrix.dir }}
+      - run: pnpm tsc
+        working-directory: ${{ matrix.dir }}
+
+  clippy:
+    strategy:
+      fail-fast: false
+      matrix:
+        dir:
+          - '.'
+          - examples/authentication
+          - examples/chaos
+          - examples/chat-room-react/src-rust
+          - examples/counter
+          - examples/hello-world
+
+    env:
+      RUSTFLAGS: "-Dwarnings" # Fail on warnings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo clippy
+        working-directory: ${{ matrix.dir }}

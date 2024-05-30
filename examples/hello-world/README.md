@@ -11,8 +11,9 @@ cargo run
 In another terminal, install TypeScript dependencies, and run the client!
 
 ```sh
-npm i
-npm run start
+corepack enable # if not enabled
+pnpm i
+pnpm start
 ```
 
 ## Note
