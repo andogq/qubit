@@ -193,7 +193,10 @@ async fn main() {
     let ctx = AppCtx::default();
 
     // Create a service and handle for the app
-    let (app_service, app_handle) = app.to_service(move |_| ctx.clone());
+    let (app_service, app_handle) = app.to_service(move |_| {
+        let ctx = ctx.clone();
+        async { ctx }
+    });
 
     // Set up the axum router
     let router = axum::Router::<()>::new()

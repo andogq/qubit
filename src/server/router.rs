@@ -70,9 +70,9 @@ where
     /// method provided here. Generally this would involve cloning some pre-existing resources
     /// (database connections, channels, state), and capturing some information from the incomming
     /// [`Request`] included as a parameter.
-    pub fn to_service(
+    pub fn to_service<F>(
         self,
-        build_ctx: impl (Fn(&Request<Body>) -> Ctx) + Clone,
+        build_ctx: impl (Fn(&Request<Body>) -> F) + Clone + Send + 'static,
     ) -> (
         impl Service<
                 Request<Body>,
@@ -81,23 +81,32 @@ where
                 Future = impl Send,
             > + Clone,
         ServerHandle,
-    ) {
+    )
+    where
+        F: std::future::Future<Output = Ctx> + Send,
+    {
         // Generate the stop and server handles for the service
         let (stop_handle, server_handle) = jsonrpsee::server::stop_channel();
 
         (
             service_fn(move |req| {
-                let ctx = build_ctx(&req);
+                let stop_handle = stop_handle.clone();
 
                 // WARN: Horrific amount of cloning, required as it is not possible to swap out the
                 // context on a pre-exising RpcModule.
-                let rpc_module = self.clone().build_rpc_module(ctx, None);
+                let s = self.clone();
 
-                let mut svc = jsonrpsee::server::Server::builder()
-                    .to_service_builder()
-                    .build(rpc_module.clone(), stop_handle.clone());
+                let build_ctx = build_ctx.clone();
 
                 async move {
+                    let ctx = build_ctx(&req).await;
+
+                    let rpc_module = s.build_rpc_module(ctx, None);
+
+                    let mut svc = jsonrpsee::server::Server::builder()
+                        .to_service_builder()
+                        .build(rpc_module.clone(), stop_handle);
+
                     match svc.call(req).await {
                         Ok(v) => Ok::<_, Infallible>(v),
                         Err(_) => unreachable!(),

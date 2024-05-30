@@ -55,7 +55,10 @@ async fn main() {
     let ctx = Ctx::default();
 
     // Create service and handle
-    let (qubit_service, qubit_handle) = router.to_service(move |_| ctx.clone());
+    let (qubit_service, qubit_handle) = router.to_service(move |_| {
+        let ctx = ctx.clone();
+        async { ctx }
+    });
 
     // Nest into an Axum rouer
     let axum_router = axum::Router::<()>::new().nest_service("/rpc", qubit_service);

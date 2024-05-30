@@ -104,13 +104,15 @@ pub fn init() -> axum::Router<()> {
             .headers()
             .get_all(COOKIE)
             .into_iter()
-            .flat_map(|cookie| Cookie::split_parse(cookie.to_str().unwrap()).into_iter())
+            .flat_map(|cookie| Cookie::split_parse(cookie.to_str().unwrap()))
             .flatten()
             .find(|cookie| cookie.name() == COOKIE_NAME)
             .map(|cookie| cookie.value().to_string());
 
-        // Attach it into the request context
-        ReqCtx { auth_cookie }
+        async {
+            // Attach it into the request context
+            ReqCtx { auth_cookie }
+        }
     });
 
     // Once the handle is dropped the server will automatically shutdown, so leak it to keep it
