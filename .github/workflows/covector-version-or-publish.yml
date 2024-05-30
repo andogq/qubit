@@ -22,6 +22,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           cache: pnpm
+          cache-dependency-path: '**/pnpm-lock.yaml'
           registry-url: 'https://registry.npmjs.org'
       - name: cargo login
         run: cargo login ${{ secrets.CRATE_TOKEN }}
