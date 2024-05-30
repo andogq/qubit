@@ -21,6 +21,9 @@ pub enum Message {
     /// Add a user to the list
     Join { name: char },
 
+    /// Send a chat message
+    Send { user: char, message: String },
+
     /// Subscribe to a list of online users
     RegisterOnline { tx: mpsc::Sender<Vec<char>> },
 
@@ -40,6 +43,10 @@ impl Client {
 
     pub async fn join(&self, name: char) {
         self.tx.send(Message::Join { name }).await.unwrap();
+    }
+
+    pub async fn send_message(&self, user: char, message: String) {
+        self.tx.send(Message::Send { user, message }).await.unwrap();
     }
 
     pub async fn stream_online(&self) -> impl Stream<Item = Vec<char>> {
@@ -78,6 +85,9 @@ impl Manager {
             Message::Join { name } => {
                 self.join(name).await;
             }
+            Message::Send { user, message } => {
+                self.send_message(user, message).await;
+            }
             Message::RegisterOnline { tx } => {
                 self.register_online_subscription(tx).await;
             }
@@ -90,6 +100,16 @@ impl Manager {
     async fn join(&mut self, name: char) {
         self.users.push(name);
         self.subscriptions.update_register_online(&self.users).await;
+    }
+
+    async fn send_message(&mut self, user: char, message: String) {
+        self.messages.push(ChatMessage {
+            user,
+            content: message,
+        });
+        self.subscriptions
+            .update_register_messages(&self.messages)
+            .await;
     }
 
     async fn register_online_subscription(&mut self, tx: mpsc::Sender<Vec<char>>) {

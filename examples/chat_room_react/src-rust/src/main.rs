@@ -18,6 +18,11 @@ async fn get_name(ctx: Ctx) -> char {
     ctx.name
 }
 
+#[handler]
+async fn send_message(ctx: Ctx, message: String) {
+    ctx.client.send_message(ctx.name, message).await
+}
+
 #[handler(subscription)]
 async fn list_online(ctx: Ctx) -> impl Stream<Item = Vec<char>> {
     ctx.client.stream_online().await
@@ -33,6 +38,7 @@ async fn main() {
     // Construct the qubit router
     let router = Router::new()
         .handler(get_name)
+        .handler(send_message)
         .handler(list_online)
         .handler(list_messages);
 
