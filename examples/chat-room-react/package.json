@@ -1,7 +1,7 @@
 {
   "name": "chat_room_react",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "conc -rk \"cargo watch -C ./src-rust -x run -w ./src -w Cargo.toml\" \"vite --clearScreen=false\"",

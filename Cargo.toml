@@ -1,10 +1,14 @@
-workspace = { members = [
-  "./crates/*",
-  "examples/authentication",
-  "examples/counter",
-  "examples/hello_world",
-  "examples/chat_room_react/src-rust"
-] }
+[workspace]
+members = [
+  "./crates/qubit-macros"
+]
+exclude = [
+  "./examples/authentication",
+  "./examples/chaos",
+  "./examples/chat-room-react/src-rust",
+  "./examples/counter",
+  "./examples/hello-world",
+]
 
 [package]
 name = "qubit"

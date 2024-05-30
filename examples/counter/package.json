@@ -1,19 +1,14 @@
 {
   "name": "counter",
   "version": "1.0.0",
-  "description": "",
+  "private": true,
   "main": "index.js",
   "scripts": {
     "start": "ts-node ./index.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "@qubit-rs/client": "^0.0.5",
-    "ws": "^8.17.0"
-  },
-  "devDependencies": {
+    "@qubit-rs/client": "file:../../packages/client",
+    "ws": "^8.17.0",
     "@types/ws": "^8.5.10",
     "ts-node": "^10.9.2"
   }

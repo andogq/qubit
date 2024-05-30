@@ -1,6 +1,6 @@
 # Examples
 
-- [Hello, World](./hello_world)
+- [Hello, World](./hello-world)
 - [Counter](./counter)
 - [Authentication](./authentication)
-- [Chat Room (React)](./chat_room_react)
+- [Chat Room (React)](./chat-room-react)

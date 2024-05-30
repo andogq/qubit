@@ -41,7 +41,7 @@ focus on building amazing applications.
 qubit = "latest"
 
 ts-rs = "8.1.0" # Required to generate TS types
-serde = { version = "1.0", features = ["derive"] } # Required for seraialisable types
+serde = { version = "1.0", features = ["derive"] } # Required for serialisable types
 futures = "0.3.30" # Required for streaming functionality
 
 tokio = { version = "1.35", features = ["full"] }
@@ -101,7 +101,7 @@ const api = ws<Server>("ws://localhost:9944/rpc");
 
 // Call the handlers
 const message = await api.hello_world();
-console.log("recieved from server:", message);
+console.log("received from server:", message);
 ```
 
 ## Examples
