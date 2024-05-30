@@ -24,10 +24,7 @@ where
 {
     /// Create a new instance of the router.
     pub fn new() -> Self {
-        Self {
-            nested_routers: Vec::new(),
-            handlers: Vec::new(),
-        }
+        Self::default()
     }
 
     /// Attach a handler to the router.
@@ -180,5 +177,14 @@ where
 
                 rpc_module
             })
+    }
+}
+
+impl<Ctx> Default for Router<Ctx> {
+    fn default() -> Self {
+        Self {
+            nested_routers: Default::default(),
+            handlers: Default::default(),
+        }
     }
 }
