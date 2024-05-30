@@ -1,17 +1,21 @@
-import { useEffect, useState } from 'react'
-import { Avatar } from './Avatar'
-import { api } from '../api'
+import { useEffect, useState } from "react";
+import { api } from "../api";
+import { Avatar } from "./Avatar";
 
 export const Online = () => {
-  const [users, setUsers] = useState<string[]>([])
+  const [users, setUsers] = useState<string[]>([]);
 
-  useEffect(() => api.list_online().subscribe({ on_data: setUsers }), [])
+  useEffect(() => api.list_online().subscribe({ on_data: setUsers }), []);
 
-  return <section>
-    <h2>Online ({users.length})</h2>
+  return (
+    <section>
+      <h2>Online ({users.length})</h2>
 
-    <div id="online">
-      {users.map(user => <Avatar key={user} emoji={user} />)}
-    </div>
-  </section>
-}
+      <div id="online">
+        {users.map((user) => (
+          <Avatar key={user} emoji={user} />
+        ))}
+      </div>
+    </section>
+  );
+};

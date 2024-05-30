@@ -6,16 +6,16 @@ import type { Server } from "./bindings.ts";
 import { WebSocket } from "ws";
 
 async function main() {
-    // Connect with the API
-    const api = ws<Server>(
-        "ws://localhost:9944/rpc",
-        // @ts-ignore mis-matching WebSocket definitions
-        { WebSocket },
-    );
+  // Connect with the API
+  const api = ws<Server>(
+    "ws://localhost:9944/rpc",
+    // @ts-ignore mis-matching WebSocket definitions
+    { WebSocket },
+  );
 
-    // Call the handlers
-    const message = await api.hello_world();
-    console.log("recieved from server:", message);
+  // Call the handlers
+  const message = await api.hello_world();
+  console.log("recieved from server:", message);
 }
 
 main();

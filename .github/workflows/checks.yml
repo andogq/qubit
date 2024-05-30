@@ -7,7 +7,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  js-checks:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+      - run: pnpm i
+      - run: pnpm lint --error-on-warnings
+
+  typecheck:
     strategy:
       fail-fast: false
       matrix:
@@ -18,9 +27,6 @@ jobs:
           - examples/chat-room-react
           - examples/counter
           - examples/hello-world
-        check:
-          - lint
-          - tsc
 
     runs-on: ubuntu-latest
     defaults:
@@ -34,9 +40,9 @@ jobs:
           cache: pnpm
           cache-dependency-path: '**/pnpm-lock.yaml'
       - run: pnpm i
-      - run: pnpm ${{ matrix.check }}
+      - run: pnpm tsc
 
-  rs-checks:
+  clippy:
     strategy:
       fail-fast: false
       matrix:

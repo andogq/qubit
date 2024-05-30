@@ -1,6 +1,6 @@
 import { ws } from "@qubit-rs/client";
-import { Server as CookieServer } from "./cookie-auth";
-import { Server as MutableCtxServer } from "./mutable-ctx";
+import type { Server as CookieServer } from "./cookie-auth";
+import type { Server as MutableCtxServer } from "./mutable-ctx";
 
 async function cookie_flow() {
   console.log("----- Beginning Cookie Flow -----");
@@ -22,19 +22,16 @@ async function cookie_flow() {
       console.error("Error whilst accessing secret:", e);
     });
   }
+  // Authenticate with the API
+  await fetch("/cookie/login", {
+    method: "POST",
+    body: new URLSearchParams({ username: "user", password: "password" }),
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  });
 
-  {
-    // Authenticate with the API
-    await fetch("/cookie/login", {
-      method: "POST",
-      body: new URLSearchParams({ username: "user", password: "password" }),
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-    });
-
-    console.log("Successfully authenticated with the API");
-  }
+  console.log("Successfully authenticated with the API");
 
   {
     // Re-create the API now that we're authenticated
@@ -49,9 +46,7 @@ async function cookie_flow() {
 async function mutable_ctx_flow() {
   console.log("----- Beginning Mutable Ctx Flow -----");
 
-  const api = ws<MutableCtxServer>(
-    `ws://${window.location.host}/mutable-ctx/rpc`,
-  );
+  const api = ws<MutableCtxServer>(`ws://${window.location.host}/mutable-ctx/rpc`);
 
   // Attempt to get the secret without authentication
   await api.secret_endpoint().catch((e) => {
