@@ -29,9 +29,6 @@ jobs:
           - examples/hello-world
 
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ${{ matrix.dir }}
     steps:
       - uses: actions/checkout@v4
       - run: corepack enable pnpm
@@ -39,8 +36,14 @@ jobs:
         with:
           cache: pnpm
           cache-dependency-path: '**/pnpm-lock.yaml'
+      - name: Build client package
+        run: pnpm i && pnpm build
+        working-directory: packages/client
+        if: ${{ matrix.dir != 'packages/client' }}
       - run: pnpm i
+        working-directory: ${{ matrix.dir }}
       - run: pnpm tsc
+        working-directory: ${{ matrix.dir }}
 
   clippy:
     strategy:
@@ -57,9 +60,7 @@ jobs:
     env:
       RUSTFLAGS: "-Dwarnings" # Fail on warnings
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ${{ matrix.dir }}
     steps:
       - uses: actions/checkout@v4
       - run: cargo clippy
+        working-directory: ${{ matrix.dir }}
