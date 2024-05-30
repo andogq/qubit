@@ -1,5 +1,15 @@
 # Changelog
 
+## \[0.3.0]
+
+### fix
+
+- [`55f4b31`](https://github.com/andogq/qubit/commit/55f4b31bfef67345e94a815c3c38062494bc1327) allow for `to_service` to return a future which produces the context
+
+### feat
+
+- [`be65ee3`](https://github.com/andogq/qubit/commit/be65ee311aea16002d2311694bb2e30958f8f28b) add `HashSet`, `BTreeSet`, and `BTreeMap` to types that implement `ExportType`
+
 ## \[0.2.1]
 
 - [`3840c3b`](https://github.com/andogq/qubit/commit/3840c3b0854e59626410b15fb5eb57739fbd1902) automatically dervie `ExportType` for `f32` and `f64`
