@@ -12,6 +12,7 @@ In another terminal, install TypeScript dependencies, and run the client!
 
 ```sh
 cd auth-demo
-npm i
-npm run dev
+corepack enable # if not enabled
+pnpm i
+pnpm dev
 ```
