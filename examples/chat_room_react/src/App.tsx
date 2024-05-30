@@ -3,7 +3,11 @@ import { History } from './components/History'
 import { Input } from './components/Input'
 import { Online } from './components/Online'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { refetchOnWindowFocus: false }
+  }
+})
 
 export const App = () => {
   return (

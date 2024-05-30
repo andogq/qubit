@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { api } from '../api'
 import { Avatar } from './Avatar'
 import { useState } from 'react'
@@ -11,15 +11,11 @@ export const Input = () => {
     queryFn: () => api.get_name()
   })
 
-  const sendMessage = useMutation({
-    mutationFn: (message: string) => api.send_message(message)
-  })
-
   return <form onSubmit={e => {
     e.preventDefault()
     const message = value.trim()
     if (value.length > 0) {
-      sendMessage.mutate(message)
+      api.send_message(message)
       setValue('')
     }
   }}>
