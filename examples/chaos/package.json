@@ -1,17 +1,10 @@
 {
-  "name": "example",
+  "name": "chaos",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
+  "private": true,
+  "main": "index.ts",
   "dependencies": {
-    "@qubit-rs/client": "file:../../packages/client"
-  },
-  "devDependencies": {
+    "@qubit-rs/client": "file:../../packages/client",
     "@types/node": "^20.11.25"
   }
 }
