@@ -46,9 +46,7 @@ async function cookie_flow() {
 async function mutable_ctx_flow() {
   console.log("----- Beginning Mutable Ctx Flow -----");
 
-  const api = ws<MutableCtxServer>(
-    `ws://${window.location.host}/mutable-ctx/rpc`,
-  );
+  const api = ws<MutableCtxServer>(`ws://${window.location.host}/mutable-ctx/rpc`);
 
   // Attempt to get the secret without authentication
   await api.secret_endpoint().catch((e) => {
