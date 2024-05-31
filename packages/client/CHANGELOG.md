@@ -1,5 +1,9 @@
 # Changelog
 
+## \[0.2.0]
+
+- [`032d01e`](https://github.com/andogq/qubit/commit/032d01ef832b437d21b04e9d422204d216fc0397) run `pnpm build` before publishing (close #29)
+
 ## \[0.1.0]
 
 ### feat

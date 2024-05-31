@@ -1,5 +1,9 @@
 # Changelog
 
+## \[0.3.0]
+
+- [`3f015f9`](https://github.com/andogq/qubit/commit/3f015f95de5776d2d07472f15cada703950e658a) pass all CI checks
+
 ## \[0.2.1]
 
 - [`d2bf039`](https://github.com/andogq/qubit/commit/d2bf03992c9ea1b160497e371882b51377f4c2ec) implement `ExportType` derive for enums (close #20)

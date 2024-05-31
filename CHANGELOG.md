@@ -1,5 +1,14 @@
 # Changelog
 
+## \[0.4.0]
+
+- [`ea54e2b`](https://github.com/andogq/qubit/commit/ea54e2b76ab11c2dae21eda5dfa7188cfcdb717a) change exported server type to `QubitServer` (close #28)
+- [`3f015f9`](https://github.com/andogq/qubit/commit/3f015f95de5776d2d07472f15cada703950e658a) pass all CI checks
+
+### Dependencies
+
+- Upgraded to `qubit-macros@0.3.0`
+
 ## \[0.3.0]
 
 ### fix
