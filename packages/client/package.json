@@ -1,13 +1,15 @@
 {
   "name": "@qubit-rs/client",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "",
   "type": "module",
   "scripts": {
     "lint": "tsc",
     "build": "tsup ./src/index.ts"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "main": "./dist/index.cjs",
   "types": "./dist/index.d.cts",
   "exports": {
@@ -33,7 +35,10 @@
     "typescript": "^5.3.3"
   },
   "tsup": {
-    "format": ["esm", "cjs"],
+    "format": [
+      "esm",
+      "cjs"
+    ],
     "splitting": true,
     "dts": true
   }
