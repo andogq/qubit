@@ -59,11 +59,11 @@ impl Display for TypeRegistry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Write out all inbuilt types first
         for inbuilt in &self.inbuilt {
-            write!(f, "{inbuilt}\n")?;
+            writeln!(f, "{inbuilt}")?;
         }
 
         for (name, ty) in &self.user {
-            write!(f, "export type {name} = {ty};\n")?;
+            writeln!(f, "export type {name} = {ty};")?;
         }
 
         Ok(())

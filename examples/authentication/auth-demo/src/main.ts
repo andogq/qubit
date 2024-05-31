@@ -1,6 +1,6 @@
 import { ws } from "@qubit-rs/client";
-import type { Server as CookieServer } from "./cookie-auth";
-import type { Server as MutableCtxServer } from "./mutable-ctx";
+import type { QubitServer as CookieServer } from "./cookie-auth";
+import type { QubitServer as MutableCtxServer } from "./mutable-ctx";
 
 async function cookie_flow() {
   console.log("----- Beginning Cookie Flow -----");

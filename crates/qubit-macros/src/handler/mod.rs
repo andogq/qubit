@@ -305,6 +305,6 @@ impl From<Handler> for TokenStream {
                     <#return_type as qubit::ExportType>::export(#registry_ident);
                 }
             }
-        }.into()
+        }
     }
 }

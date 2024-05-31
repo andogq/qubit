@@ -39,6 +39,7 @@ pub struct Test {
 }
 
 #[derive(Clone, Default)]
+#[allow(dead_code)]
 pub struct AppCtx {
     database: bool,
     log: String,
@@ -50,6 +51,7 @@ mod user {
     use super::*;
 
     #[derive(Clone)]
+    #[allow(dead_code)]
     pub struct UserCtx {
         app_ctx: AppCtx,
         user: u32,
@@ -164,6 +166,7 @@ struct NestedStruct {
 }
 
 #[derive(Clone, Serialize, ExportType, TS)]
+#[allow(dead_code)]
 enum MyEnum {
     A,
     B(u8),
