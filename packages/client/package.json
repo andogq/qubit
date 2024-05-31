@@ -7,9 +7,7 @@
     "lint": "tsc",
     "build": "tsup ./src/index.ts"
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "main": "./dist/index.cjs",
   "types": "./dist/index.d.cts",
   "exports": {
@@ -35,10 +33,7 @@
     "typescript": "^5.3.3"
   },
   "tsup": {
-    "format": [
-      "esm",
-      "cjs"
-    ],
+    "format": ["esm", "cjs"],
     "splitting": true,
     "dts": true
   }
