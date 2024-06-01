@@ -10,7 +10,7 @@ exclude = [
 
 [package]
 name = "qubit"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 authors = [ "Tom Anderson <tom@ando.gq>" ]
 repository = "https://github.com/andogq/qubit"
@@ -29,5 +29,5 @@ serde_json = "1.0.111"
 tokio = { version = "1.37.0", features = [ "rt", "rt-multi-thread" ] }
 tower = "0.4.13"
 ts-rs = "8.1.0"
-qubit-macros = { version = "0.3.0", path = "./crates/qubit-macros" }
+qubit-macros = { version = "0.4.0", path = "./crates/qubit-macros" }
 trait-variant = "0.1.2"
