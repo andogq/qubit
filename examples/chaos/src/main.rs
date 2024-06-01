@@ -14,7 +14,7 @@ use axum::routing::get;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug, ExportType)]
+#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug)]
 pub struct Metadata {
     param_a: String,
     param_b: u32,
@@ -23,7 +23,7 @@ pub struct Metadata {
     more_metadata: Option<Box<Metadata>>,
 }
 
-#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug, ExportType)]
+#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug)]
 pub struct User {
     name: String,
     email: String,
@@ -32,7 +32,7 @@ pub struct User {
     metadata: Metadata,
 }
 
-#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug, ExportType)]
+#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug)]
 pub struct Test {
     a: usize,
     b: bool,
@@ -159,13 +159,13 @@ async fn array(_ctx: AppCtx) -> Vec<String> {
     vec!["a".to_string(), "b".to_string(), "c".to_string()]
 }
 
-#[derive(Clone, Serialize, ExportType, TS)]
+#[derive(Clone, Serialize, TS)]
 struct NestedStruct {
     a: f32,
     b: bool,
 }
 
-#[derive(Clone, Serialize, ExportType, TS)]
+#[derive(Clone, Serialize, TS)]
 #[allow(dead_code)]
 enum MyEnum {
     A,
@@ -190,7 +190,7 @@ async fn main() {
         .nest("user", user::create_router());
 
     // Save the router's bindings
-    app.write_type_to_file("./bindings.ts");
+    app.write_bindings_to_dir("./bindings");
 
     // Set up the context for the app
     let ctx = AppCtx::default();

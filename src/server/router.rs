@@ -1,4 +1,4 @@
-use std::{convert::Infallible, fs, path::Path};
+use std::{collections::HashSet, convert::Infallible, fmt::Write as _, fs, path::Path};
 
 use futures::FutureExt;
 use http::Request;
@@ -41,24 +41,67 @@ where
         self
     }
 
-    /// Write this router's type to the provided path, often a path that is reachable from the
-    /// TypeScript client.
-    pub fn write_type_to_file(&self, path: impl AsRef<Path>) {
-        // Generate all dependencies for this router
-        let dependencies = {
-            let mut registry = TypeRegistry::default();
-            self.add_dependencies(&mut registry);
-            registry
-        };
+    /// Write required bindings for this router the the provided directory. The directory will be
+    /// cleared, so anything within will be lost.
+    pub fn write_bindings_to_dir(&self, out_dir: impl AsRef<Path>) {
+        let out_dir = out_dir.as_ref();
 
-        // Generate the type for this router
-        let router = format!("export type QubitServer = {};", self.get_type());
+        // Make sure the directory path exists
+        fs::create_dir_all(out_dir).unwrap();
 
-        // Build the file contents
-        let content = format!("{dependencies}\n{router}");
+        // Clear the directiry
+        fs::remove_dir_all(out_dir).unwrap();
 
-        // Write out
-        fs::write(path, content).unwrap();
+        // Re-create the directory
+        fs::create_dir_all(out_dir).unwrap();
+
+        // Export all the dependencies, and create their import statements
+        let (imports, _types) = self
+            .handlers
+            .iter()
+            .chain(
+                self.nested_routers
+                    .iter()
+                    .flat_map(|(_, router)| &router.handlers),
+            )
+            .flat_map(|handler| {
+                (handler.export_all_dependencies_to)(out_dir)
+                    .unwrap()
+                    .into_iter()
+                    .map(|dep| {
+                        (
+                            format!("./{}", dep.output_path.to_str().unwrap()),
+                            dep.ts_name,
+                        )
+                    })
+                    .chain((handler.qubit_types)().into_iter().map(|ty| ty.to_ts()))
+            })
+            .fold(
+                (String::new(), HashSet::new()),
+                |(mut imports, mut types), ty| {
+                    if types.contains(&ty) {
+                        return (imports, types);
+                    }
+
+                    let (package, ty_name) = ty;
+
+                    write!(
+                        &mut imports,
+                        r#"import type {{ {ty_name} }} from "{package}";"#,
+                    )
+                    .unwrap();
+
+                    types.insert((package, ty_name));
+
+                    (imports, types)
+                },
+            );
+
+        // Generate server type
+        let server_type = format!("export type QubitServer = {};", self.get_type());
+
+        // Write out index file
+        fs::write(out_dir.join("index.ts"), [imports, server_type].join("\n")).unwrap();
     }
 
     /// Turn the router into a [`tower::Service`], so that it can be nested into a HTTP server.
@@ -113,19 +156,6 @@ where
             }),
             server_handle,
         )
-    }
-
-    /// Adds all of the dependencies for this router to the provided dependency list.
-    fn add_dependencies(&self, dependencies: &mut TypeRegistry) {
-        // Add all handler dependencies
-        self.handlers
-            .iter()
-            .for_each(|handler| (handler.export_types)(dependencies));
-
-        // Add dependencies for nested routers
-        self.nested_routers
-            .iter()
-            .for_each(|(_, router)| router.add_dependencies(dependencies));
     }
 
     /// Get the TypeScript type of this router.

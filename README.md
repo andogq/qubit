@@ -70,7 +70,7 @@ async fn hello_world(_ctx: ()) -> String {
 let router = Router::new()
     .handler(hello_world);
 
-router.write_type_to_file("./bindings.ts");
+router.write_bindings_to_dir("./bindings");
 ```
 
 3. Attach the Qubit router to an Axum router, and start it
@@ -95,10 +95,10 @@ hyper::Server::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
 ```ts
 // Import transport from client, and generated server type
 import { ws } from "@qubit-rs/client";
-import type { Server } from "./bindings.ts";
+import type { QubitServer } from "./bindings";
 
 // Connect with the API
-const api = ws<Server>("ws://localhost:9944/rpc");
+const api = ws<QubitServer>("ws://localhost:9944/rpc");
 
 // Call the handlers
 const message = await api.hello_world();

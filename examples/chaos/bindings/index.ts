@@ -1,0 +1,2 @@
+import type { Stream } from "@qubit-rs/client";import type { MyEnum } from "./MyEnum.ts";import type { User } from "./User.ts";import type { Test } from "./Test.ts";
+export type QubitServer = { version: () => Promise<string>, count: () => Promise<number>, countdown: (min: number, max: number) => Stream<number>, array: () => Promise<Array<string>>, enum_test: () => Promise<MyEnum>, user: { someHandler: (_id: string) => Promise<User>, create: (name: string, email: string, age: number) => Promise<User>, list: () => Promise<Array<Test>>, asdf: () => Promise<null> } };

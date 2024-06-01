@@ -1,4 +1,2 @@
-import type { Stream } from "@qubit-rs/client";
-export type ChatMessage = { user: string, content: string, };
-
+import type { Stream } from "@qubit-rs/client";import type { ChatMessage } from "./ChatMessage.ts";
 export type QubitServer = { get_name: () => Promise<string>, send_message: (message: string) => Promise<null>, list_online: () => Stream<Array<string>>, list_messages: () => Stream<Array<ChatMessage>> };

@@ -26,16 +26,6 @@ impl HandlerReturn {
             Self::Return(_) => "Promise".to_string(),
         }
     }
-
-    /// Register any required inbuilt types.
-    fn register_inbuilt(&self, registry: &Ident) -> TokenStream {
-        match self {
-            HandlerReturn::Stream(_) => {
-                quote! { #registry.inbuilt(qubit::builder::ty::InbuiltType::Stream); }
-            }
-            HandlerReturn::Return(_) => TokenStream::new(),
-        }
-    }
 }
 
 impl ToTokens for HandlerReturn {
@@ -272,8 +262,12 @@ impl From<Handler> for TokenStream {
         // Must be a collision-free ident to use as a generic within the handler
         let inner_ctx_ty = quote! { __internal_AppCtx };
 
-        let registry_ident = parse_quote! { registry };
-        let inbuilt_return_type = return_type.register_inbuilt(&registry_ident);
+        // Generate implementation of the `qubit_types` method.
+        let qubit_types = if let HandlerReturn::Stream(_) = return_type {
+            quote! { ::std::vec![::qubit::ty::util::QubitType::Stream] }
+        } else {
+            quote! { ::std::vec![] }
+        };
 
         quote! {
             #[allow(non_camel_case_types)]
@@ -295,14 +289,18 @@ impl From<Handler> for TokenStream {
                     #register_impl
                 }
 
-                fn export_types(#registry_ident: &mut qubit::builder::ty::TypeRegistry) {
-                    #inbuilt_return_type
+                fn export_all_dependencies_to(out_dir: &::std::path::Path) -> ::std::result::Result<::std::vec::Vec<::ts_rs::Dependency>, ::ts_rs::ExportError> {
+                    // Export the return type
+                    let mut dependencies = ::qubit::ty::util::export_with_dependencies::<#return_type>(out_dir)?;
 
-                    // Add dependencies for the parameters
-                    #(<#param_tys as qubit::ExportType>::export(#registry_ident);)*
+                    // Export each of the parameters
+                    #(dependencies.extend(::qubit::ty::util::export_with_dependencies::<#param_tys>(out_dir)?);)*
 
-                    // Add dependencies for the return type
-                    <#return_type as qubit::ExportType>::export(#registry_ident);
+                    ::std::result::Result::Ok(dependencies)
+                }
+
+                fn qubit_types() -> ::std::vec::Vec<::qubit::ty::util::QubitType> {
+                    #qubit_types
                 }
             }
         }

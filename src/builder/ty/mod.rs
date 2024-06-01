@@ -1,11 +1,7 @@
 //! Type generation specific functionality. There is no real need for this to be directly used,
 //! [`qubit_macros::handler`] should handle it all.
 
-mod export_type;
-mod registry;
-
-pub use export_type::*;
-pub use registry::*;
+pub mod util;
 
 /// Components used to construct the client type for this handler.
 #[derive(Debug)]

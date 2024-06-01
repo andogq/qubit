@@ -8,7 +8,7 @@
   },
   "files": {
     "include": ["*.ts", "*.tsx", "*.json"],
-    "ignore": ["bindings.ts", "cookie-auth.ts", "mutable-ctx.ts"]
+    "ignore": ["bindings*"]
   },
   "organizeImports": {
     "enabled": true
