@@ -41,6 +41,8 @@ where
         self
     }
 
+    /// Write required bindings for this router the the provided directory. The directory will be
+    /// cleared, so anything within will be lost.
     pub fn write_bindings_to_dir(&self, out_dir: impl AsRef<Path>) {
         let out_dir = out_dir.as_ref();
 
@@ -102,26 +104,6 @@ where
         fs::write(out_dir.join("index.ts"), [imports, server_type].join("\n")).unwrap();
     }
 
-    /// Write this router's type to the provided path, often a path that is reachable from the
-    /// TypeScript client.
-    pub fn write_type_to_file(&self, path: impl AsRef<Path>) {
-        // Generate all dependencies for this router
-        let dependencies = {
-            let mut registry = TypeRegistry::default();
-            self.add_dependencies(&mut registry);
-            registry
-        };
-
-        // Generate the type for this router
-        let router = format!("export type QubitServer = {};", self.get_type());
-
-        // Build the file contents
-        let content = format!("{dependencies}\n{router}");
-
-        // Write out
-        fs::write(path, content).unwrap();
-    }
-
     /// Turn the router into a [`tower::Service`], so that it can be nested into a HTTP server.
     ///
     /// Every incomming request has its own `Ctx` created for it, using the provided `build_ctx`
@@ -174,19 +156,6 @@ where
             }),
             server_handle,
         )
-    }
-
-    /// Adds all of the dependencies for this router to the provided dependency list.
-    fn add_dependencies(&self, dependencies: &mut TypeRegistry) {
-        // Add all handler dependencies
-        self.handlers
-            .iter()
-            .for_each(|handler| (handler.export_types)(dependencies));
-
-        // Add dependencies for nested routers
-        self.nested_routers
-            .iter()
-            .for_each(|(_, router)| router.add_dependencies(dependencies));
     }
 
     /// Get the TypeScript type of this router.

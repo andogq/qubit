@@ -96,7 +96,7 @@ async fn secret_endpoint(ctx: AuthCtx) -> String {
 
 pub fn init() -> axum::Router<()> {
     let router = Router::new().handler(echo_cookie).handler(secret_endpoint);
-    router.write_type_to_file("./auth-demo/src/cookie-auth.ts");
+    router.write_bindings_to_dir("./auth-demo/src/bindings-cookie-auth");
 
     let (qubit_service, handle) = router.to_service(move |req| {
         // Extract cookie from request

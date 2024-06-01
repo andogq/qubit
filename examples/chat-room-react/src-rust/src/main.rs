@@ -43,8 +43,8 @@ async fn main() {
         .handler(list_messages);
 
     // Save the type
-    router.write_type_to_file("../src/bindings.ts");
-    println!("Successfully wrote server types to `./bindings.ts`");
+    router.write_bindings_to_dir("../src/bindings");
+    println!("Successfully wrote server bindings to `./bindings`");
 
     // Create service and handle
     let client = Manager::start();

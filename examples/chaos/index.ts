@@ -1,5 +1,5 @@
 import { ws } from "@qubit-rs/client";
-import type { QubitServer } from "./bindings.ts";
+import type { QubitServer } from "./bindings";
 
 const client = ws<QubitServer>("ws://localhost:9944/rpc");
 
