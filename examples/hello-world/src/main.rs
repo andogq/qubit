@@ -13,7 +13,7 @@ async fn main() {
     let router = Router::new().handler(hello_world);
 
     // Save the type
-    router.write_type_to_file("./bindings.ts");
+    router.write_bindings_to_dir("./bindings");
     println!("Successfully write server type to `./bindings.ts`");
 
     // Create service and handle

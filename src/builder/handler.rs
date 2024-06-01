@@ -19,7 +19,11 @@
 //! pointers to the methods of [`Handler`]. This is possible since none of these methods reference
 //! `self`. This is what is actually stored on [`crate::Router`].
 
-use crate::{builder::RpcBuilder, HandlerType, TypeRegistry};
+use std::path::Path;
+
+use ts_rs::{Dependency, ExportError};
+
+use crate::{builder::RpcBuilder, util::QubitType, HandlerType, TypeRegistry};
 
 /// Handlers run for specific RPC requests. This trait will automatically be implemented if the
 /// [`crate::handler`] macro is attached to a function containing a handler implementation.
@@ -32,6 +36,11 @@ pub trait Handler<AppCtx> {
 
     /// Export any types required to use this [`HandlerType`] in the client.
     fn export_types(registry: &mut TypeRegistry);
+
+    fn export_all_dependencies_to(out_dir: &Path) -> Result<Vec<Dependency>, ExportError>;
+
+    /// Provide a list of Qubit types that this handler relies on.
+    fn qubit_types() -> Vec<QubitType>;
 }
 
 /// Wrapper struct to assist with erasure of concrete [`Handler`] type. Contains function pointers
@@ -50,6 +59,9 @@ pub(crate) struct HandlerCallbacks<Ctx> {
     /// Function pointer to the implementation that will add any type dependencies for the handler
     /// to the provided collection.
     pub export_types: fn(&mut TypeRegistry),
+
+    pub export_all_dependencies_to: fn(&Path) -> Result<Vec<Dependency>, ExportError>,
+    pub qubit_types: fn() -> Vec<QubitType>,
 }
 
 impl<Ctx> HandlerCallbacks<Ctx>
@@ -64,6 +76,8 @@ where
             register: H::register,
             get_type: H::get_type,
             export_types: H::export_types,
+            export_all_dependencies_to: H::export_all_dependencies_to,
+            qubit_types: H::qubit_types,
         }
     }
 }

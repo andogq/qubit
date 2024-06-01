@@ -275,6 +275,13 @@ impl From<Handler> for TokenStream {
         let registry_ident = parse_quote! { registry };
         let inbuilt_return_type = return_type.register_inbuilt(&registry_ident);
 
+        // Generate implementation of the `qubit_types` method.
+        let qubit_types = if let HandlerReturn::Stream(_) = return_type {
+            quote! { ::std::vec![::qubit::ty::util::QubitType::Stream] }
+        } else {
+            quote! { ::std::vec![] }
+        };
+
         quote! {
             #[allow(non_camel_case_types)]
             #visibility struct #name;
@@ -303,6 +310,20 @@ impl From<Handler> for TokenStream {
 
                     // Add dependencies for the return type
                     <#return_type as qubit::ExportType>::export(#registry_ident);
+                }
+
+                fn export_all_dependencies_to(out_dir: &::std::path::Path) -> ::std::result::Result<::std::vec::Vec<::ts_rs::Dependency>, ::ts_rs::ExportError> {
+                    // Export the return type
+                    let mut dependencies = ::qubit::ty::util::export_with_dependencies::<#return_type>(out_dir)?;
+
+                    // Export each of the parameters
+                    #(dependencies.extend(::qubit::ty::util::export_with_dependencies::<#param_tys>(out_dir)?);)*
+
+                    ::std::result::Result::Ok(dependencies)
+                }
+
+                fn qubit_types() -> ::std::vec::Vec<::qubit::ty::util::QubitType> {
+                    #qubit_types
                 }
             }
         }

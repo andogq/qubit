@@ -1,4 +1,4 @@
-use std::{convert::Infallible, fs, path::Path};
+use std::{collections::HashSet, convert::Infallible, fmt::Write as _, fs, path::Path};
 
 use futures::FutureExt;
 use http::Request;
@@ -39,6 +39,67 @@ where
         self.nested_routers.push((namespace, router));
 
         self
+    }
+
+    pub fn write_bindings_to_dir(&self, out_dir: impl AsRef<Path>) {
+        let out_dir = out_dir.as_ref();
+
+        // Make sure the directory path exists
+        fs::create_dir_all(out_dir).unwrap();
+
+        // Clear the directiry
+        fs::remove_dir_all(out_dir).unwrap();
+
+        // Re-create the directory
+        fs::create_dir_all(out_dir).unwrap();
+
+        // Export all the dependencies, and create their import statements
+        let (imports, _types) = self
+            .handlers
+            .iter()
+            .chain(
+                self.nested_routers
+                    .iter()
+                    .flat_map(|(_, router)| &router.handlers),
+            )
+            .flat_map(|handler| {
+                (handler.export_all_dependencies_to)(out_dir)
+                    .unwrap()
+                    .into_iter()
+                    .map(|dep| {
+                        (
+                            format!("./{}", dep.output_path.to_str().unwrap()),
+                            dep.ts_name,
+                        )
+                    })
+                    .chain((handler.qubit_types)().into_iter().map(|ty| ty.to_ts()))
+            })
+            .fold(
+                (String::new(), HashSet::new()),
+                |(mut imports, mut types), ty| {
+                    if types.contains(&ty) {
+                        return (imports, types);
+                    }
+
+                    let (package, ty_name) = ty;
+
+                    write!(
+                        &mut imports,
+                        r#"import type {{ {ty_name} }} from "{package}";"#,
+                    )
+                    .unwrap();
+
+                    types.insert((package, ty_name));
+
+                    (imports, types)
+                },
+            );
+
+        // Generate server type
+        let server_type = format!("export type QubitServer = {};", self.get_type());
+
+        // Write out index file
+        fs::write(out_dir.join("index.ts"), [imports, server_type].join("\n")).unwrap();
     }
 
     /// Write this router's type to the provided path, often a path that is reachable from the

@@ -48,8 +48,8 @@ async fn main() {
         .handler(countdown);
 
     // Save the type
-    router.write_type_to_file("./bindings.ts");
-    println!("Successfully write server type to `./bindings.ts`");
+    router.write_bindings_to_dir("./bindings");
+    println!("Successfully write bindings to `./bindings`");
 
     // Create initial ctx
     let ctx = Ctx::default();

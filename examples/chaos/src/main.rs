@@ -191,6 +191,7 @@ async fn main() {
 
     // Save the router's bindings
     app.write_type_to_file("./bindings.ts");
+    app.write_bindings_to_dir("./bindings");
 
     // Set up the context for the app
     let ctx = AppCtx::default();
