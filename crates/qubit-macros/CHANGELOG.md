@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.4.0]
+
+### feat
+
+- [`625df36`](https://github.com/andogq/qubit/commit/625df3640b3a1134866040de56a1e29943c15e76) remove `ExportType` macro, to now only rely on `ts-rs::TS` (close #26)
+
 ## \[0.3.0]
 
 - [`3f015f9`](https://github.com/andogq/qubit/commit/3f015f95de5776d2d07472f15cada703950e658a) pass all CI checks
