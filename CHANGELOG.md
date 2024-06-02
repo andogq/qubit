@@ -1,5 +1,15 @@
 # Changelog
 
+## \[0.5.1]
+
+### Dependencies
+
+- Upgraded to `qubit-macros@0.4.1`
+
+### minor
+
+- [`a57ec51`](https://github.com/andogq/qubit/commit/a57ec51e05b8b4dc509a401f1a17dee1d3f45b5e) update crate description to match repository
+
 ## \[0.5.0]
 
 ### Dependencies
