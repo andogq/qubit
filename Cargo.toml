@@ -15,7 +15,7 @@ edition = "2021"
 authors = [ "Tom Anderson <tom@ando.gq>" ]
 repository = "https://github.com/andogq/qubit"
 license = "MIT"
-description = "Type-safe framework for an JSONRPC server written in Rust with an automatically generated TypeScript client."
+description = "Seamless RPC for Rust & TypeScript"
 exclude = [ "./client", "./example" ]
 
 [dependencies]
