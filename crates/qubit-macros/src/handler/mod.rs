@@ -45,7 +45,7 @@ pub struct Handler {
     name: Ident,
 
     /// Type of the context used in the handler.
-    ctx_ty: Type,
+    ctx_ty: Option<Type>,
 
     /// Inputs for the handler. Currently does not support any kind of destructuring.
     inputs: Vec<(Ident, Type)>,
@@ -98,15 +98,11 @@ impl Handler {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        // TODO: Remove this restriction, allow handlers to accept no parameters
-        if inputs.is_empty() {
-            return Err(Error::new(
-                span,
-                "handlers must accept atleast one argument (the ctx)",
-            ));
-        }
-
-        let (_, ctx_ty) = inputs.remove(0);
+        let ctx_ty = if inputs.is_empty() {
+            None
+        } else {
+            Some(inputs.remove(0).1)
+        };
 
         Ok(Self {
             implementation,
@@ -214,6 +210,15 @@ impl From<Handler> for TokenStream {
 
         let handler_name_str = name.to_string();
 
+        // Must be a collision-free ident to use as a generic within the handler
+        let inner_ctx_ty: Type = parse_quote! { __internal_AppCtx };
+
+        // Record whether the handler needs a ctx passed to it
+        let ctx_required = ctx_ty.is_some();
+
+        // Use the ctx type, or default back to the app ctx type if none is provided
+        let ctx_ty = ctx_ty.unwrap_or_else(|| inner_ctx_ty.clone());
+
         let register_impl = {
             // Define idents in one place, so they will be checked by the compiler
             let ctx_ident = quote! { ctx };
@@ -226,17 +231,23 @@ impl From<Handler> for TokenStream {
                 }
             });
 
+            let handler_call = if ctx_required {
+                quote! { handler(#ctx_ident, #(#param_names,)*).await }
+            } else {
+                quote! { handler().await }
+            };
+
             // Body of the handler registration implementation
             let register_inner = quote! {
                 #parse_params
 
-                handler(#ctx_ident, #(#param_names,)*).await
+                #handler_call
             };
 
             match &return_type {
                 HandlerReturn::Return(_) => {
                     quote! {
-                        rpc_builder.query(#handler_name_str, |#ctx_ident, #params_ident| async move {
+                        rpc_builder.query(#handler_name_str, |#ctx_ident: #ctx_ty, #params_ident| async move {
                             #register_inner
                         })
                     }
@@ -250,7 +261,7 @@ impl From<Handler> for TokenStream {
                             #handler_name_str,
                             #notification_name,
                             #unsubscribe_name,
-                            |#ctx_ident, #params_ident| async move {
+                            |#ctx_ident: #ctx_ty, #params_ident| async move {
                                 #register_inner
                             }
                         )
@@ -258,9 +269,6 @@ impl From<Handler> for TokenStream {
                 }
             }
         };
-
-        // Must be a collision-free ident to use as a generic within the handler
-        let inner_ctx_ty = quote! { __internal_AppCtx };
 
         // Generate implementation of the `qubit_types` method.
         let qubit_types = if let HandlerReturn::Stream(_) = return_type {
@@ -273,8 +281,8 @@ impl From<Handler> for TokenStream {
             #[allow(non_camel_case_types)]
             #visibility struct #name;
             impl<#inner_ctx_ty> qubit::Handler<#inner_ctx_ty> for #name
-                where #ctx_ty: qubit::FromContext<#inner_ctx_ty>,
-                    #inner_ctx_ty: 'static + Send + Sync + Clone
+                where #inner_ctx_ty: 'static + Send + Sync + Clone,
+                     #ctx_ty: ::qubit::FromContext<#inner_ctx_ty>,
             {
                 fn get_type() -> qubit::HandlerType {
                     qubit::HandlerType {
