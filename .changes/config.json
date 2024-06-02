@@ -15,7 +15,14 @@
     "rust": {
       "version": true,
       "getPublishedVersion": "cargo search ${ pkg.pkg } --limit 1 | sed -nE 's/^[^\"]*\"//; s/\".*//1p'",
-      "prepublish": ["cargo generate-lockfile"],
+      "prepublish": [
+        {
+          "command": "cargo generate-lockfile",
+          "dryRunCommand": true,
+          "runFromRoot": true,
+          "pipe": true
+        }
+      ],
       "publish": ["cargo publish"],
       "postpublish": [
         "git tag ${ pkg.pkg }-v${ pkgFile.versionMajor } -f",
