@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.4.1]
+
+### feat
+
+- [`f227cc9`](https://github.com/andogq/qubit/commit/f227cc96e6170cb039905fe0b55b5585ca5b81ee) handlers with no parameters no longer need to take `ctx`
+
 ## \[0.4.0]
 
 ### feat
