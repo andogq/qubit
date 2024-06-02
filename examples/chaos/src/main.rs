@@ -75,7 +75,7 @@ mod user {
     }
 
     #[handler(name = "someHandler")]
-    async fn get(_ctx: UserCtx, _id: String) -> User {
+    async fn get(_ctx: AppCtx, _id: String) -> User {
         User {
             name: "some user".to_string(),
             email: "email@example.com".to_string(),
@@ -94,13 +94,13 @@ mod user {
         use super::*;
 
         #[handler]
-        pub async fn asdf(_ctx: UserCtx) {
+        pub async fn asdf() {
             todo!()
         }
     }
 
     #[handler]
-    async fn create(_ctx: UserCtx, name: String, email: String, age: u32) -> User {
+    async fn create(_ctx: AppCtx, name: String, email: String, age: u32) -> User {
         println!("creating user: {name}");
 
         User {
@@ -118,7 +118,7 @@ mod user {
     }
 
     #[handler]
-    async fn list(_ctx: AppCtx) -> Vec<Test> {
+    async fn list() -> Vec<Test> {
         todo!()
     }
 }
@@ -141,7 +141,7 @@ async fn count(ctx: CountCtx) -> usize {
 }
 
 #[handler(subscription)]
-async fn countdown(_ctx: AppCtx, min: usize, max: usize) -> impl Stream<Item = usize> {
+async fn countdown(_ctx: CountCtx, min: usize, max: usize) -> impl Stream<Item = usize> {
     stream::iter(min..=max).then(|n| async move {
         tokio::time::sleep(Duration::from_secs(1)).await;
 
@@ -150,12 +150,12 @@ async fn countdown(_ctx: AppCtx, min: usize, max: usize) -> impl Stream<Item = u
 }
 
 #[handler]
-async fn version(_ctx: AppCtx) -> String {
+async fn version() -> String {
     "v1.0.0".to_string()
 }
 
 #[handler]
-async fn array(_ctx: AppCtx) -> Vec<String> {
+async fn array() -> Vec<String> {
     vec!["a".to_string(), "b".to_string(), "c".to_string()]
 }
 
@@ -174,7 +174,7 @@ enum MyEnum {
     D(NestedStruct),
 }
 #[handler]
-async fn enum_test(_ctx: AppCtx) -> MyEnum {
+async fn enum_test() -> MyEnum {
     MyEnum::B(10)
 }
 

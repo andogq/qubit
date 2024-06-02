@@ -46,7 +46,7 @@ async fn login(ctx: Ctx, username: String, password: String) -> bool {
 }
 
 #[handler]
-async fn secret_endpoint(_ctx: AuthCtx) -> String {
+async fn secret_endpoint() -> String {
     "Secret message!".to_string()
 }
 

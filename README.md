@@ -63,7 +63,7 @@ hyper = { version = "0.14", features = ["server"] }
 
 ```rs
 #[handler]
-async fn hello_world(_ctx: ()) -> String {
+async fn hello_world() -> String {
     "Hello, world!".to_string()
 }
 

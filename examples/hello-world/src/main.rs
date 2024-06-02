@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use qubit::{handler, Router};
 
 #[handler]
-async fn hello_world(_ctx: ()) -> String {
+async fn hello_world() -> String {
     "Hello, world!".to_string()
 }
 
