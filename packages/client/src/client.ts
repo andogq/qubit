@@ -3,8 +3,15 @@ import { wrap_promise } from "./proxy";
 import type { StreamSubscriber } from "./stream";
 
 export type Client = {
-  request: (id: string | number, payload: any) => Promise<RpcResponse<any>>;
-  subscribe?: (id: string | number, on_data?: (value: any) => void, on_end?: () => void) => () => void;
+  request: (
+    id: string | number,
+    payload: any,
+  ) => Promise<RpcResponse<unknown> | null>;
+  subscribe?: (
+    id: string | number,
+    on_data?: (value: any) => void,
+    on_end?: () => void,
+  ) => () => void;
 };
 
 export function build_client<Server>(client: Client): Server {
@@ -30,7 +37,7 @@ export function build_client<Server>(client: Client): Server {
               const payload = create_payload(id, method.join("."), args);
               const response = await client.request(id, payload);
 
-              if (response.type === "ok") {
+              if (response !== null && response.type === "ok") {
                 resolve(response.value);
               } else {
                 reject(response);
@@ -82,7 +89,10 @@ export function build_client<Server>(client: Client): Server {
                 let required_count: number | null = null;
 
                 // Result should be a subscription ID
-                if (typeof subscription_id !== "string" && typeof subscription_id !== "number") {
+                if (
+                  typeof subscription_id !== "string" &&
+                  typeof subscription_id !== "number"
+                ) {
                   // TODO: Throw an error
                   on_error(new Error("cannot subscribe to subscription"));
                   return () => {};
@@ -92,7 +102,11 @@ export function build_client<Server>(client: Client): Server {
                 return subscribe(
                   subscription_id,
                   (data) => {
-                    if (typeof data === "object" && "close_stream" in data && data.close_stream === subscription_id) {
+                    if (
+                      typeof data === "object" &&
+                      "close_stream" in data &&
+                      data.close_stream === subscription_id
+                    ) {
                       required_count = data.count;
                     } else if (on_data) {
                       count += 1;
