@@ -41,9 +41,7 @@ export function create_subscription_manager() {
 
       // Make sure the handler won't be over written
       if (subscription.handler) {
-        console.error(
-          `attempted to subscribe to a subscription multiple times (subscription ID: ${id})`,
-        );
+        console.error(`attempted to subscribe to a subscription multiple times (subscription ID: ${id})`);
         return;
       }
 

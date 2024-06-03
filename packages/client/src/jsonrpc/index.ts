@@ -41,11 +41,7 @@ export function parse_response<T>(response: any): RpcResponse<T> | null {
       throw new Error("invalid value for `jsonrpc`");
     }
 
-    if (
-      "params" in response &&
-      "subscription" in response.params &&
-      "result" in response.params
-    ) {
+    if ("params" in response && "subscription" in response.params && "result" in response.params) {
       return {
         type: "message",
         id: response.params.subscription,
@@ -53,11 +49,7 @@ export function parse_response<T>(response: any): RpcResponse<T> | null {
       };
     }
 
-    if (
-      typeof response?.id !== "number" &&
-      typeof response?.id !== "string" &&
-      response?.id !== null
-    ) {
+    if (typeof response?.id !== "number" && typeof response?.id !== "string" && response?.id !== null) {
       throw new Error("missing `id` field from response");
     }
 
@@ -66,10 +58,7 @@ export function parse_response<T>(response: any): RpcResponse<T> | null {
     }
 
     if ("error" in response && !("result" in response)) {
-      if (
-        typeof response.error?.code === "number" &&
-        typeof response.error?.message === "string"
-      ) {
+      if (typeof response.error?.code === "number" && typeof response.error?.message === "string") {
         // TODO: Validate error.data field when it's decided
         return { type: "error", id: response.id, value: response.error };
       }

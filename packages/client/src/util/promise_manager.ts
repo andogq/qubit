@@ -5,10 +5,7 @@ import type { RpcResponse } from "../jsonrpc";
  * same ID.
  */
 export function create_promise_manager() {
-  const promises: Record<
-    string | number,
-    (response: RpcResponse<unknown>) => void
-  > = {};
+  const promises: Record<string | number, (response: RpcResponse<unknown>) => void> = {};
 
   return {
     /** Send some payload, for a given ID */

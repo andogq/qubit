@@ -1,4 +1,4 @@
-import { parse_response, type RpcResponse } from "../jsonrpc";
+import { type RpcResponse, parse_response } from "../jsonrpc";
 
 type Socket = { send: (payload: string) => void };
 
