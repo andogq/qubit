@@ -7,19 +7,30 @@ export function create_payload(id: number, method: string, params: any) {
   });
 }
 
+/**
+ * A JSONRPC-2.0 error.
+ */
 export type RpcError = {
   code: number;
   message: string;
   data: any;
 };
 
-export type RpcResponse<T> =
-  | { type: "ok"; id: number; value: T }
-  | { type: "error"; id: number; value: RpcError }
-  | { type: "bad_response" }
-  | { type: "message"; id: string; value: T };
+/**
+ * An incoming message for a specific subscription
+ */
+export type RpcSubscriptionMessage<T> = {
+  type: "message";
+  id: string | number;
+  value: T;
+};
 
-export function parse_response<T>(response: any): RpcResponse<T> {
+export type RpcResponse<T> =
+  | { type: "ok"; id: string | number; value: T }
+  | { type: "error"; id: string | number; value: RpcError }
+  | RpcSubscriptionMessage<T>;
+
+export function parse_response<T>(response: any): RpcResponse<T> | null {
   try {
     if (typeof response === "string") {
       // biome-ignore lint/style/noParameterAssign: rust-pilled
@@ -30,11 +41,23 @@ export function parse_response<T>(response: any): RpcResponse<T> {
       throw new Error("invalid value for `jsonrpc`");
     }
 
-    if ("params" in response && "subscription" in response.params && "result" in response.params) {
-      return { type: "message", id: response.params.subscription, value: response.params.result };
+    if (
+      "params" in response &&
+      "subscription" in response.params &&
+      "result" in response.params
+    ) {
+      return {
+        type: "message",
+        id: response.params.subscription,
+        value: response.params.result,
+      };
     }
 
-    if (typeof response?.id !== "number" && typeof response?.id !== "string" && response?.id !== null) {
+    if (
+      typeof response?.id !== "number" &&
+      typeof response?.id !== "string" &&
+      response?.id !== null
+    ) {
       throw new Error("missing `id` field from response");
     }
 
@@ -43,7 +66,10 @@ export function parse_response<T>(response: any): RpcResponse<T> {
     }
 
     if ("error" in response && !("result" in response)) {
-      if (typeof response.error?.code === "number" && typeof response.error?.message === "string") {
+      if (
+        typeof response.error?.code === "number" &&
+        typeof response.error?.message === "string"
+      ) {
         // TODO: Validate error.data field when it's decided
         return { type: "error", id: response.id, value: response.error };
       }
@@ -55,6 +81,6 @@ export function parse_response<T>(response: any): RpcResponse<T> {
     console.error("Error encountered whilst parsing response");
     console.error(e);
 
-    return { type: "bad_response" };
+    return null;
   }
 }
