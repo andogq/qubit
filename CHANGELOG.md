@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.5.2]
+
+### fix
+
+- [`0bb7ac9`](https://github.com/andogq/qubit/commit/0bb7ac934730cca49acc3785074c65a356b5ebe5) ([#41](https://github.com/andogq/qubit/pull/41)) fix exporting tuple types returned from handlers (close #41)
+
 ## \[0.5.1]
 
 ### Dependencies
