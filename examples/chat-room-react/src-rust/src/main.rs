@@ -48,14 +48,19 @@ async fn main() {
 
     // Create service and handle
     let client = Manager::start();
-    let (qubit_service, qubit_handle) = router.to_service(move |_| {
-        let client = client.clone();
-        let name = random_emoji();
-        async move {
-            client.join(name).await;
-            Ctx { client, name }
-        }
-    });
+    let (qubit_service, qubit_handle) = router.to_service(
+        move |_| {
+            let client = client.clone();
+            let name = random_emoji();
+            async move {
+                client.join(name).await;
+                Ctx { client, name }
+            }
+        },
+        |ctx| async move {
+            ctx.client.leave(ctx.name).await;
+        },
+    );
 
     // Nest into an Axum rouer
     let axum_router = axum::Router::<()>::new().nest_service("/rpc", qubit_service);

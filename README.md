@@ -77,7 +77,7 @@ router.write_bindings_to_dir("./bindings");
 
 ```rs
 // Create a service and handle
-let (qubit_service, _qubit_handle) = router.to_service(|_| async {});
+let (qubit_service, _qubit_handle) = router.to_service(|_| async {}, |_| async {});
 
 // Nest into an Axum router
 let axum_router = axum::Router::<()>::new()
