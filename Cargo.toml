@@ -10,7 +10,7 @@ exclude = [
 
 [package]
 name = "qubit"
-version = "0.5.2"
+version = "0.6.0"
 edition = "2021"
 authors = [ "Tom Anderson <tom@ando.gq>" ]
 repository = "https://github.com/andogq/qubit"

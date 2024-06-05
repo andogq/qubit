@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.6.0]
+
+### feat
+
+- [`57e124f`](https://github.com/andogq/qubit/commit/57e124faf3fc4f7af0e5b25f5ac18f982e1d820a) add `on_close` callback to `to_service`, which will be run when the client connection closes (close #44)
+
 ## \[0.5.2]
 
 ### fix
