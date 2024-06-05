@@ -108,11 +108,16 @@ where
     ///
     /// Every incomming request has its own `Ctx` created for it, using the provided `build_ctx`
     /// method provided here. Generally this would involve cloning some pre-existing resources
-    /// (database connections, channels, state), and capturing some information from the incomming
+    /// (database connections, channels, state), and capturing some information from the incoming
     /// [`Request`] included as a parameter.
-    pub fn to_service<F>(
+    ///
+    /// A closure can be provided to be called when the connection is closed, which will be
+    /// provided with the `ctx` associated with that connection. For HTTP clients this isn't overly
+    /// useful, but for WS clients this can be handy for tracking active clients.
+    pub fn to_service<F, G>(
         self,
         build_ctx: impl (Fn(&Request<Body>) -> F) + Clone + Send + 'static,
+        on_close: impl (Fn(Ctx) -> G) + Clone + Send + 'static,
     ) -> (
         impl Service<
                 Request<Body>,
@@ -124,6 +129,7 @@ where
     )
     where
         F: std::future::Future<Output = Ctx> + Send,
+        G: std::future::Future<Output = ()> + Send,
     {
         // Generate the stop and server handles for the service
         let (stop_handle, server_handle) = jsonrpsee::server::stop_channel();
@@ -137,15 +143,26 @@ where
                 let s = self.clone();
 
                 let build_ctx = build_ctx.clone();
+                let on_close = on_close.clone();
 
                 async move {
                     let ctx = build_ctx(&req).await;
 
-                    let rpc_module = s.build_rpc_module(ctx, None);
+                    let rpc_module = s.build_rpc_module(ctx.clone(), None);
 
                     let mut svc = jsonrpsee::server::Server::builder()
                         .to_service_builder()
                         .build(rpc_module.clone(), stop_handle);
+
+                    // Set up task to track when connection is closed
+                    let on_session_closed = svc.on_session_closed();
+                    tokio::spawn(async move {
+                        // Wait for the session to close
+                        on_session_closed.await;
+
+                        // Run the on_close hook
+                        on_close(ctx).await;
+                    });
 
                     match svc.call(req).await {
                         Ok(v) => Ok::<_, Infallible>(v),

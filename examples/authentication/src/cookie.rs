@@ -98,22 +98,25 @@ pub fn init() -> axum::Router<()> {
     let router = Router::new().handler(echo_cookie).handler(secret_endpoint);
     router.write_bindings_to_dir("./auth-demo/src/bindings-cookie-auth");
 
-    let (qubit_service, handle) = router.to_service(move |req| {
-        // Extract cookie from request
-        let auth_cookie = req
-            .headers()
-            .get_all(COOKIE)
-            .into_iter()
-            .flat_map(|cookie| Cookie::split_parse(cookie.to_str().unwrap()))
-            .flatten()
-            .find(|cookie| cookie.name() == COOKIE_NAME)
-            .map(|cookie| cookie.value().to_string());
+    let (qubit_service, handle) = router.to_service(
+        move |req| {
+            // Extract cookie from request
+            let auth_cookie = req
+                .headers()
+                .get_all(COOKIE)
+                .into_iter()
+                .flat_map(|cookie| Cookie::split_parse(cookie.to_str().unwrap()))
+                .flatten()
+                .find(|cookie| cookie.name() == COOKIE_NAME)
+                .map(|cookie| cookie.value().to_string());
 
-        async {
-            // Attach it into the request context
-            ReqCtx { auth_cookie }
-        }
-    });
+            async {
+                // Attach it into the request context
+                ReqCtx { auth_cookie }
+            }
+        },
+        |_| async {},
+    );
 
     // Once the handle is dropped the server will automatically shutdown, so leak it to keep it
     // running. Don't actually do this.

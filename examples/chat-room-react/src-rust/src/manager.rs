@@ -20,6 +20,9 @@ pub enum Message {
     /// Add a user to the list
     Join { name: char },
 
+    /// Remove a user from the list
+    Leave { name: char },
+
     /// Send a chat message
     Send { user: char, message: String },
 
@@ -42,6 +45,10 @@ impl Client {
 
     pub async fn join(&self, name: char) {
         self.tx.send(Message::Join { name }).await.unwrap();
+    }
+
+    pub async fn leave(&self, name: char) {
+        self.tx.send(Message::Leave { name }).await.unwrap();
     }
 
     pub async fn send_message(&self, user: char, message: String) {
@@ -84,6 +91,9 @@ impl Manager {
             Message::Join { name } => {
                 self.join(name).await;
             }
+            Message::Leave { name } => {
+                self.leave(name).await;
+            }
             Message::Send { user, message } => {
                 self.send_message(user, message).await;
             }
@@ -98,6 +108,11 @@ impl Manager {
 
     async fn join(&mut self, name: char) {
         self.users.push(name);
+        self.subscriptions.update_register_online(&self.users).await;
+    }
+
+    async fn leave(&mut self, name: char) {
+        self.users.retain(|c| *c != name);
         self.subscriptions.update_register_online(&self.users).await;
     }
 

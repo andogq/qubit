@@ -17,7 +17,7 @@ async fn main() {
     println!("Successfully write server type to `./bindings`");
 
     // Create service and handle
-    let (qubit_service, qubit_handle) = router.to_service(|_| async {});
+    let (qubit_service, qubit_handle) = router.to_service(|_| async {}, |_| async {});
 
     // Nest into an Axum rouer
     let axum_router = axum::Router::<()>::new().nest_service("/rpc", qubit_service);

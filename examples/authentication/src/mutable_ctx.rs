@@ -54,7 +54,8 @@ pub fn init() -> axum::Router<()> {
     let router = Router::new().handler(login).handler(secret_endpoint);
     router.write_bindings_to_dir("./auth-demo/src/bindings-mutable-ctx");
 
-    let (qubit_service, handle) = router.to_service(move |_| async { Ctx::default() });
+    let (qubit_service, handle) =
+        router.to_service(move |_| async { Ctx::default() }, |_| async {});
 
     // Once the handle is dropped the server will automatically shutdown, so leak it to keep it
     // running. Don't actually do this.
