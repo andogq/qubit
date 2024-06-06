@@ -1,6 +1,6 @@
 import { type RpcResponse, create_payload } from "./jsonrpc";
 import { wrap_promise } from "./proxy";
-import type { StreamSubscriber } from "./stream";
+import type { StreamHandler, StreamHandlers, StreamSubscriber } from "./stream";
 
 export type Client = {
   request: (
@@ -14,28 +14,79 @@ export type Client = {
   ) => () => void;
 };
 
+/**
+ * Set up a proxy that tracks all the methods chained onto it, and calls the provided method when
+ * the proxy is used as a function called.
+ */
 function proxy_chain<T>(
   apply: (chain: string[], args: unknown[]) => unknown,
+  chain: string[] = [],
 ): T {
-  const chain: string[] = [];
+  const proxy: T = new Proxy(() => {}, {
+    get: (_target, property, client) => {
+      // Make sure it was accessed with a valid property
+      if (typeof property !== "string") {
+        return client;
+      }
 
-  const proxy: T = new Proxy(
-    {},
-    {
-      get: (_target, property) => {
-        if (typeof property === "string") {
-          chain.push(property);
-        }
+      // If there is no chain, create a new instance
+      if (chain.length === 0) {
+        return proxy_chain(apply, [property]);
+      }
 
-        return proxy;
-      },
-      apply: (_target, _this, args) => {
-        return apply(chain, args);
-      },
+      // Update the existing chain
+      chain.push(property);
+
+      return client;
     },
-  ) as unknown as T;
+    apply: (_target, _this, args) => {
+      return apply(chain, args);
+    },
+  }) as unknown as T;
 
   return proxy;
+}
+
+/**
+ * Convert promise that resolves into a callback into a callback that can be called synchronously.
+ */
+function sync_promise(implementation: () => Promise<() => void>): () => void {
+  // Run the implementation, save the promise
+  const callback_promise = implementation();
+
+  // Synchronously return a callback that will call the asynchronous callback
+  return () => {
+    callback_promise.then((callback) => {
+      callback();
+    });
+  };
+}
+
+/**
+ * Destructure user handlers, and ensure that they all exist.
+ */
+function get_handlers(
+  handler: StreamHandler<unknown>,
+): StreamHandlers<unknown> {
+  let on_data = (_: unknown) => {};
+  let on_error = (_: Error) => {};
+  let on_end = () => {};
+
+  if (typeof handler === "function") {
+    on_data = handler;
+  } else {
+    if (handler?.on_data) {
+      on_data = handler.on_data;
+    }
+    if (handler?.on_error) {
+      on_error = handler.on_error;
+    }
+    if (handler?.on_end) {
+      on_end = handler.on_end;
+    }
+  }
+
+  return { on_data, on_error, on_end };
 }
 
 export function build_client<Server>(client: Client): Server {
@@ -56,24 +107,9 @@ export function build_client<Server>(client: Client): Server {
       }
     });
 
-    const subscribe: StreamSubscriber<any> = (handler) => {
-      let on_data = (_: unknown) => {};
-      let on_error = (_: Error) => {};
-      let on_end = () => {};
-
-      if (typeof handler === "function") {
-        on_data = handler;
-      } else {
-        if (handler?.on_data) {
-          on_data = handler.on_data;
-        }
-        if (handler?.on_error) {
-          on_error = handler.on_error;
-        }
-        if (handler?.on_end) {
-          on_end = handler.on_end;
-        }
-      }
+    const subscribe: StreamSubscriber<unknown> = (handler) => {
+      // Get user handlers for the subscription
+      const { on_data, on_error, on_end } = get_handlers(handler);
 
       // Make sure the client can handle susbcriptions
       if (!client.subscribe) {
@@ -82,18 +118,7 @@ export function build_client<Server>(client: Client): Server {
       }
       const subscribe = client.subscribe;
 
-      // Hoist the unsubscribe function, which is asyncronousely returned
-      // biome-ignore lint/style/useConst: biome fails to recognise reassignment?
-      let unsubscribe_inner: Promise<() => void>;
-
-      // Helper unsubscribe function, which will wait for the internal unsubscribe
-      // function to be populated before calling it.
-      const unsubscribe = async () => {
-        (await unsubscribe_inner)();
-      };
-
-      // Populate inner unsubscribe with the asynchronous subscription
-      unsubscribe_inner = (async () => {
+      const unsubscribe = sync_promise(async () => {
         // Get the response of the request
         const subscription_id = await p;
 
@@ -119,10 +144,16 @@ export function build_client<Server>(client: Client): Server {
               "close_stream" in data &&
               data.close_stream === subscription_id
             ) {
+              // Prepare to start closing the subscription
               required_count = data.count;
-            } else if (on_data) {
+            } else {
+              // Keep a count of incoming messages
               count += 1;
-              on_data(data);
+
+              // Forward the response onto the user
+              if (on_data) {
+                on_data(data);
+              }
             }
 
             if (count === required_count) {
@@ -132,7 +163,7 @@ export function build_client<Server>(client: Client): Server {
           },
           on_end,
         );
-      })();
+      });
 
       return unsubscribe;
     };

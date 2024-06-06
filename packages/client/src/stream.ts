@@ -1,12 +1,11 @@
-export type StreamSubscriber<T> = (
-  handler:
-    | ((data: T) => void)
-    | {
-        on_data?: (data: T) => void;
-        on_error?: (error: Error) => void;
-        on_end?: () => void;
-      },
-) => () => void;
+export type StreamHandlers<T> = {
+  on_data: (data: T) => void;
+  on_error: (error: Error) => void;
+  on_end: () => void;
+};
+export type StreamHandler<T> = ((data: T) => void) | Partial<StreamHandlers<T>>;
+
+export type StreamSubscriber<T> = (handler: StreamHandler<T>) => () => void;
 
 export type Stream<T> = {
   subscribe: StreamSubscriber<T>;

@@ -50,6 +50,8 @@ export function create_socket(
       if (!socket_open) {
         // Queue the request up for when the socket opens
         queue.push(payload);
+      } else {
+        socket.send(payload);
       }
     },
   };
