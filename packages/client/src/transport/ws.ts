@@ -1,16 +1,8 @@
 import { build_client } from "../client";
 import type { RpcResponse } from "../jsonrpc";
-import {
-  type SocketOptions,
-  create_promise_manager,
-  create_socket,
-  create_subscription_manager,
-} from "../util";
+import { type SocketOptions, create_promise_manager, create_socket, create_subscription_manager } from "../util";
 
-export function ws<Server>(
-  host: string,
-  socket_options?: SocketOptions,
-): Server {
+export function ws<Server>(host: string, socket_options?: SocketOptions): Server {
   const subscriptions = create_subscription_manager();
   const requests = create_promise_manager();
 
@@ -27,10 +19,7 @@ export function ws<Server>(
     socket_options,
   );
 
-  const send_request = (
-    id: string | number,
-    payload: any,
-  ): Promise<RpcResponse<any>> => {
+  const send_request = (id: string | number, payload: any): Promise<RpcResponse<any>> => {
     // Send the data to the socket
     socket.send(payload);
 
