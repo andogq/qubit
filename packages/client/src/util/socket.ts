@@ -13,37 +13,56 @@ export function create_socket(
 ): Socket {
   /** Track whether the socket has been opened. */
   let socket_open = false;
+  let next_timeout = 0.5;
 
   /** Queue of requests that were made before the socket was opened. */
   let queue: string[] = [];
 
+  // TODO: Type this
+  const WS: any = options?.WebSocket || WebSocket;
+
   let socket: WebSocket;
-  if (options?.WebSocket) {
-    // TODO: Also work out how to type this
-    const WebSocket = options.WebSocket as any;
-    socket = new WebSocket(host);
-  } else {
-    socket = new WebSocket(host);
+
+  function new_socket() {
+    socket = new WS(host);
+
+    socket.addEventListener("open", () => {
+      socket_open = true;
+      next_timeout = 0.5; // Reset timeout
+
+      // Run through the items in the queue and send them off
+      for (const payload of queue) {
+        socket.send(payload);
+      }
+
+      queue = [];
+    });
+
+    socket.addEventListener("message", (e) => {
+      const message = parse_response(e.data);
+
+      if (message) {
+        on_message(message);
+      }
+    });
+
+    socket.addEventListener("close", () => {
+      // Start attempting to re-open the socket
+      socket_open = false;
+
+      setTimeout(() => {
+        // Increase the timeout
+        next_timeout *= 2;
+
+        // Try re-create the socket
+        new_socket();
+
+        // TODO: Re-subscribe to subscriptions
+      }, next_timeout * 1000);
+    });
   }
 
-  socket.addEventListener("open", () => {
-    socket_open = true;
-
-    // Run through the items in the queue and send them off
-    for (const payload of queue) {
-      socket.send(payload);
-    }
-
-    queue = [];
-  });
-
-  socket.addEventListener("message", (e) => {
-    const message = parse_response(e.data);
-
-    if (message) {
-      on_message(message);
-    }
-  });
+  new_socket();
 
   return {
     send: (payload: string) => {
