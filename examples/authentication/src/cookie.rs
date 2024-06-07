@@ -79,7 +79,7 @@ impl FromContext<ReqCtx> for AuthCtx {
 }
 
 /// Handler takes in [`ReqCtx`], so will run regardless of authentication status.
-#[handler]
+#[handler(query)]
 async fn echo_cookie(ctx: ReqCtx) -> String {
     if let Some(cookie) = ctx.auth_cookie {
         format!("A cookie is set: {cookie}")
@@ -89,7 +89,7 @@ async fn echo_cookie(ctx: ReqCtx) -> String {
 }
 
 /// Handler takes in [`AuthCtx`], so will only run if the middleware can be properly constructed.
-#[handler]
+#[handler(query)]
 async fn secret_endpoint(ctx: AuthCtx) -> String {
     format!("Welcome {}. The secret is: `super_secret`", ctx.user)
 }

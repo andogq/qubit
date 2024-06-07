@@ -8,25 +8,25 @@ use crate::ctx::Ctx;
 mod ctx;
 
 // Simple handler, with no parameters from the client and no return values.
-#[handler]
+#[handler(mutation)]
 async fn increment(ctx: Ctx) {
     ctx.increment();
 }
 
 // Another simple handler.
-#[handler]
+#[handler(mutation)]
 async fn decrement(ctx: Ctx) {
     ctx.decrement();
 }
 
 // Handler that takes a parameter from the client.
-#[handler]
+#[handler(mutation)]
 async fn add(ctx: Ctx, n: i32) {
     ctx.add(n);
 }
 
 // Handler that returns a value to the client.
-#[handler]
+#[handler(query)]
 async fn get(ctx: Ctx) -> i32 {
     ctx.get()
 }

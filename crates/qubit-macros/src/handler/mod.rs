@@ -126,17 +126,19 @@ impl Handler {
 
                 match (&return_type, options.kind) {
                     // Valid case, return type matches with handler annotation
-                    (HandlerReturn::Stream(_), Some(HandlerKind::Subscription))
-                    | (HandlerReturn::Return(_), Some(HandlerKind::Query) | None) => return_type,
+                    (HandlerReturn::Stream(_), HandlerKind::Subscription)
+                    | (HandlerReturn::Return(_), HandlerKind::Query | HandlerKind::Mutation) => {
+                        return_type
+                    }
 
                     // Mismatches
-                    (HandlerReturn::Stream(_), Some(HandlerKind::Query) | None) => {
+                    (HandlerReturn::Stream(_), HandlerKind::Query | HandlerKind::Mutation) => {
                         return Err(Error::new(
                             span,
                             "handler indicated to be a query, however a stream was returned",
                         ));
                     }
-                    (HandlerReturn::Return(_), Some(HandlerKind::Subscription)) => {
+                    (HandlerReturn::Return(_), HandlerKind::Subscription) => {
                         return Err(Error::new(
                             span,
                             "handler indicated to be a subscription, however a stream was not returned",

@@ -13,12 +13,12 @@ struct Ctx {
     name: char,
 }
 
-#[handler]
+#[handler(query)]
 async fn get_name(ctx: Ctx) -> char {
     ctx.name
 }
 
-#[handler]
+#[handler(mutation)]
 async fn send_message(ctx: Ctx, message: String) {
     ctx.client.send_message(ctx.name, message).await
 }
