@@ -1,5 +1,13 @@
 # Changelog
 
+## \[0.2.1]
+
+- [`39fb781`](https://github.com/andogq/qubit/commit/39fb781d89b47b97780cc8683976027a5f127dc7) update package.json with repo and keywords
+
+### feat
+
+- [`223833d`](https://github.com/andogq/qubit/commit/223833d94baf47ac6200bd9db44a7a39af102019) implement reconnecting web socket in client
+
 ## \[0.2.0]
 
 - [`032d01e`](https://github.com/andogq/qubit/commit/032d01ef832b437d21b04e9d422204d216fc0397) run `pnpm build` before publishing (close #29)
