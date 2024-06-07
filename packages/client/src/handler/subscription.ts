@@ -6,7 +6,8 @@ export type StreamHandlers<T> = {
 export type StreamHandler<T> = ((data: T) => void) | Partial<StreamHandlers<T>>;
 
 export type StreamSubscriber<T> = (handler: StreamHandler<T>) => () => void;
+export type StreamUnsubscribe = () => void;
 
-export type Stream<T> = {
-  subscribe: StreamSubscriber<T>;
+export type Subscription<T> = {
+  subscribe: T;
 };

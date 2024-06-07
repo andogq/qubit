@@ -1,2 +1,2 @@
 export * from "./transport";
-export type { Stream } from "./stream";
+export * from "./handler";

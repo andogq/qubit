@@ -18,21 +18,24 @@ enum HandlerReturn {
     Return(Type),
 }
 
-impl HandlerReturn {
-    /// Get the equivalent TS type for this return type.
-    fn ts_container(&self) -> String {
-        match self {
-            Self::Stream(_) => "Stream".to_string(),
-            Self::Return(_) => "Promise".to_string(),
-        }
-    }
-}
-
 impl ToTokens for HandlerReturn {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
             Self::Stream(ty) | Self::Return(ty) => ty.to_tokens(tokens),
         }
+    }
+}
+
+impl HandlerKind {
+    pub fn ts_type(&self) -> String {
+        match self {
+            HandlerKind::Query => "Query<({params}) => Promise<{return_ty}>>",
+            HandlerKind::Mutation => "Mutation<({params}) => Promise<{return_ty}>>",
+            HandlerKind::Subscription => {
+                "Subscription<({params} handler: StreamHandler<{return_ty}>) => StreamUnsubscribe>"
+            }
+        }
+        .to_string()
     }
 }
 
@@ -52,6 +55,9 @@ pub struct Handler {
 
     /// Return type of the handler.
     return_type: HandlerReturn,
+
+    /// The kind of the handler (`query`, `mutation`, `subscription`)
+    kind: HandlerKind,
 
     /// The actual handler implementation.
     implementation: ItemFn,
@@ -108,6 +114,7 @@ impl Handler {
             implementation,
             visibility: handler.vis,
             name: options.name.unwrap_or(handler.sig.ident),
+            kind: options.kind.clone(),
             ctx_ty,
             inputs,
             return_type: {
@@ -170,10 +177,11 @@ impl Handler {
     /// Produce a token stream that will generate the TS signature of this handler.
     fn get_signature(&self) -> TokenStream {
         let return_type = &self.return_type;
-        let container = return_type.ts_container();
 
         let param_names_str = self.parameter_names_str();
         let param_tys = self.parameter_tys();
+
+        let base_ty = self.kind.ts_type();
 
         quote! {
             {
@@ -182,12 +190,11 @@ impl Handler {
                 ]
                     .into_iter()
                     .map(|(param, ty): (&str, String)| {
-                        format!("{param}: {ty}")
+                        format!("{param}: {ty}, ")
                     })
-                    .collect::<Vec<_>>()
-                    .join(", ");
+                    .collect::<String>();
 
-                format!("({}) => {}<{}>", parameters, #container, <#return_type as ts_rs::TS>::name())
+                format!(#base_ty, params=parameters, return_ty=<#return_type as ts_rs::TS>::name())
             }
         }
     }
@@ -207,6 +214,7 @@ impl From<Handler> for TokenStream {
             ctx_ty,
             inputs,
             return_type,
+            kind,
             implementation,
         } = handler;
 
@@ -220,6 +228,8 @@ impl From<Handler> for TokenStream {
 
         // Use the ctx type, or default back to the app ctx type if none is provided
         let ctx_ty = ctx_ty.unwrap_or_else(|| inner_ctx_ty.clone());
+
+        let kind_str = kind.to_string();
 
         let register_impl = {
             // Define idents in one place, so they will be checked by the compiler
@@ -273,10 +283,13 @@ impl From<Handler> for TokenStream {
         };
 
         // Generate implementation of the `qubit_types` method.
-        let qubit_types = if let HandlerReturn::Stream(_) = return_type {
-            quote! { ::std::vec![::qubit::ty::util::QubitType::Stream] }
-        } else {
-            quote! { ::std::vec![] }
+        let qubit_type_base = quote! { ::qubit::ty::util::QubitType };
+        let qubit_types = match kind {
+            HandlerKind::Query => quote! { ::std::vec![#qubit_type_base::Query] },
+            HandlerKind::Mutation => quote! { ::std::vec![#qubit_type_base::Mutation] },
+            HandlerKind::Subscription => {
+                quote! { ::std::vec![#qubit_type_base::Subscription, #qubit_type_base::StreamHandler, #qubit_type_base::StreamUnsubscribe] }
+            }
         };
 
         quote! {
@@ -290,6 +303,7 @@ impl From<Handler> for TokenStream {
                     qubit::HandlerType {
                         name: #handler_name_str.to_string(),
                         signature: #signature,
+                        kind: #kind_str.to_string(),
                     }
                 }
 

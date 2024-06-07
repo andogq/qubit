@@ -1,6 +1,9 @@
+use std::fmt::Display;
+
 use syn::{meta::ParseNestedMeta, Ident, LitStr, Result};
 
 /// Handlers can have different variations depending on how they interact with the client.
+#[derive(Clone)]
 pub enum HandlerKind {
     /// Query handlers support the standard request/response pattern, and are safe to be cached.
     Query,
@@ -12,6 +15,20 @@ pub enum HandlerKind {
     /// Subscriptions have an initial request, and returns a stream of responses that the client
     /// will continue to consume.
     Subscription,
+}
+
+impl Display for HandlerKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                HandlerKind::Query => "Query",
+                HandlerKind::Mutation => "Mutation",
+                HandlerKind::Subscription => "Subscription",
+            }
+        )
+    }
 }
 
 /// Options that may be attached to a handler.
