@@ -5,6 +5,7 @@
       "version": true,
       "getPublishedVersion": "npm view ${ pkgFile.pkg.name } version",
       "prepublish": ["pnpm i", "pnpm build"],
+      "postversion": ["pnpm format"],
       "publish": ["pnpm publish --access public --no-git-checks"],
       "postpublish": [
         "git tag ${ pkg.pkg }-v${ pkgFile.versionMajor } -f",
@@ -15,7 +16,7 @@
     "rust": {
       "version": true,
       "getPublishedVersion": "cargo search ${ pkg.pkg } --limit 1 | sed -nE 's/^[^\"]*\"//; s/\".*//1p'",
-      "prepublish": [
+      "postversion": [
         {
           "command": "cargo generate-lockfile",
           "dryRunCommand": true,
