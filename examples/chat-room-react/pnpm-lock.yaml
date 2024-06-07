@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@qubit-rs/client':
-        specifier: file:../../packages/client
-        version: file:../../packages/client
+        specifier: link:../../packages/client
+        version: link:../../packages/client
       '@tanstack/react-query':
         specifier: ^5.40.0
         version: 5.40.0(react@18.3.1)
@@ -307,9 +307,6 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.25':
     resolution: {integrity: sha512-vNk6aEwybGtawWmy/PzwnGDOjCkLWSD2wqvjGGAgOAwCGWySYXfYoxt00IJkTF+8Lb57DwOb3Aa0o9CApepiYQ==}
-
-  '@qubit-rs/client@file:../../packages/client':
-    resolution: {directory: ../../packages/client, type: directory}
 
   '@rollup/rollup-android-arm-eabi@4.18.0':
     resolution: {integrity: sha512-Tya6xypR10giZV1XzxmH5wr25VcZSncG0pZIjfePT0OVBvqNEurzValetGNarVrGiq66EBVAFn15iYX4w6FKgQ==}
@@ -952,8 +949,6 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.4.15
-
-  '@qubit-rs/client@file:../../packages/client': {}
 
   '@rollup/rollup-android-arm-eabi@4.18.0':
     optional: true

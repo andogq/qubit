@@ -1,7 +1,13 @@
 {
   "name": "@qubit-rs/client",
   "version": "0.2.0",
-  "description": "",
+  "description": "Seamless RPC for Rust & TypeScript",
+  "keywords": ["api", "rust", "subscriptions", "rpc-framework", "jsonrpc", "trpc"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andogq/qubit.git",
+    "directory": "pacakges/client"
+  },
   "type": "module",
   "scripts": {
     "lint": "tsc",
