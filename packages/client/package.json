@@ -2,14 +2,7 @@
   "name": "@qubit-rs/client",
   "version": "0.2.0",
   "description": "Seamless RPC for Rust & TypeScript",
-  "keywords": [
-    "api",
-    "rust",
-    "subscriptions",
-    "rpc-framework",
-    "jsonrpc",
-    "trpc"
-  ],
+  "keywords": ["api", "rust", "subscriptions", "rpc-framework", "jsonrpc", "trpc"],
   "repository": {
     "type": "git",
     "url": "https://github.com/andogq/qubit.git",
