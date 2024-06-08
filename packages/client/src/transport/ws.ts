@@ -1,4 +1,4 @@
-import { build_new_client } from "../client";
+import { build_client } from "../client";
 import type { RpcResponse } from "../jsonrpc";
 import { type SocketOptions, create_promise_manager, create_socket, create_subscription_manager } from "../util";
 
@@ -27,7 +27,7 @@ export function ws<Server>(host: string, socket_options?: SocketOptions): Server
     return requests.wait_for(id);
   };
 
-  return build_new_client({
+  return build_client({
     request: send_request,
     subscribe: (id, on_data, on_end) => {
       if (on_data) {
