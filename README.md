@@ -80,10 +80,14 @@ let axum_router = axum::Router::<()>::new()
     .nest_service("/rpc", qubit_service);
 
 // Start a Hyper server
-hyper::Server::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
-    .serve(axum_router.into_make_service())
-    .await
-    .unwrap();
+axum::serve(
+    tokio::net::TcpListener::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
+        .await
+        .unwrap(),
+    axum_router,
+)
+.await
+.unwrap();
 ```
 
 4. Make requests from the TypeScript client
@@ -106,12 +110,6 @@ console.log("received from server:", message);
 Checkout all the examples in the [`examples`](./examples) directory.
 
 ## FAQs
-
-### Hyper 1.0
-
-Unfortunately, this crate is blocked by upstream dependencies before it can upgrade to Hyper 1.0
-(and other associated packages like Axum 0.7). This is actively being worked on by the upstream
-dependencies, so will be arriving soon.
 
 ### Qubit?
 
