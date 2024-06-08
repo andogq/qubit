@@ -8,7 +8,7 @@
   },
   "files": {
     "include": ["*.ts", "*.tsx", "*.json"],
-    "ignore": ["bindings*"]
+    "ignore": ["bindings*", "package.json"]
   },
   "organizeImports": {
     "enabled": true
