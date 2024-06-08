@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.6.1]
+
+### Dependencies
+
+- Upgraded to `qubit-macros@0.5.0`
+
 ## \[0.6.0]
 
 ### feat

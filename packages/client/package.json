@@ -1,8 +1,15 @@
 {
   "name": "@qubit-rs/client",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Seamless RPC for Rust & TypeScript",
-  "keywords": ["api", "rust", "subscriptions", "rpc-framework", "jsonrpc", "trpc"],
+  "keywords": [
+    "api",
+    "rust",
+    "subscriptions",
+    "rpc-framework",
+    "jsonrpc",
+    "trpc"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/andogq/qubit.git",
@@ -13,7 +20,9 @@
     "lint": "tsc",
     "build": "tsup ./src/index.ts"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "main": "./dist/index.cjs",
   "types": "./dist/index.d.cts",
   "exports": {
@@ -39,7 +48,10 @@
     "typescript": "^5.3.3"
   },
   "tsup": {
-    "format": ["esm", "cjs"],
+    "format": [
+      "esm",
+      "cjs"
+    ],
     "splitting": true,
     "dts": true
   }

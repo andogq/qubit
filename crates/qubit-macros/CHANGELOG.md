@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.5.0]
+
+### feat
+
+- [`429c19f`](https://github.com/andogq/qubit/commit/429c19f3506bdd225b2c2762907d8c880a07bbca) require handlers to have attribute of `query`, `mutation`, or `subscription`
+
 ## \[0.4.1]
 
 ### feat
