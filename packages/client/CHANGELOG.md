@@ -1,5 +1,12 @@
 # Changelog
 
+## \[0.3.0]
+
+### feat
+
+- [`200efef`](https://github.com/andogq/qubit/commit/200efef21d10ed674afb27c336b6a9e2d02f58ad) output a Qubit logo header to binding files
+- [`45510bf`](https://github.com/andogq/qubit/commit/45510bfc270c076012f6179a2567ae9c6c9fbff4) change handler syntax within the client
+
 ## \[0.2.1]
 
 - [`39fb781`](https://github.com/andogq/qubit/commit/39fb781d89b47b97780cc8683976027a5f127dc7) update package.json with repo and keywords
