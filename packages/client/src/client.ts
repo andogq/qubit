@@ -1,17 +1,33 @@
 import { type RpcResponse, create_payload } from "./jsonrpc";
 import { wrap_promise } from "./proxy";
-import type { StreamHandler, StreamHandlers, StreamSubscriber } from "./stream";
+import type {
+  StreamHandler,
+  StreamHandlers,
+  StreamSubscriber,
+  Subscription,
+} from "./handler/subscription";
+import type { Mutation, Query } from "./handler";
 
 export type Client = {
-  request: (id: string | number, payload: any) => Promise<RpcResponse<unknown> | null>;
-  subscribe?: (id: string | number, on_data?: (value: any) => void, on_end?: () => void) => () => void;
+  request: (
+    id: string | number,
+    payload: any,
+  ) => Promise<RpcResponse<unknown> | null>;
+  subscribe?: (
+    id: string | number,
+    on_data?: (value: any) => void,
+    on_end?: () => void,
+  ) => () => void;
 };
 
 /**
  * Set up a proxy that tracks all the methods chained onto it, and calls the provided method when
  * the proxy is used as a function called.
  */
-function proxy_chain<T>(apply: (chain: string[], args: unknown[]) => unknown, chain: string[] = []): T {
+function proxy_chain<T>(
+  apply: (chain: string[], args: unknown[]) => unknown,
+  chain: string[] = [],
+): T {
   const proxy: T = new Proxy(() => {}, {
     get: (_target, property, client) => {
       // Make sure it was accessed with a valid property
@@ -55,7 +71,9 @@ function sync_promise(implementation: () => Promise<() => void>): () => void {
 /**
  * Destructure user handlers, and ensure that they all exist.
  */
-function get_handlers(handler: StreamHandler<unknown>): StreamHandlers<unknown> {
+function get_handlers(
+  handler: StreamHandler<unknown>,
+): StreamHandlers<unknown> {
   let on_data = (_: unknown) => {};
   let on_error = (_: Error) => {};
   let on_end = () => {};
@@ -75,6 +93,129 @@ function get_handlers(handler: StreamHandler<unknown>): StreamHandlers<unknown> 
   }
 
   return { on_data, on_error, on_end };
+}
+
+export function build_new_client<Server>(client: Client): Server {
+  let next_id = 0;
+
+  async function send(method: string[], args: unknown): Promise<unknown> {
+    const id = next_id++;
+
+    const payload = create_payload(id, method.join("."), args);
+    const response = await client.request(id, payload);
+
+    if (response !== null && response.type === "ok") {
+      return response.value;
+    } else {
+      throw response;
+    }
+  }
+
+  // Base proxy returns a new proxy with all the new associated state
+  return new Proxy(
+    {},
+    {
+      get: (_target, property, receiver) => {
+        if (typeof property !== "string") {
+          return receiver;
+        }
+
+        const method: string[] = [property];
+
+        // Create a new proxy every time it's accessed
+        const proxy = new Proxy<
+          Query<unknown> & Mutation<unknown> & Subscription<unknown>
+        >(
+          // TODO: Make all these better
+          {
+            query: (...args: unknown[]) => {
+              return send(method, args);
+            },
+            mutate: async (...args: unknown[]) => {
+              return send(method, args);
+            },
+            subscribe: async (...args: unknown[]) => {
+              const { on_data, on_error, on_end } = get_handlers(
+                args.pop() as StreamHandler<unknown>,
+              );
+              const p = send(method, args);
+
+              const unsubscribe = sync_promise(async () => {
+                // Get the response of the request
+                const subscription_id = await p;
+
+                let count = 0;
+                let required_count: number | null = null;
+
+                // Result should be a subscription ID
+                if (
+                  typeof subscription_id !== "string" &&
+                  typeof subscription_id !== "number"
+                ) {
+                  // TODO: Throw an error
+                  on_error(new Error("cannot subscribe to subscription"));
+                  return () => {};
+                }
+
+                if (!client.subscribe) {
+                  on_error(new Error("client does not support subscriptions"));
+                  return () => {};
+                }
+
+                // Subscribe to incomming requests
+                return client.subscribe(
+                  subscription_id,
+                  (data) => {
+                    if (
+                      typeof data === "object" &&
+                      "close_stream" in data &&
+                      data.close_stream === subscription_id
+                    ) {
+                      // Prepare to start closing the subscription
+                      required_count = data.count;
+                    } else {
+                      // Keep a count of incoming messages
+                      count += 1;
+
+                      // Forward the response onto the user
+                      if (on_data) {
+                        on_data(data);
+                      }
+                    }
+
+                    if (count === required_count) {
+                      // The expected amount of messages have been recieved, so it is safe to terminate the connection
+                      unsubscribe();
+                    }
+                  },
+                  on_end,
+                );
+              });
+            },
+          },
+          {
+            get: (target, property, proxy) => {
+              // Must be using a terminating call
+              if (property in target) {
+                // @ts-ignore
+                return target[property];
+              }
+
+              if (typeof property !== "string") {
+                return proxy;
+              }
+
+              // Otherwise add to the message and continue the proxy
+              method.push(property);
+              return proxy;
+            },
+          },
+        );
+
+        return proxy;
+      },
+    },
+  ) as unknown as Server;
 }
 
 export function build_client<Server>(client: Client): Server {
@@ -114,7 +255,10 @@ export function build_client<Server>(client: Client): Server {
         let required_count: number | null = null;
 
         // Result should be a subscription ID
-        if (typeof subscription_id !== "string" && typeof subscription_id !== "number") {
+        if (
+          typeof subscription_id !== "string" &&
+          typeof subscription_id !== "number"
+        ) {
           // TODO: Throw an error
           on_error(new Error("cannot subscribe to subscription"));
           return () => {};
@@ -124,7 +268,11 @@ export function build_client<Server>(client: Client): Server {
         return subscribe(
           subscription_id,
           (data) => {
-            if (typeof data === "object" && "close_stream" in data && data.close_stream === subscription_id) {
+            if (
+              typeof data === "object" &&
+              "close_stream" in data &&
+              data.close_stream === subscription_id
+            ) {
               // Prepare to start closing the subscription
               required_count = data.count;
             } else {

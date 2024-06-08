@@ -9,12 +9,12 @@ export const History = () => {
 
   const { data: name } = useQuery({
     queryKey: ["name"],
-    queryFn: () => api.get_name(),
+    queryFn: () => api.get_name.query(),
   });
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  useEffect(() => api.list_messages().subscribe({ on_data: setMessages }), []);
+  useEffect(() => api.list_messages.subscribe({ on_data: setMessages }), []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll when messages changes
   useEffect(() => {

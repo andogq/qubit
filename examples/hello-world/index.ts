@@ -14,7 +14,7 @@ async function main() {
   );
 
   // Call the handlers
-  const message = await api.hello_world();
+  const message = await api.hello_world.query();
   console.log("recieved from server:", message);
 }
 

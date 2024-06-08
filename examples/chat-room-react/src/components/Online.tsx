@@ -5,7 +5,7 @@ import { Avatar } from "./Avatar";
 export const Online = () => {
   const [users, setUsers] = useState<string[]>([]);
 
-  useEffect(() => api.list_online().subscribe({ on_data: setUsers }), []);
+  useEffect(() => api.list_online.subscribe({ on_data: setUsers }), []);
 
   return (
     <section>
