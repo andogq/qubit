@@ -55,6 +55,8 @@ where
         // Re-create the directory
         fs::create_dir_all(out_dir).unwrap();
 
+        let header = String::from(include_str!("../header.txt"));
+
         // Export all the dependencies, and create their import statements
         let (imports, _types) = self
             .handlers
@@ -85,7 +87,7 @@ where
 
                     let (package, ty_name) = ty;
 
-                    write!(
+                    writeln!(
                         &mut imports,
                         r#"import type {{ {ty_name} }} from "{package}";"#,
                     )
@@ -101,7 +103,15 @@ where
         let server_type = format!("export type QubitServer = {};", self.get_type());
 
         // Write out index file
-        fs::write(out_dir.join("index.ts"), [imports, server_type].join("\n")).unwrap();
+        fs::write(
+            out_dir.join("index.ts"),
+            [header, imports, server_type]
+                .into_iter()
+                .filter(|part| !part.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+        .unwrap();
     }
 
     /// Turn the router into a [`tower::Service`], so that it can be nested into a HTTP server.
