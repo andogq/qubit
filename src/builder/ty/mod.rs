@@ -12,4 +12,7 @@ pub struct HandlerType {
 
     /// Signature of this handler.
     pub signature: String,
+
+    /// Kind of the handler, which will be used as the final part of the call in TypeScript.
+    pub kind: String,
 }

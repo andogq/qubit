@@ -34,7 +34,7 @@ impl FromContext<Ctx> for AuthCtx {
     }
 }
 
-#[handler]
+#[handler(mutation)]
 async fn login(ctx: Ctx, username: String, password: String) -> bool {
     if username == USERNAME && password == PASSWORD {
         // Update the context to indicate that the user is logged in
@@ -45,7 +45,7 @@ async fn login(ctx: Ctx, username: String, password: String) -> bool {
     false
 }
 
-#[handler]
+#[handler(query)]
 async fn secret_endpoint() -> String {
     "Secret message!".to_string()
 }

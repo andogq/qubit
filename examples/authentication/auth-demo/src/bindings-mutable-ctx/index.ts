@@ -1,2 +1,2 @@
-
-export type QubitServer = { login: (username: string, password: string) => Promise<boolean>, secret_endpoint: () => Promise<string> };
+import type { Mutation } from "@qubit-rs/client";import type { Query } from "@qubit-rs/client";
+export type QubitServer = { login: Mutation<(username: string, password: string, ) => Promise<boolean>>, secret_endpoint: Query<() => Promise<string>> };

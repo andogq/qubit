@@ -15,10 +15,10 @@ async function cookie_flow() {
   {
     const api = build_api();
 
-    console.log("Cookie echo from server:", await api.echo_cookie());
+    console.log("Cookie echo from server:", await api.echo_cookie.query());
 
     // Can we get the secret?
-    await api.secret_endpoint().catch((e) => {
+    await api.secret_endpoint.query().catch((e) => {
       console.error("Error whilst accessing secret:", e);
     });
   }
@@ -36,8 +36,8 @@ async function cookie_flow() {
   {
     // Re-create the API now that we're authenticated
     const api = build_api();
-    console.log("Cookie is", await api.echo_cookie());
-    console.log("Can we get the secret?", await api.secret_endpoint());
+    console.log("Cookie is", await api.echo_cookie.query());
+    console.log("Can we get the secret?", await api.secret_endpoint.query());
   }
 
   console.log("----- Ending Cookie Flow -----");
@@ -49,15 +49,15 @@ async function mutable_ctx_flow() {
   const api = ws<MutableCtxServer>(`ws://${window.location.host}/mutable-ctx/rpc`);
 
   // Attempt to get the secret without authentication
-  await api.secret_endpoint().catch((e) => {
+  await api.secret_endpoint.query().catch((e) => {
     console.error("Error whilst accessing secret:", e);
   });
 
   // Login to authenticate this connection
-  await api.login("user", "password");
+  await api.login.mutate("user", "password");
   console.log("Successfully authenticated with the API");
 
-  console.log("The secret is", await api.secret_endpoint());
+  console.log("The secret is", await api.secret_endpoint.query());
 
   console.log("----- Ending Mutable Ctx Flow -----");
 }

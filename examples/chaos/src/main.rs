@@ -74,7 +74,7 @@ mod user {
             .handler(nested::asdf)
     }
 
-    #[handler(name = "someHandler")]
+    #[handler(query, name = "someHandler")]
     async fn get(_ctx: AppCtx, _id: String) -> User {
         User {
             name: "some user".to_string(),
@@ -93,13 +93,13 @@ mod user {
     mod nested {
         use super::*;
 
-        #[handler]
+        #[handler(query)]
         pub async fn asdf() {
             todo!()
         }
     }
 
-    #[handler]
+    #[handler(mutation)]
     async fn create(_ctx: AppCtx, name: String, email: String, age: u32) -> User {
         println!("creating user: {name}");
 
@@ -117,7 +117,7 @@ mod user {
         }
     }
 
-    #[handler]
+    #[handler(query)]
     async fn list() -> Vec<Test> {
         todo!()
     }
@@ -135,7 +135,7 @@ impl FromContext<AppCtx> for CountCtx {
     }
 }
 
-#[handler]
+#[handler(mutation)]
 async fn count(ctx: CountCtx) -> usize {
     ctx.count.fetch_add(1, Ordering::Relaxed)
 }
@@ -149,12 +149,12 @@ async fn countdown(_ctx: CountCtx, min: usize, max: usize) -> impl Stream<Item =
     })
 }
 
-#[handler]
+#[handler(query)]
 async fn version() -> String {
     "v1.0.0".to_string()
 }
 
-#[handler]
+#[handler(query)]
 async fn array() -> Vec<String> {
     vec!["a".to_string(), "b".to_string(), "c".to_string()]
 }
@@ -173,7 +173,7 @@ enum MyEnum {
     C { field: u8 },
     D(NestedStruct),
 }
-#[handler]
+#[handler(query)]
 async fn enum_test() -> MyEnum {
     MyEnum::B(10)
 }

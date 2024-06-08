@@ -8,7 +8,7 @@ export const Input = () => {
 
   const { data: name } = useQuery({
     queryKey: ["name"],
-    queryFn: () => api.get_name(),
+    queryFn: () => api.get_name.query(),
   });
 
   return (
@@ -17,7 +17,7 @@ export const Input = () => {
         e.preventDefault();
         const message = value.trim();
         if (value.length > 0) {
-          api.send_message(message);
+          api.send_message.mutate(message);
           setValue("");
         }
       }}

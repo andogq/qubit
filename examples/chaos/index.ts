@@ -3,20 +3,20 @@ import type { QubitServer } from "./bindings";
 
 const client = ws<QubitServer>("ws://localhost:9944/rpc");
 
-client
-  .version()
+client.version
+  .query()
   .then((version) => console.log({ version }))
   .catch(console.error);
-client.user
-  .someHandler("test")
+client.user.someHandler
+  .query("test")
   .then((user) => console.log(user))
   .catch(console.error);
-client
-  .count()
+client.count
+  .mutate()
   .then((value) => console.log({ value }))
   .catch(console.error);
 
-client.countdown(1, 4).subscribe({
+client.countdown.subscribe(1, 4, {
   on_data: (data) => {
     console.log("countdown: ", data);
   },
@@ -25,4 +25,4 @@ client.countdown(1, 4).subscribe({
   },
 });
 
-client.countdown(1, 4).subscribe((n) => console.log("number is", n));
+client.countdown.subscribe(1, 4, (n) => console.log("number is", n));

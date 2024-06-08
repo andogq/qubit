@@ -1,2 +1,2 @@
-import type { Stream } from "@qubit-rs/client";import type { ChatMessage } from "./ChatMessage.ts";
-export type QubitServer = { get_name: () => Promise<string>, send_message: (message: string) => Promise<null>, list_online: () => Stream<Array<string>>, list_messages: () => Stream<Array<ChatMessage>> };
+import type { Query } from "@qubit-rs/client";import type { Mutation } from "@qubit-rs/client";import type { Subscription } from "@qubit-rs/client";import type { StreamHandler } from "@qubit-rs/client";import type { StreamUnsubscribe } from "@qubit-rs/client";import type { ChatMessage } from "./ChatMessage.ts";
+export type QubitServer = { get_name: Query<() => Promise<string>>, send_message: Mutation<(message: string, ) => Promise<null>>, list_online: Subscription<( handler: StreamHandler<Array<string>>) => StreamUnsubscribe>, list_messages: Subscription<( handler: StreamHandler<Array<ChatMessage>>) => StreamUnsubscribe> };
