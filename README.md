@@ -46,9 +46,9 @@ ts-rs = "8.1.0" # Required to generate TS types
 serde = { version = "1.0", features = ["derive"] } # Required for serialisable types
 futures = "0.3.30" # Required for streaming functionality
 
-tokio = { version = "1.35", features = ["full"] }
-axum = "0.6"
-hyper = { version = "0.14", features = ["server"] }
+tokio = { version = "1.38", features = ["full"] }
+axum = "0.7"
+hyper = { version = "1.0", features = ["server"] }
 ```
 
 ```bash
