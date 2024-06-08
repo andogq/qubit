@@ -40,7 +40,7 @@ focus on building amazing applications.
 ```toml
 # Cargo.toml
 [dependencies]
-qubit = "latest"
+qubit = "0.6.1"
 
 ts-rs = "8.1.0" # Required to generate TS types
 serde = { version = "1.0", features = ["derive"] } # Required for serialisable types
@@ -51,19 +51,14 @@ axum = "0.6"
 hyper = { version = "0.14", features = ["server"] }
 ```
 
-```jsonc
-// package.json
-{
-    "dependencies": {
-        "@qubit-rs/client": "latest"
-    }
-}
+```bash
+pnpm i @qubit-rs/client@latest
 ```
 
 2. Setup a Qubit router, and save the generated types
 
 ```rs
-#[handler]
+#[handler(query)]
 async fn hello_world() -> String {
     "Hello, world!".to_string()
 }
@@ -102,7 +97,7 @@ import type { QubitServer } from "./bindings";
 const api = ws<QubitServer>("ws://localhost:9944/rpc");
 
 // Call the handlers
-const message = await api.hello_world();
+const message = await api.hello_world.query();
 console.log("received from server:", message);
 ```
 
