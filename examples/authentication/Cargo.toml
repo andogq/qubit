@@ -11,7 +11,7 @@ serde = { version = "1.0", features = ["derive"] }
 futures = "0.3.30"
 
 tokio = { version = "1.35", features = ["full"] }
-axum = "0.6"
-hyper = { version = "0.14", features = ["server"] }
+axum = "0.7"
+hyper = { version = "1.0", features = ["server"] }
 
 cookie = "0.18"

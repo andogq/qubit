@@ -12,6 +12,7 @@ use qubit::*;
 
 use axum::routing::get;
 use serde::{Deserialize, Serialize};
+use tokio::net::TcpListener;
 use ts_rs::TS;
 
 #[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug)]
@@ -210,10 +211,14 @@ async fn main() {
         .nest_service("/rpc", app_service);
 
     // Start the server
-    hyper::Server::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
-        .serve(router.into_make_service())
-        .await
-        .unwrap();
+    axum::serve(
+        TcpListener::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
+            .await
+            .unwrap(),
+        router,
+    )
+    .await
+    .unwrap();
 
     // Once the server has stopped, ensure that the app is shutdown
     app_handle.stop().unwrap();

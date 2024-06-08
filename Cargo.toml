@@ -1,33 +1,33 @@
 [workspace]
-members = [ "./crates/qubit-macros" ]
+members = ["./crates/qubit-macros"]
 exclude = [
   "./examples/authentication",
   "./examples/chaos",
   "./examples/chat-room-react/src-rust",
   "./examples/counter",
-  "./examples/hello-world"
+  "./examples/hello-world",
 ]
 
 [package]
 name = "qubit"
 version = "0.6.1"
 edition = "2021"
-authors = [ "Tom Anderson <tom@ando.gq>" ]
+authors = ["Tom Anderson <tom@ando.gq>"]
 repository = "https://github.com/andogq/qubit"
 license = "MIT"
 description = "Seamless RPC for Rust & TypeScript"
-exclude = [ "./client", "./example" ]
+exclude = ["./client", "./example"]
 
 [dependencies]
-axum = "0.6.20"
+axum = "0.7"
 futures = "0.3.30"
-http = "0.2.9"
-hyper = { version = "0.14.28", features = [ "server" ] }
-jsonrpsee = { version = "0.22.5", features = [ "server" ] }
-serde = { version = "1.0.195", features = [ "derive" ] }
+http = "1.1"
+hyper = { version = "1.0", features = ["server"] }
+jsonrpsee = { version = "0.23", features = ["server"] }
+serde = { version = "1.0.195", features = ["derive"] }
 serde_json = "1.0.111"
-tokio = { version = "1.37.0", features = [ "rt", "rt-multi-thread" ] }
-tower = "0.4.13"
+tokio = { version = "1.38", features = ["rt", "rt-multi-thread"] }
+tower = "0.4"
 ts-rs = "8.1.0"
 qubit-macros = { version = "0.5.0", path = "./crates/qubit-macros" }
 trait-variant = "0.1.2"
