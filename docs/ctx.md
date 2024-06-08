@@ -10,10 +10,6 @@ to the context builder. If this is a problem, then raise an issue.
 
 ## Case Study: Authentication
 
-As an example, let's explore two possibilities for authenticating a client.
-
-### Cookie Authentication
-
 The most straight forward setup would be to use server-set cookies to authenticate the client. Some
 action from the client initiates a request to the client to set a cookie, which will be sent on
 every consecutive request. There are some limitations for this method:
@@ -28,12 +24,5 @@ every consecutive request. There are some limitations for this method:
 
 This authentication method is best suited for clients that are serviced over HTTP.
 
-See the sample at [`cookie.rs`](../examples/authentication/src/cookie.rs).
+Checkout the the [example](../examples/authentication/src/main.rs).
 
-### Mutable Context
-
-An alternate option is to perform the authentication over the connection, although this only works
-with the WebSocket client as the context must be persisted between queries. This method is
-therefore best suited for clients communicating over WebSockets.
-
-See the sample at [`mutable_ctx.rs`](../examples/authentication/src/mutable_ctx.rs).
