@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.3.1]
+
+### fix
+
+- [`8fca0ce`](https://github.com/andogq/qubit/commit/8fca0ceee34786f28c17f5e979dad7f4125d517a) remove old client builder
+
 ## \[0.3.0]
 
 ### feat

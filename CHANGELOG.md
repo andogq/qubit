@@ -1,5 +1,17 @@
 # Changelog
 
+## \[0.7.0]
+
+- [`69669f4`](https://github.com/andogq/qubit/commit/69669f4dbb99cc179479ca6a5b2c33c0639b8531) update to jsonrpsee 0.23.0
+
+### Dependencies
+
+- Upgraded to `qubit-macros@0.5.1`
+
+### fix
+
+- [`fe5fd40`](https://github.com/andogq/qubit/commit/fe5fd4049510e7b9847da7518ae7ea01abd1bde6) bring README back up to date
+
 ## \[0.6.1]
 
 ### Dependencies

@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.5.1]
+
+### fix
+
+- [`bf93414`](https://github.com/andogq/qubit/commit/bf93414c1e2732d5e0ae5c13425529038303a935) use absolute paths in the macro
+
 ## \[0.5.0]
 
 ### feat
