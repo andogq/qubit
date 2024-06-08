@@ -124,7 +124,7 @@ impl Handler {
                         // BUG: Assuming that any trait implementation is a stream, which definitely isn't
                         // the case.
                         Type::ImplTrait(TypeImplTrait { bounds, .. }) => HandlerReturn::Stream(
-                            parse_quote! { <dyn #bounds as futures::Stream>::Item },
+                            parse_quote! { <dyn #bounds as ::futures::Stream>::Item },
                         ),
                         // All other return types will be treated as a regular return type.
                         return_type => HandlerReturn::Return(return_type),
@@ -186,15 +186,15 @@ impl Handler {
         quote! {
             {
                 let parameters = [
-                    #((#param_names_str, <#param_tys as ts_rs::TS>::name())),*
+                    #((#param_names_str, <#param_tys as ::ts_rs::TS>::name())),*
                 ]
                     .into_iter()
                     .map(|(param, ty): (&str, String)| {
                         format!("{param}: {ty}, ")
                     })
-                    .collect::<String>();
+                    .collect::<::std::string::String>();
 
-                format!(#base_ty, params=parameters, return_ty=<#return_type as ts_rs::TS>::name())
+                format!(#base_ty, params=parameters, return_ty=<#return_type as ::ts_rs::TS>::name())
             }
         }
     }
@@ -295,19 +295,19 @@ impl From<Handler> for TokenStream {
         quote! {
             #[allow(non_camel_case_types)]
             #visibility struct #name;
-            impl<#inner_ctx_ty> qubit::Handler<#inner_ctx_ty> for #name
-                where #inner_ctx_ty: 'static + Send + Sync + Clone,
+            impl<#inner_ctx_ty> ::qubit::Handler<#inner_ctx_ty> for #name
+                where #inner_ctx_ty: 'static + ::std::marker::Send + ::std::marker::Sync + ::std::clone::Clone,
                      #ctx_ty: ::qubit::FromContext<#inner_ctx_ty>,
             {
-                fn get_type() -> qubit::HandlerType {
-                    qubit::HandlerType {
+                fn get_type() -> ::qubit::HandlerType {
+                    ::qubit::HandlerType {
                         name: #handler_name_str.to_string(),
                         signature: #signature,
                         kind: #kind_str.to_string(),
                     }
                 }
 
-                fn register(rpc_builder: qubit::RpcBuilder<#inner_ctx_ty>) -> qubit::RpcBuilder<#inner_ctx_ty> {
+                fn register(rpc_builder: ::qubit::RpcBuilder<#inner_ctx_ty>) -> ::qubit::RpcBuilder<#inner_ctx_ty> {
                     #implementation
 
                     #register_impl
