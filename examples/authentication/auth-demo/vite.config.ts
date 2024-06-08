@@ -3,11 +3,11 @@ import { defineConfig } from "vite";
 export default defineConfig({
   server: {
     proxy: {
-      "/cookie": {
+      "/rpc": {
         target: "http://localhost:9944",
         ws: true,
       },
-      "/mutable-ctx": {
+      "/login": {
         target: "http://localhost:9944",
         ws: true,
       },
