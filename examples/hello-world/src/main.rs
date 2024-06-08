@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 
 use qubit::{handler, Router};
+use tokio::net::TcpListener;
 
 #[handler(query)]
 async fn hello_world() -> String {
@@ -24,10 +25,14 @@ async fn main() {
 
     // Start a Hyper server
     println!("Listening at 127.0.0.1:9944");
-    hyper::Server::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
-        .serve(axum_router.into_make_service())
-        .await
-        .unwrap();
+    axum::serve(
+        TcpListener::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
+            .await
+            .unwrap(),
+        axum_router,
+    )
+    .await
+    .unwrap();
 
     // Shutdown Qubit
     qubit_handle.stop().unwrap();

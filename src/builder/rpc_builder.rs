@@ -53,7 +53,7 @@ where
         Fut: Future<Output = T> + Send + 'static,
     {
         self.module
-            .register_async_method(self.namespace_str(name), move |params, ctx| {
+            .register_async_method(self.namespace_str(name), move |params, ctx, _extensions| {
                 // NOTE: Handler has to be cloned in since `register_async_method` takes `Fn`, not
                 // `FnOnce`. Not sure if it's better to be an `Rc`/leaked/???
                 let handler = handler.clone();
@@ -101,7 +101,7 @@ where
                 self.namespace_str(name),
                 self.namespace_str(notification_name),
                 self.namespace_str(unsubscribe_name),
-                move |params, subscription, ctx| {
+                move |params, subscription, ctx, _extensions| {
                     // NOTE: Same deal here with cloning the handler as in the query registration.
                     let handler = handler.clone();
 

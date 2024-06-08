@@ -4,6 +4,7 @@ use futures::Stream;
 use manager::{ChatMessage, Client, Manager};
 use qubit::{handler, Router};
 use rand::{thread_rng, Rng};
+use tokio::net::TcpListener;
 
 mod manager;
 
@@ -67,10 +68,14 @@ async fn main() {
 
     // Start a Hyper server
     println!("Listening at 127.0.0.1:9944");
-    hyper::Server::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
-        .serve(axum_router.into_make_service())
-        .await
-        .unwrap();
+    axum::serve(
+        TcpListener::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
+            .await
+            .unwrap(),
+        axum_router,
+    )
+    .await
+    .unwrap();
 
     // Shutdown Qubit
     qubit_handle.stop().unwrap();

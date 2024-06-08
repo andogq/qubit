@@ -1,10 +1,9 @@
 use std::{collections::HashSet, convert::Infallible, fmt::Write as _, fs, path::Path};
 
 use futures::FutureExt;
-use http::Request;
-use hyper::{service::service_fn, Body};
 pub use jsonrpsee::server::ServerHandle;
 use jsonrpsee::RpcModule;
+use tower::service_fn;
 use tower::Service;
 
 use crate::builder::*;
@@ -126,12 +125,12 @@ where
     /// useful, but for WS clients this can be handy for tracking active clients.
     pub fn to_service<F, G>(
         self,
-        build_ctx: impl (Fn(&Request<Body>) -> F) + Clone + Send + 'static,
+        build_ctx: impl (Fn(&hyper::Request<axum::body::Body>) -> F) + Clone + Send + 'static,
         on_close: impl (Fn(Ctx) -> G) + Clone + Send + 'static,
     ) -> (
         impl Service<
-                Request<Body>,
-                Response = impl axum::response::IntoResponse,
+                hyper::Request<axum::body::Body>,
+                Response = jsonrpsee::server::HttpResponse,
                 Error = Infallible,
                 Future = impl Send,
             > + Clone,
