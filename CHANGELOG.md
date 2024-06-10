@@ -1,5 +1,13 @@
 # Changelog
 
+## \[0.8.0]
+
+- [`cb95f67`](https://github.com/andogq/qubit/commit/cb95f67c1457458a7123814d872bcdc7bdb1fba9) fix example dependency versions in README
+
+### feat
+
+- [`64913a8`](https://github.com/andogq/qubit/commit/64913a884e82ee35e6b63ded86755582a8031360) provide mutable reference to request parts, instead of the entire request to the context builder.
+
 ## \[0.7.0]
 
 - [`69669f4`](https://github.com/andogq/qubit/commit/69669f4dbb99cc179479ca6a5b2c33c0639b8531) update to jsonrpsee 0.23.0
