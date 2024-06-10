@@ -3,10 +3,10 @@
 Qubit manages context on a per HTTP request basis. That is, for every incoming HTTP request a new
 `Ctx` instance will be generated. This occurs in the `service_fn` closure within the `to_service`
 method on `Router`. This process will include calling the user-defined `build_ctx` method with the
-incoming HTTP request, allowing for the state to be populated using request information, including
-headers. Unfortunately, due to the nature of how Axum nests services, the underlying connection
-(and therefore information like the IP address of the upstream request initiator) is not accessible
-to the context builder. If this is a problem, then raise an issue.
+parts of the incoming HTTP request, allowing for the state to be populated using request
+information, including headers. Unfortunately, due to the nature of how Axum nests services, the
+underlying connection (and therefore information like the IP address of the upstream request
+initiator) is not accessible to the context builder. If this is a problem, then raise an issue.
 
 ## Case Study: Authentication
 

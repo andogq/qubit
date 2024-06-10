@@ -125,7 +125,7 @@ where
     /// useful, but for WS clients this can be handy for tracking active clients.
     pub fn to_service<F, G>(
         self,
-        build_ctx: impl (Fn(&hyper::Request<axum::body::Body>) -> F) + Clone + Send + 'static,
+        build_ctx: impl (Fn(&mut http::request::Parts) -> F) + Clone + Send + 'static,
         on_close: impl (Fn(Ctx) -> G) + Clone + Send + 'static,
     ) -> (
         impl Service<
@@ -144,7 +144,7 @@ where
         let (stop_handle, server_handle) = jsonrpsee::server::stop_channel();
 
         (
-            service_fn(move |req| {
+            service_fn(move |req: hyper::Request<axum::body::Body>| {
                 let stop_handle = stop_handle.clone();
 
                 // WARN: Horrific amount of cloning, required as it is not possible to swap out the
@@ -155,7 +155,9 @@ where
                 let on_close = on_close.clone();
 
                 async move {
-                    let ctx = build_ctx(&req).await;
+                    let (mut parts, body) = req.into_parts();
+
+                    let ctx = build_ctx(&mut parts).await;
 
                     let rpc_module = s.build_rpc_module(ctx.clone(), None);
 
@@ -173,7 +175,7 @@ where
                         on_close(ctx).await;
                     });
 
-                    match svc.call(req).await {
+                    match svc.call(hyper::Request::from_parts(parts, body)).await {
                         Ok(v) => Ok::<_, Infallible>(v),
                         Err(_) => unreachable!(),
                     }

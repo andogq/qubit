@@ -104,10 +104,10 @@ async fn main() {
     router.write_bindings_to_dir("./auth-demo/src/bindings");
 
     let (qubit_service, handle) = router.to_service(
-        move |req| {
+        move |parts| {
             // Extract cookie from request
-            let auth_cookie = req
-                .headers()
+            let auth_cookie = parts
+                .headers
                 .get_all(COOKIE)
                 .into_iter()
                 .flat_map(|cookie| Cookie::split_parse(cookie.to_str().unwrap()))
