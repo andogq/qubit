@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.3.2]
+
+### fix
+
+- [`61f46c3`](https://github.com/andogq/qubit/commit/61f46c3ad82f4b869579d896697c3c4312154ac2) remove test import
+
 ## \[0.3.1]
 
 ### fix
