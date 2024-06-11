@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.3.3]
+
+### feat
+
+- [`f8ff07b`](https://github.com/andogq/qubit/commit/f8ff07b8d3b92aef60687b868a04ff08f4a8de2f) feat: allow for polyfilling `fetch` for `http` transport (close #55)
+
 ## \[0.3.2]
 
 ### fix
