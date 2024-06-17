@@ -50,17 +50,19 @@ async fn main() {
     // Create service and handle
     let client = Manager::start();
     let (qubit_service, qubit_handle) = router.to_service(
-        move |_| {
-            let client = client.clone();
-            let name = random_emoji();
-            async move {
-                client.join(name).await;
-                Ctx { client, name }
-            }
-        },
-        |ctx| async move {
-            ctx.client.leave(ctx.name).await;
-        },
+        Ctx {
+            client, name: '🦀'
+        }, //     move |_| {
+           //         let client = client.clone();
+           //         let name = random_emoji();
+           //         async move {
+           //             client.join(name).await;
+           //             Ctx { client, name }
+           //         }
+           //     },
+           //     |ctx| async move {
+           //         ctx.client.leave(ctx.name).await;
+           //     },
     );
 
     // Nest into an Axum rouer
@@ -81,6 +83,7 @@ async fn main() {
     qubit_handle.stop().unwrap();
 }
 
+#[allow(dead_code)]
 fn random_emoji() -> char {
     char::from_u32(thread_rng().gen_range(0x1F600..0x1F64F)).unwrap_or('🦀')
 }

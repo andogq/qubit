@@ -18,9 +18,11 @@ pub struct Manager {
 
 pub enum Message {
     /// Add a user to the list
+    #[allow(dead_code)]
     Join { name: char },
 
     /// Remove a user from the list
+    #[allow(dead_code)]
     Leave { name: char },
 
     /// Send a chat message
@@ -43,10 +45,12 @@ impl Client {
         Self { tx }
     }
 
+    #[allow(dead_code)]
     pub async fn join(&self, name: char) {
         self.tx.send(Message::Join { name }).await.unwrap();
     }
 
+    #[allow(dead_code)]
     pub async fn leave(&self, name: char) {
         self.tx.send(Message::Leave { name }).await.unwrap();
     }
