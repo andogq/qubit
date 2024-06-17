@@ -58,13 +58,8 @@ where
 
         // Export all the dependencies, and create their import statements
         let (imports, _types) = self
-            .handlers
-            .iter()
-            .chain(
-                self.nested_routers
-                    .iter()
-                    .flat_map(|(_, router)| &router.handlers),
-            )
+            .get_handlers()
+            .into_iter()
             .flat_map(|handler| {
                 (handler.export_all_dependencies_to)(out_dir)
                     .unwrap()
@@ -226,15 +221,35 @@ where
             .build();
 
         // Generate modules for nested routers, and merge them with the existing router
+        let parent_namespace = namespace;
         self.nested_routers
             .into_iter()
             .fold(rpc_module, |mut rpc_module, (namespace, router)| {
+                let namespace = if let Some(parent_namespace) = parent_namespace {
+                    // WARN: Probably not great leaking here
+                    format!("{parent_namespace}.{namespace}").leak()
+                } else {
+                    namespace
+                };
+
                 rpc_module
                     .merge(router.build_rpc_module(ctx.clone(), Some(namespace)))
                     .unwrap();
 
                 rpc_module
             })
+    }
+
+    fn get_handlers(&self) -> Vec<HandlerCallbacks<Ctx>> {
+        self.handlers
+            .iter()
+            .cloned()
+            .chain(
+                self.nested_routers
+                    .iter()
+                    .flat_map(|(_, router)| router.get_handlers()),
+            )
+            .collect()
     }
 }
 
