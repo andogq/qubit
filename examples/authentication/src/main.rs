@@ -6,10 +6,7 @@ use axum::{
     Form,
 };
 use cookie::Cookie;
-use hyper::{
-    header::{COOKIE, SET_COOKIE},
-    StatusCode,
-};
+use hyper::{header::SET_COOKIE, StatusCode};
 use qubit::{handler, ErrorCode, FromContext, Router, RpcError};
 use serde::Deserialize;
 use tokio::net::TcpListener;
@@ -104,23 +101,23 @@ async fn main() {
     router.write_bindings_to_dir("./auth-demo/src/bindings");
 
     let (qubit_service, handle) = router.to_service(
-        move |parts| {
-            // Extract cookie from request
-            let auth_cookie = parts
-                .headers
-                .get_all(COOKIE)
-                .into_iter()
-                .flat_map(|cookie| Cookie::split_parse(cookie.to_str().unwrap()))
-                .flatten()
-                .find(|cookie| cookie.name() == COOKIE_NAME)
-                .map(|cookie| cookie.value().to_string());
-
-            async {
-                // Attach it into the request context
-                ReqCtx { auth_cookie }
-            }
-        },
-        |_| async {},
+        ReqCtx { auth_cookie: None }, // move |parts| {
+                                      //     // Extract cookie from request
+                                      //     let auth_cookie = parts
+                                      //         .headers
+                                      //         .get_all(COOKIE)
+                                      //         .into_iter()
+                                      //         .flat_map(|cookie| Cookie::split_parse(cookie.to_str().unwrap()))
+                                      //         .flatten()
+                                      //         .find(|cookie| cookie.name() == COOKIE_NAME)
+                                      //         .map(|cookie| cookie.value().to_string());
+                                      //
+                                      //     async {
+                                      //         // Attach it into the request context
+                                      //         ReqCtx { auth_cookie }
+                                      //     }
+                                      // },
+                                      // |_| async {},
     );
 
     // Once the handle is dropped the server will automatically shutdown, so leak it to keep it
