@@ -193,17 +193,8 @@ async fn main() {
     // Save the router's bindings
     app.write_bindings_to_dir("./bindings");
 
-    // Set up the context for the app
-    let ctx = AppCtx::default();
-
     // Create a service and handle for the app
-    let (app_service, app_handle) = app.to_service(
-        move |_| {
-            let ctx = ctx.clone();
-            async { ctx }
-        },
-        |_| async {},
-    );
+    let (app_service, app_handle) = app.to_service(AppCtx::default());
 
     // Set up the axum router
     let router = axum::Router::<()>::new()
