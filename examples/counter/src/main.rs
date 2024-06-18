@@ -52,17 +52,8 @@ async fn main() {
     router.write_bindings_to_dir("./bindings");
     println!("Successfully write bindings to `./bindings`");
 
-    // Create initial ctx
-    let ctx = Ctx::default();
-
     // Create service and handle
-    let (qubit_service, qubit_handle) = router.to_service(
-        move |_| {
-            let ctx = ctx.clone();
-            async { ctx }
-        },
-        |_| async {},
-    );
+    let (qubit_service, qubit_handle) = router.to_service(Ctx::default());
 
     // Nest into an Axum rouer
     let axum_router = axum::Router::<()>::new().nest_service("/rpc", qubit_service);

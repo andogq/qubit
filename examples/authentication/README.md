@@ -1,7 +1,5 @@
 # Authentication
 
-For more information, check out the [documentation](../../docs/ctx.md).
-
 In one terminal, start the server.
 
 ```sh

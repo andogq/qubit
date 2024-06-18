@@ -58,8 +58,11 @@ mod user {
         user: u32,
     }
 
-    impl FromContext<AppCtx> for UserCtx {
-        async fn from_app_ctx(ctx: AppCtx) -> Result<Self, RpcError> {
+    impl FromRequestExtensions<AppCtx> for UserCtx {
+        async fn from_request_extensions(
+            ctx: AppCtx,
+            _extensions: Extensions,
+        ) -> Result<Self, RpcError> {
             Ok(UserCtx {
                 app_ctx: ctx,
                 user: 0,
@@ -128,8 +131,11 @@ struct CountCtx {
     count: Arc<AtomicUsize>,
 }
 
-impl FromContext<AppCtx> for CountCtx {
-    async fn from_app_ctx(ctx: AppCtx) -> Result<Self, RpcError> {
+impl FromRequestExtensions<AppCtx> for CountCtx {
+    async fn from_request_extensions(
+        ctx: AppCtx,
+        _extensions: Extensions,
+    ) -> Result<Self, RpcError> {
         Ok(Self {
             count: ctx.count.clone(),
         })
@@ -193,17 +199,8 @@ async fn main() {
     // Save the router's bindings
     app.write_bindings_to_dir("./bindings");
 
-    // Set up the context for the app
-    let ctx = AppCtx::default();
-
     // Create a service and handle for the app
-    let (app_service, app_handle) = app.to_service(
-        move |_| {
-            let ctx = ctx.clone();
-            async { ctx }
-        },
-        |_| async {},
-    );
+    let (app_service, app_handle) = app.to_service(AppCtx::default());
 
     // Set up the axum router
     let router = axum::Router::<()>::new()

@@ -109,19 +109,10 @@ where
     }
 
     /// Turn the router into a [`tower::Service`], so that it can be nested into a HTTP server.
-    ///
-    /// Every incomming request has its own `Ctx` created for it, using the provided `build_ctx`
-    /// method provided here. Generally this would involve cloning some pre-existing resources
-    /// (database connections, channels, state), and capturing some information from the incoming
-    /// [`Request`] included as a parameter.
-    ///
-    /// A closure can be provided to be called when the connection is closed, which will be
-    /// provided with the `ctx` associated with that connection. For HTTP clients this isn't overly
-    /// useful, but for WS clients this can be handy for tracking active clients.
-    pub fn to_service<F, G>(
+    /// The provided `ctx` will be cloned for each request.
+    pub fn to_service(
         self,
-        build_ctx: impl (Fn(&mut http::request::Parts) -> F) + Clone + Send + 'static,
-        on_close: impl (Fn(Ctx) -> G) + Clone + Send + 'static,
+        ctx: Ctx,
     ) -> (
         impl Service<
                 hyper::Request<axum::body::Body>,
@@ -130,48 +121,22 @@ where
                 Future = impl Send,
             > + Clone,
         ServerHandle,
-    )
-    where
-        F: std::future::Future<Output = Ctx> + Send,
-        G: std::future::Future<Output = ()> + Send,
-    {
+    ) {
         // Generate the stop and server handles for the service
         let (stop_handle, server_handle) = jsonrpsee::server::stop_channel();
 
+        // Build out the RPC module into a service
+        let mut service = jsonrpsee::server::Server::builder()
+            .to_service_builder()
+            .build(self.build_rpc_module(ctx, None), stop_handle);
+
         (
             service_fn(move |req: hyper::Request<axum::body::Body>| {
-                let stop_handle = stop_handle.clone();
-
-                // WARN: Horrific amount of cloning, required as it is not possible to swap out the
-                // context on a pre-exising RpcModule.
-                let s = self.clone();
-
-                let build_ctx = build_ctx.clone();
-                let on_close = on_close.clone();
+                let call = service.call(req);
 
                 async move {
-                    let (mut parts, body) = req.into_parts();
-
-                    let ctx = build_ctx(&mut parts).await;
-
-                    let rpc_module = s.build_rpc_module(ctx.clone(), None);
-
-                    let mut svc = jsonrpsee::server::Server::builder()
-                        .to_service_builder()
-                        .build(rpc_module.clone(), stop_handle);
-
-                    // Set up task to track when connection is closed
-                    let on_session_closed = svc.on_session_closed();
-                    tokio::spawn(async move {
-                        // Wait for the session to close
-                        on_session_closed.await;
-
-                        // Run the on_close hook
-                        on_close(ctx).await;
-                    });
-
-                    match svc.call(hyper::Request::from_parts(parts, body)).await {
-                        Ok(v) => Ok::<_, Infallible>(v),
+                    match call.await {
+                        Ok(response) => Ok::<_, Infallible>(response),
                         Err(_) => unreachable!(),
                     }
                 }

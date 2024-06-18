@@ -15,3 +15,4 @@ axum = "0.7"
 hyper = { version = "1.0", features = ["server"] }
 
 cookie = "0.18"
+tower = "0.4.13"

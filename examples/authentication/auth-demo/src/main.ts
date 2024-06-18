@@ -8,7 +8,7 @@ async function main() {
     return ws<QubitServer>(`ws://${window.location.host}/rpc`);
   }
 
-  document.cookie += "qubit-auth=;expires=Thu, 01 Jan 1970 00:00:01 GMT";
+  document.cookie += "qubit-auth=;expires=Thu, 01 Jan 1970 00:00:01 GMT;SameSite=Lax";
 
   // Make some un-authenticated requests
   {
@@ -35,7 +35,7 @@ async function main() {
   {
     // Re-create the API now that we're authenticated
     const api = build_api();
-    console.log("Cookie is", await api.echo_cookie.query());
+    console.log("Cookie is:", await api.echo_cookie.query());
     console.log("Can we get the secret?", await api.secret_endpoint.query());
   }
 

@@ -8,7 +8,7 @@ use jsonrpsee::{
 use serde::Serialize;
 use serde_json::json;
 
-use crate::FromContext;
+use crate::FromRequestExtensions;
 
 /// Builder to construct the RPC module. Handlers can be registered using the [`RpcBuilder::query`]
 /// and [`RpcBuilder::subscription`] methods. It tracks an internally mutable [`RpcModule`] and
@@ -43,31 +43,32 @@ where
 
     /// Register a new query handler with the provided name.
     ///
-    /// The `handler` can take its own `Ctx`, so long as it implements [`FromContext`]. It must
-    /// return a future which outputs a serializable value.
+    /// The `handler` can take its own `Ctx`, so long as it implements [`FromRequestExtensions`]. It
+    /// must return a future which outputs a serializable value.
     pub fn query<T, C, F, Fut>(mut self, name: &'static str, handler: F) -> Self
     where
         T: Serialize + Clone + 'static,
-        C: FromContext<Ctx>,
+        C: FromRequestExtensions<Ctx>,
         F: Fn(C, Params<'static>) -> Fut + Send + Sync + Clone + 'static,
         Fut: Future<Output = T> + Send + 'static,
     {
         self.module
-            .register_async_method(self.namespace_str(name), move |params, ctx, _extensions| {
+            .register_async_method(self.namespace_str(name), move |params, ctx, extensions| {
                 // NOTE: Handler has to be cloned in since `register_async_method` takes `Fn`, not
                 // `FnOnce`. Not sure if it's better to be an `Rc`/leaked/???
                 let handler = handler.clone();
 
                 async move {
                     // Build the context
-                    let ctx = match C::from_app_ctx(ctx.deref().clone()).await {
-                        Ok(ctx) => ctx,
-                        Err(e) => {
-                            // Handle any error building the context by turning it into a response
-                            // payload.
-                            return ResponsePayload::Error(e.into());
-                        }
-                    };
+                    let ctx =
+                        match C::from_request_extensions(ctx.deref().clone(), extensions).await {
+                            Ok(ctx) => ctx,
+                            Err(e) => {
+                                // Handle any error building the context by turning it into a response
+                                // payload.
+                                return ResponsePayload::Error(e.into());
+                            }
+                        };
 
                     // Run the actual handler
                     ResponsePayload::success(handler(ctx, params).await)
@@ -80,8 +81,8 @@ where
 
     /// Register a new subscription handler with the provided name.
     ///
-    /// The `handler` can take its own `Ctx`, so long as it implements [`FromContext`]. It must
-    /// return a future that outputs a stream of serializable values.
+    /// The `handler` can take its own `Ctx`, so long as it implements [`FromRequestExtensions`]. It
+    /// must return a future that outputs a stream of serializable values.
     pub fn subscription<T, C, F, Fut, S>(
         mut self,
         name: &'static str,
@@ -91,7 +92,7 @@ where
     ) -> Self
     where
         T: Serialize + Send + Clone + 'static,
-        C: FromContext<Ctx>,
+        C: FromRequestExtensions<Ctx>,
         F: Fn(C, Params<'static>) -> Fut + Send + Sync + Clone + 'static,
         Fut: Future<Output = S> + Send + 'static,
         S: Stream<Item = T> + Send + 'static,
@@ -101,7 +102,7 @@ where
                 self.namespace_str(name),
                 self.namespace_str(notification_name),
                 self.namespace_str(unsubscribe_name),
-                move |params, subscription, ctx, _extensions| {
+                move |params, subscription, ctx, extensions| {
                     // NOTE: Same deal here with cloning the handler as in the query registration.
                     let handler = handler.clone();
 
@@ -135,7 +136,9 @@ where
                         // Build the context
                         // NOTE: It won't be held across await so that `C` doesn't have to be
                         // `Send`
-                        let ctx = match C::from_app_ctx(ctx.deref().clone()).await {
+                        let ctx = match C::from_request_extensions(ctx.deref().clone(), extensions)
+                            .await
+                        {
                             Ok(ctx) => ctx,
                             Err(e) => {
                                 // Handle any error building the context by turning it into a

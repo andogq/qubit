@@ -6,13 +6,11 @@ use axum::{
     Form,
 };
 use cookie::Cookie;
-use hyper::{
-    header::{COOKIE, SET_COOKIE},
-    StatusCode,
-};
-use qubit::{handler, ErrorCode, FromContext, Router, RpcError};
+use hyper::{header::SET_COOKIE, StatusCode};
+use qubit::{handler, ErrorCode, Extensions, FromRequestExtensions, Router, RpcError};
 use serde::Deserialize;
 use tokio::net::TcpListener;
+use tower::ServiceBuilder;
 
 const COOKIE_NAME: &str = "qubit-auth";
 
@@ -35,6 +33,7 @@ async fn login(Form(login_form): Form<LoginForm>) -> impl IntoResponse {
                 SET_COOKIE,
                 Cookie::build((COOKIE_NAME, "abc-123"))
                     .path("/")
+                    .same_site(cookie::SameSite::Lax)
                     .build()
                     .to_string(),
             )
@@ -48,26 +47,36 @@ async fn login(Form(login_form): Form<LoginForm>) -> impl IntoResponse {
     }
 }
 
-/// Context which will be generated for every request.
-#[derive(Clone)]
+/// A simple context that optionally contains a cookie.
 struct ReqCtx {
-    /// Authentication cookie extracted from the headers, if present.
-    auth_cookie: Option<String>,
+    auth_cookie: Option<Cookie<'static>>,
+}
+
+impl FromRequestExtensions<()> for ReqCtx {
+    async fn from_request_extensions(
+        _ctx: (),
+        mut extensions: Extensions,
+    ) -> Result<Self, RpcError> {
+        Ok(Self {
+            // Extract the auth cookie from the extensions
+            auth_cookie: extensions.remove(),
+        })
+    }
 }
 
 /// Another context, used to represent an authenticated request. Will act as a middleware, as a
 /// handler that relies on this context will only be run if it can be successfully generated.
-#[derive(Clone)]
 struct AuthCtx {
     user: String,
 }
 
-impl FromContext<ReqCtx> for AuthCtx {
-    /// Implementation to generate the [`AuthCtx`] from the [`ReqCtx`]. Is falliable, so requests
-    /// can be blocked at this point.
-    async fn from_app_ctx(ctx: ReqCtx) -> Result<Self, qubit::RpcError> {
+impl FromRequestExtensions<()> for AuthCtx {
+    async fn from_request_extensions(_ctx: (), extensions: Extensions) -> Result<Self, RpcError> {
+        // Build up the `ReqCtx`
+        let req_ctx = ReqCtx::from_request_extensions((), extensions).await?;
+
         // Enforce that the auth cookie is present
-        let Some(cookie) = ctx.auth_cookie else {
+        let Some(cookie) = req_ctx.auth_cookie else {
             // Return an error to cancel the request if it's not
             return Err(RpcError {
                 code: ErrorCode::ServerError(-32001),
@@ -77,7 +86,9 @@ impl FromContext<ReqCtx> for AuthCtx {
         };
 
         // Otherwise, progress using this new context.
-        Ok(AuthCtx { user: cookie })
+        Ok(AuthCtx {
+            user: cookie.value().to_string(),
+        })
     }
 }
 
@@ -103,25 +114,34 @@ async fn main() {
     let router = Router::new().handler(echo_cookie).handler(secret_endpoint);
     router.write_bindings_to_dir("./auth-demo/src/bindings");
 
-    let (qubit_service, handle) = router.to_service(
-        move |parts| {
-            // Extract cookie from request
-            let auth_cookie = parts
-                .headers
-                .get_all(COOKIE)
-                .into_iter()
-                .flat_map(|cookie| Cookie::split_parse(cookie.to_str().unwrap()))
-                .flatten()
-                .find(|cookie| cookie.name() == COOKIE_NAME)
-                .map(|cookie| cookie.value().to_string());
+    let (qubit_service, handle) = router.to_service(());
 
-            async {
-                // Attach it into the request context
-                ReqCtx { auth_cookie }
+    let qubit_service = ServiceBuilder::new()
+        .map_request(|mut req: hyper::Request<_>| {
+            // Extract a certain cookie from the request
+            let auth_cookie = req
+                // Pull out the request headers
+                .headers()
+                // Select the cookie header
+                .get(hyper::header::COOKIE)
+                // Get the value of the header
+                .and_then(|cookie| cookie.to_str().ok())
+                .and_then(|cookie_header| {
+                    // Parse the cookie header
+                    Cookie::split_parse(cookie_header.to_string())
+                        .filter_map(|cookie| cookie.ok())
+                        // Attempt to find a specific cookie that matches the cookie we want
+                        .find(|cookie| cookie.name() == COOKIE_NAME)
+                });
+
+            // If we find the auth cookie, save it to the request extension
+            if let Some(auth_cookie) = auth_cookie {
+                req.extensions_mut().insert(auth_cookie);
             }
-        },
-        |_| async {},
-    );
+
+            req
+        })
+        .service(qubit_service);
 
     // Once the handle is dropped the server will automatically shutdown, so leak it to keep it
     // running. Don't actually do this.

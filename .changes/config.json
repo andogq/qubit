@@ -17,7 +17,7 @@
       "getPublishedVersion": "cargo search ${ pkg.pkg } --limit 1 | sed -nE 's/^[^\"]*\"//; s/\".*//1p'",
       "postversion": [
         {
-          "command": "cargo generate-lockfile",
+          "command": "./scripts/generate-lock-files.sh",
           "dryRunCommand": true,
           "runFromRoot": true,
           "pipe": true
