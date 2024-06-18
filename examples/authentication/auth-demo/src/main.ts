@@ -8,8 +8,7 @@ async function main() {
     return ws<QubitServer>(`ws://${window.location.host}/rpc`);
   }
 
-  document.cookie +=
-    "qubit-auth=;expires=Thu, 01 Jan 1970 00:00:01 GMT;SameSite=Lax";
+  document.cookie += "qubit-auth=;expires=Thu, 01 Jan 1970 00:00:01 GMT;SameSite=Lax";
 
   // Make some un-authenticated requests
   {
