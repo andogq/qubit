@@ -57,6 +57,7 @@ dependencies = [
  "qubit",
  "serde",
  "tokio",
+ "tower",
  "ts-rs",
 ]
 
