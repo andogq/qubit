@@ -297,7 +297,7 @@ impl From<Handler> for TokenStream {
             #visibility struct #name;
             impl<#inner_ctx_ty> ::qubit::Handler<#inner_ctx_ty> for #name
                 where #inner_ctx_ty: 'static + ::std::marker::Send + ::std::marker::Sync + ::std::clone::Clone,
-                     #ctx_ty: ::qubit::FromContext<#inner_ctx_ty>,
+                     #ctx_ty: ::qubit::FromRequestExtensions<#inner_ctx_ty>,
             {
                 fn get_type() -> ::qubit::HandlerType {
                     ::qubit::HandlerType {

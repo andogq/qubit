@@ -7,7 +7,7 @@ use axum::{
 };
 use cookie::Cookie;
 use hyper::{header::SET_COOKIE, StatusCode};
-use qubit::{handler, ErrorCode, FromContext, Router, RpcError};
+use qubit::{handler, ErrorCode, Extensions, FromRequestExtensions, Router, RpcError};
 use serde::Deserialize;
 use tokio::net::TcpListener;
 
@@ -59,10 +59,13 @@ struct AuthCtx {
     user: String,
 }
 
-impl FromContext<ReqCtx> for AuthCtx {
+impl FromRequestExtensions<ReqCtx> for AuthCtx {
     /// Implementation to generate the [`AuthCtx`] from the [`ReqCtx`]. Is falliable, so requests
     /// can be blocked at this point.
-    async fn from_app_ctx(ctx: ReqCtx) -> Result<Self, qubit::RpcError> {
+    async fn from_request_extensions(
+        ctx: ReqCtx,
+        _extensions: Extensions,
+    ) -> Result<Self, qubit::RpcError> {
         // Enforce that the auth cookie is present
         let Some(cookie) = ctx.auth_cookie else {
             // Return an error to cancel the request if it's not

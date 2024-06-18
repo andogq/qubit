@@ -2,23 +2,23 @@ mod error;
 mod router;
 
 pub use error::*;
+pub use http::Extensions;
 pub use router::{Router, ServerHandle};
 
-/// Router context variation that can derived from `Ctx`.
-#[trait_variant::make(FromContext: Send)]
-pub trait LocalFromContext<Ctx>
+/// Context can be built from request information by implementing the following trait. The
+/// extensions are passed in from the request (see [`Extensions`]), which can be added using tower
+/// middleware.
+#[trait_variant::make(Send)]
+pub trait FromRequestExtensions<Ctx>
 where
     Self: Sized,
 {
-    /// Create a new instance from the provided context.
-    ///
-    /// This is falliable, so any errors must produce a [`RpcError`], which will be returned to the
-    /// client.
-    async fn from_app_ctx(ctx: Ctx) -> Result<Self, RpcError>;
+    /// Using the provided context and extensions, build a new extension.
+    async fn from_request_extensions(ctx: Ctx, extensions: Extensions) -> Result<Self, RpcError>;
 }
 
-impl<Ctx: Send> FromContext<Ctx> for Ctx {
-    async fn from_app_ctx(ctx: Ctx) -> Result<Self, RpcError> {
+impl<Ctx: Send> FromRequestExtensions<Ctx> for Ctx {
+    async fn from_request_extensions(ctx: Ctx, _extensions: Extensions) -> Result<Self, RpcError> {
         Ok(ctx)
     }
 }
