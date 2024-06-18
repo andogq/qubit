@@ -1,5 +1,20 @@
 # Changelog
 
+## \[0.9.0]
+
+### Dependencies
+
+- Upgraded to `qubit-macros@0.6.0`
+
+### feat
+
+- [`9543d12`](https://github.com/andogq/qubit/commit/9543d126a915d5501a83ba207591858283cebe87) (**BREAKING**) pass single cloneable ctx to builder instead of closure that accepts a request
+- [`7274cb0`](https://github.com/andogq/qubit/commit/7274cb059af6ab1d00d92099fab2a7ee8ea2b6be) **BREAKING** replace `FromContext` with `FromRequestExtensions` to build ctx from request information (via tower middleware)
+
+### fix
+
+- [`111db0a`](https://github.com/andogq/qubit/commit/111db0a3fb52c221749f12aeda5757df847df5a8) fix incorrect handling of deeply nested routers
+
 ## \[0.8.0]
 
 - [`cb95f67`](https://github.com/andogq/qubit/commit/cb95f67c1457458a7123814d872bcdc7bdb1fba9) fix example dependency versions in README

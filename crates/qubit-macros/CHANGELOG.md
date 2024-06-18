@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.6.0]
+
+### feat
+
+- [`7274cb0`](https://github.com/andogq/qubit/commit/7274cb059af6ab1d00d92099fab2a7ee8ea2b6be) **BREAKING** replace `FromContext` with `FromRequestExtensions` to build ctx from request information (via tower middleware)
+
 ## \[0.5.1]
 
 ### fix
