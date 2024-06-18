@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.6.1]
+
+### fix
+
+- [`dbf8fd5`](https://github.com/andogq/qubit/commit/dbf8fd5ee5745f070be7842a68d8fb6e8eb70cdf) update readme with correct instructions
+
 ## \[0.6.0]
 
 ### feat

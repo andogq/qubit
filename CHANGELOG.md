@@ -1,5 +1,15 @@
 # Changelog
 
+## \[0.9.1]
+
+### Dependencies
+
+- Upgraded to `qubit-macros@0.6.1`
+
+### fix
+
+- [`dbf8fd5`](https://github.com/andogq/qubit/commit/dbf8fd5ee5745f070be7842a68d8fb6e8eb70cdf) update readme with correct instructions
+
 ## \[0.9.0]
 
 ### Dependencies
