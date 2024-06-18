@@ -73,7 +73,7 @@ router.write_bindings_to_dir("./bindings");
 
 ```rs
 // Create a service and handle
-let (qubit_service, _qubit_handle) = router.to_service(|_| async {}, |_| async {});
+let (qubit_service, qubit_handle) = router.to_service(());
 
 // Nest into an Axum router
 let axum_router = axum::Router::<()>::new()
@@ -88,6 +88,8 @@ axum::serve(
 )
 .await
 .unwrap();
+
+qubit_handle.stop().unwrap();
 ```
 
 4. Make requests from the TypeScript client
