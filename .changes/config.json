@@ -20,7 +20,7 @@
           "command": "./scripts/generate-lock-files.sh",
           "dryRunCommand": true,
           "runFromRoot": true,
-          "pipe": true
+          "pipe": false
         }
       ],
       "publish": ["cargo publish"],
