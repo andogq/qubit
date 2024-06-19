@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.6.2]
+
+### feat
+
+- [`e426945`](https://github.com/andogq/qubit/commit/e426945cda8cacd9a33c7cc8705945324dc5c305) allow for `query` handlers to be accessed via `GET` as well as `POST`
+
 ## \[0.6.1]
 
 ### fix
