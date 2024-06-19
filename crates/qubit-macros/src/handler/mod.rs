@@ -256,10 +256,16 @@ impl From<Handler> for TokenStream {
                 #handler_call
             };
 
+            let register_method = match kind {
+                HandlerKind::Query => quote! { query },
+                HandlerKind::Mutation => quote! { mutation },
+                HandlerKind::Subscription => quote! { subscription },
+            };
+
             match &return_type {
                 HandlerReturn::Return(_) => {
                     quote! {
-                        rpc_builder.query(#handler_name_str, |#ctx_ident: #ctx_ty, #params_ident| async move {
+                        rpc_builder.#register_method(#handler_name_str, |#ctx_ident: #ctx_ty, #params_ident| async move {
                             #register_inner
                         })
                     }
@@ -269,7 +275,7 @@ impl From<Handler> for TokenStream {
                     let unsubscribe_name = format!("{handler_name_str}_unsub");
 
                     quote! {
-                        rpc_builder.subscription(
+                        rpc_builder.#register_method(
                             #handler_name_str,
                             #notification_name,
                             #unsubscribe_name,

@@ -1,12 +1,17 @@
 use std::{collections::HashSet, convert::Infallible, fmt::Write as _, fs, path::Path};
 
+use axum::body::Body;
 use futures::FutureExt;
+use http::{HeaderValue, Method, Request};
+use jsonrpsee::server::ws::is_upgrade_request;
 pub use jsonrpsee::server::ServerHandle;
 use jsonrpsee::RpcModule;
 use tower::service_fn;
 use tower::Service;
+use tower::ServiceBuilder;
 
 use crate::builder::*;
+use crate::RequestKind;
 
 /// Router for the RPC server. Can have different handlers attached to it, as well as nested
 /// routers in order to create a hierarchy. It is also capable of generating its own type, suitable
@@ -127,6 +132,50 @@ where
 
         // Build out the RPC module into a service
         let mut service = jsonrpsee::server::Server::builder()
+            .set_http_middleware(ServiceBuilder::new().map_request(|mut req: Request<_>| {
+                // Check if this is a GET request, and if it is convert it to a regular POST
+                let request_type = if matches!(req.method(), &Method::GET)
+                    && !is_upgrade_request(&req)
+                {
+                    // Change this request into a regular POST request, and indicate that it should
+                    // be a query.
+                    *req.method_mut() = Method::POST;
+
+                    // Parse out the query parameters, and turn them into the body
+                    let Some(query) = req.uri().query().map(|query| query.to_string()) else {
+                        return req;
+                    };
+                    let Ok(body) = serde_qs::from_str::<jsonrpsee::types::Request>(&query) else {
+                        return req;
+                    };
+                    let Ok(body) = serde_json::to_string(&body) else {
+                        return req;
+                    };
+
+                    // Update the headers
+                    let headers = req.headers_mut();
+                    headers.insert(
+                        hyper::header::CONTENT_TYPE,
+                        HeaderValue::from_static("application/json"),
+                    );
+                    headers.insert(
+                        hyper::header::ACCEPT,
+                        HeaderValue::from_static("application/json"),
+                    );
+
+                    // Reconstruct the body
+                    *req.body_mut() = Body::from(body);
+
+                    RequestKind::Query
+                } else {
+                    RequestKind::Any
+                };
+
+                // Set the request kind
+                req.extensions_mut().insert(request_type);
+
+                req
+            }))
             .to_service_builder()
             .build(self.build_rpc_module(ctx, None), stop_handle);
 

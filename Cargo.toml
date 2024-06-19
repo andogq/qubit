@@ -25,9 +25,10 @@ http = "1.1"
 hyper = { version = "1.0", features = ["server"] }
 jsonrpsee = { version = "0.23", features = ["server"] }
 serde = { version = "1.0.195", features = ["derive"] }
-serde_json = "1.0.111"
+serde_json = "1.0.117"
 tokio = { version = "1.38", features = ["rt", "rt-multi-thread"] }
 tower = "0.4"
 ts-rs = "8.1.0"
 qubit-macros = { version = "0.6.1", path = "./crates/qubit-macros" }
 trait-variant = "0.1.2"
+serde_qs = "0.13.0"

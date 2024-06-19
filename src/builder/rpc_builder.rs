@@ -2,13 +2,13 @@ use std::ops::Deref;
 
 use futures::{Future, Stream, StreamExt};
 use jsonrpsee::{
-    types::{Params, ResponsePayload},
+    types::{ErrorCode, Params, ResponsePayload},
     RpcModule, SubscriptionCloseResponse, SubscriptionMessage,
 };
 use serde::Serialize;
 use serde_json::json;
 
-use crate::FromRequestExtensions;
+use crate::{FromRequestExtensions, RequestKind, RpcError};
 
 /// Builder to construct the RPC module. Handlers can be registered using the [`RpcBuilder::query`]
 /// and [`RpcBuilder::subscription`] methods. It tracks an internally mutable [`RpcModule`] and
@@ -45,7 +45,35 @@ where
     ///
     /// The `handler` can take its own `Ctx`, so long as it implements [`FromRequestExtensions`]. It
     /// must return a future which outputs a serializable value.
-    pub fn query<T, C, F, Fut>(mut self, name: &'static str, handler: F) -> Self
+    pub fn query<T, C, F, Fut>(self, name: &'static str, handler: F) -> Self
+    where
+        T: Serialize + Clone + 'static,
+        C: FromRequestExtensions<Ctx>,
+        F: Fn(C, Params<'static>) -> Fut + Send + Sync + Clone + 'static,
+        Fut: Future<Output = T> + Send + 'static,
+    {
+        self.register_handler(name, handler, RequestKind::Query)
+    }
+
+    /// Register a new mutation handler with the provided name.
+    pub fn mutation<T, C, F, Fut>(self, name: &'static str, handler: F) -> Self
+    where
+        T: Serialize + Clone + 'static,
+        C: FromRequestExtensions<Ctx>,
+        F: Fn(C, Params<'static>) -> Fut + Send + Sync + Clone + 'static,
+        Fut: Future<Output = T> + Send + 'static,
+    {
+        self.register_handler(name, handler, RequestKind::Mutation)
+    }
+
+    /// Internal implementation for handler registrations, which will only run the internal handler
+    /// if the request kind is correct.
+    fn register_handler<T, C, F, Fut>(
+        mut self,
+        name: &'static str,
+        handler: F,
+        request_kind: RequestKind,
+    ) -> Self
     where
         T: Serialize + Clone + 'static,
         C: FromRequestExtensions<Ctx>,
@@ -59,6 +87,21 @@ where
                 let handler = handler.clone();
 
                 async move {
+                    if &request_kind
+                        != extensions
+                            .get::<RequestKind>()
+                            .expect("request kind to be added to request extensions")
+                    {
+                        return ResponsePayload::Error(
+                            RpcError {
+                                code: ErrorCode::MethodNotFound,
+                                message: "method not found".to_string(),
+                                data: None,
+                            }
+                            .into(),
+                        );
+                    }
+
                     // Build the context
                     let ctx =
                         match C::from_request_extensions(ctx.deref().clone(), extensions).await {

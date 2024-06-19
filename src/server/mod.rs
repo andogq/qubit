@@ -22,3 +22,26 @@ impl<Ctx: Send> FromRequestExtensions<Ctx> for Ctx {
         Ok(ctx)
     }
 }
+
+/// Utility type to describe the kind of request.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum RequestKind {
+    /// Query requests, which can be made with `GET` or `POST` requests.
+    Query,
+    /// Mutation requests, which can be made only with `POST` requests.
+    Mutation,
+    /// Any type of request.
+    Any,
+}
+
+impl PartialEq for RequestKind {
+    fn eq(&self, other: &Self) -> bool {
+        matches!(
+            (self, other),
+            (Self::Any, _)
+                | (_, Self::Any)
+                | (Self::Query, Self::Query)
+                | (Self::Mutation, Self::Mutation)
+        )
+    }
+}
