@@ -100,7 +100,7 @@ export function build_client<Server, TPlugins extends Plugins>(
     mutate: async (method, ...args: unknown[]) => {
       return send(method, args);
     },
-    subscribe: async (method, ...args: unknown[]) => {
+    subscribe: (method, ...args: unknown[]) => {
       const { on_data, on_error, on_end } = get_handlers(args.pop() as StreamHandler<unknown>);
       const p = send(method, args);
 
@@ -123,7 +123,7 @@ export function build_client<Server, TPlugins extends Plugins>(
           return () => {};
         }
 
-        // Subscribe to incomming requests
+        // Subscribe to incoming requests
         return client.subscribe(
           subscription_id,
           (data) => {
@@ -148,6 +148,8 @@ export function build_client<Server, TPlugins extends Plugins>(
           on_end,
         );
       });
+
+      return unsubscribe;
     },
   });
 }
