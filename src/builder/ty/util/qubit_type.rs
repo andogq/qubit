@@ -6,8 +6,6 @@ pub enum QubitType {
     Query,
     Mutation,
     Subscription,
-    StreamHandler,
-    StreamUnsubscribe,
 }
 
 impl QubitType {
@@ -17,10 +15,6 @@ impl QubitType {
             Self::Query => (CLIENT_PACKAGE.to_string(), "Query".to_string()),
             Self::Mutation => (CLIENT_PACKAGE.to_string(), "Mutation".to_string()),
             Self::Subscription => (CLIENT_PACKAGE.to_string(), "Subscription".to_string()),
-            Self::StreamHandler => (CLIENT_PACKAGE.to_string(), "StreamHandler".to_string()),
-            Self::StreamUnsubscribe => {
-                (CLIENT_PACKAGE.to_string(), "StreamUnsubscribe".to_string())
-            }
         }
     }
 }

@@ -29,11 +29,9 @@ impl ToTokens for HandlerReturn {
 impl HandlerKind {
     pub fn ts_type(&self) -> String {
         match self {
-            HandlerKind::Query => "Query<({params}) => Promise<{return_ty}>>",
-            HandlerKind::Mutation => "Mutation<({params}) => Promise<{return_ty}>>",
-            HandlerKind::Subscription => {
-                "Subscription<({params} handler: StreamHandler<{return_ty}>) => StreamUnsubscribe>"
-            }
+            HandlerKind::Query => "Query<[{params}], {return_ty}>",
+            HandlerKind::Mutation => "Mutation<[{params}], {return_ty}>",
+            HandlerKind::Subscription => "Subscription<[{params}], {return_ty}>",
         }
         .to_string()
     }
@@ -294,7 +292,7 @@ impl From<Handler> for TokenStream {
             HandlerKind::Query => quote! { ::std::vec![#qubit_type_base::Query] },
             HandlerKind::Mutation => quote! { ::std::vec![#qubit_type_base::Mutation] },
             HandlerKind::Subscription => {
-                quote! { ::std::vec![#qubit_type_base::Subscription, #qubit_type_base::StreamHandler, #qubit_type_base::StreamUnsubscribe] }
+                quote! { ::std::vec![#qubit_type_base::Subscription] }
             }
         };
 

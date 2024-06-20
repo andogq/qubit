@@ -5,9 +5,16 @@ export type StreamHandlers<T> = {
 };
 export type StreamHandler<T> = ((data: T) => void) | Partial<StreamHandlers<T>>;
 
-export type StreamSubscriber<T> = (handler: StreamHandler<T>) => () => void;
 export type StreamUnsubscribe = () => void;
 
-export type Subscription<T> = {
-  subscribe: T;
+/**
+ * Helper type to add handler to a list of arguments, in a way that it will be named.
+ */
+type AddHandler<Arr extends any[], Item> = [
+  ...Arr,
+  handler: StreamHandler<Item>,
+];
+
+export type Subscription<Args extends any[], Item> = {
+  subscribe: (...args: AddHandler<Args, Item>) => StreamUnsubscribe;
 };
