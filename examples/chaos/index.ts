@@ -1,7 +1,7 @@
-import { ws } from "@qubit-rs/client";
+import { build_client, ws } from "@qubit-rs/client";
 import type { QubitServer } from "./bindings";
 
-const client = ws<QubitServer>("ws://localhost:9944/rpc");
+const client = build_client<QubitServer>(ws("ws://localhost:9944/rpc"));
 
 client.version
   .query()

@@ -4,7 +4,7 @@
   "private": true,
   "main": "index.ts",
   "dependencies": {
-    "@qubit-rs/client": "file:../../packages/client",
+    "@qubit-rs/client": "link:../../packages/client",
     "@types/node": "^20.11.25"
   }
 }
