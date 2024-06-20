@@ -18,14 +18,22 @@ export const History = () => {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll when messages changes
   useEffect(() => {
-    containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: "smooth" });
+    containerRef.current?.scrollTo({
+      top: containerRef.current.scrollHeight,
+      behavior: "smooth",
+    });
   }, [messages]);
 
   return (
     <output ref={containerRef}>
       {messages.map((message, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: order will never change
-        <Message key={i} emoji={message.user} message={message.content} you={message.user === name} />
+        <Message
+          key={i}
+          emoji={message.user}
+          message={message.content}
+          you={message.user === name}
+        />
       ))}
     </output>
   );
