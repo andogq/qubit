@@ -1,8 +1,8 @@
-import { build_client } from "../client";
+import type { Transport } from ".";
 import type { RpcResponse } from "../jsonrpc";
 import { type SocketOptions, create_promise_manager, create_socket, create_subscription_manager } from "../util";
 
-export function ws<Server>(host: string, socket_options?: SocketOptions): Server {
+export function ws(host: string, socket_options?: SocketOptions) {
   const subscriptions = create_subscription_manager();
   const requests = create_promise_manager();
 
@@ -27,7 +27,7 @@ export function ws<Server>(host: string, socket_options?: SocketOptions): Server
     return requests.wait_for(id);
   };
 
-  return build_client({
+  return {
     request: send_request,
     subscribe: (id, on_data, on_end) => {
       if (on_data) {
@@ -49,5 +49,5 @@ export function ws<Server>(host: string, socket_options?: SocketOptions): Server
         }
       };
     },
-  });
+  } satisfies Transport;
 }

@@ -1,11 +1,7 @@
 import type { StreamHandler, StreamHandlers } from "./handler/subscription";
-import { type RpcResponse, create_payload } from "./jsonrpc";
-import { type Handlers, type RawHandlers, create_path_builder } from "./path_builder";
-
-export type Client = {
-  request: (id: string | number, payload: any) => Promise<RpcResponse<unknown> | null>;
-  subscribe?: (id: string | number, on_data?: (value: any) => void, on_end?: () => void) => () => void;
-};
+import { create_payload } from "./jsonrpc";
+import { type Handlers, type Plugins, create_path_builder } from "./path_builder";
+import type { Transport } from "./transport";
 
 /**
  * Convert promise that resolves into a callback into a callback that can be called synchronously.
@@ -58,7 +54,7 @@ type AtEdge<T, Yes, No> = T extends HasNestedObject<T> ? Yes : No;
 /**
  * Inject the provided plugins into the edges of the server.
  */
-type InjectPlugins<TServer, TPlugins extends RawHandlers> = AtEdge<
+type InjectPlugins<TServer, TPlugins extends Plugins> = AtEdge<
   TServer,
   // Is at edge, merge with plugins
   TServer & TPlugins,
@@ -69,16 +65,16 @@ type InjectPlugins<TServer, TPlugins extends RawHandlers> = AtEdge<
 /**
  * Build a new client for a server.
  */
-export function build_client<Server>(client: Client): Server;
+export function build_client<Server>(client: Transport): Server;
 /**
  * Build a new client and inject the following plugins.
  */
-export function build_client<Server, TPlugins extends RawHandlers>(
-  client: Client,
+export function build_client<Server, TPlugins extends Plugins>(
+  transport: Transport,
   plugins: TPlugins,
 ): InjectPlugins<Server, Handlers<TPlugins>>;
-export function build_client<Server, TPlugins extends RawHandlers>(
-  client: Client,
+export function build_client<Server, TPlugins extends Plugins>(
+  client: Transport,
   plugins?: TPlugins,
 ): InjectPlugins<Server, Handlers<TPlugins>> {
   let next_id = 0;

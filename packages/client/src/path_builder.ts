@@ -10,15 +10,15 @@ export type HandlerFn<TArgs extends any[], TReturn> = (path: string[], ...args: 
 type StripPath<F> = F extends HandlerFn<infer TArgs, infer TReturn> ? (...args: TArgs) => TReturn : never;
 
 /**
- * A collection of raw handlers, meaning handlers that include the path parameter.
+ * A collection of plugins, meaning handlers that include the path parameter.
  */
-export type RawHandlers = Record<string, HandlerFn<any[], any>>;
+export type Plugins = Record<string, HandlerFn<any[], any>>;
 
 /**
  * For all available handlers, will produce a handler that has the `path` parameter stripped from
  * it.
  */
-export type Handlers<THandlers extends RawHandlers> = {
+export type Handlers<THandlers extends Plugins> = {
   [K in keyof THandlers]: StripPath<THandlers[K]>;
 };
 
@@ -38,7 +38,7 @@ function proxy_builder<T, TOut extends Record<any, any>>(builder: (property: str
  * Converts an object of raw handlers into handlers suitable for end-users. It requires a
  * reference to the path array which will be captured by all handlers.
  */
-function wrap_handlers<THandlers extends RawHandlers>(handlers: THandlers, path: string[]): Handlers<THandlers> {
+function wrap_handlers<THandlers extends Plugins>(handlers: THandlers, path: string[]): Handlers<THandlers> {
   const wrapped: Partial<Handlers<THandlers>> = {};
 
   for (const [key, handler] of Object.entries(handlers)) {
@@ -57,7 +57,7 @@ function wrap_handlers<THandlers extends RawHandlers>(handlers: THandlers, path:
  * accessing an item from the `handlers` parameter, return the method with the traversed path
  * provided.
  */
-export function create_path_builder<TOut, THandlers extends RawHandlers>(handlers: THandlers): TOut {
+export function create_path_builder<TOut, THandlers extends Plugins>(handlers: THandlers): TOut {
   return proxy_builder((property) => {
     const path = [];
 
