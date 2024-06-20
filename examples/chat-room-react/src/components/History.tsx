@@ -27,8 +27,8 @@ export const History = () => {
   return (
     <output ref={containerRef}>
       {messages.map((message, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: order will never change
         <Message
+          // biome-ignore lint/suspicious/noArrayIndexKey: order will never change
           key={i}
           emoji={message.user}
           message={message.content}

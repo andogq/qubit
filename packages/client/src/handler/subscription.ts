@@ -10,10 +10,7 @@ export type StreamUnsubscribe = () => void;
 /**
  * Helper type to add handler to a list of arguments, in a way that it will be named.
  */
-type AddHandler<Arr extends any[], Item> = [
-  ...Arr,
-  handler: StreamHandler<Item>,
-];
+type AddHandler<Arr extends any[], Item> = [...Arr, handler: StreamHandler<Item>];
 
 export type Subscription<Args extends any[], Item> = {
   subscribe: (...args: AddHandler<Args, Item>) => StreamUnsubscribe;
