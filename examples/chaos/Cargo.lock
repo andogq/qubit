@@ -734,7 +734,7 @@ dependencies = [
 
 [[package]]
 name = "qubit"
-version = "0.9.2"
+version = "0.9.3"
 dependencies = [
  "axum",
  "futures",
@@ -753,7 +753,7 @@ dependencies = [
 
 [[package]]
 name = "qubit-macros"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "proc-macro2",
  "quote",

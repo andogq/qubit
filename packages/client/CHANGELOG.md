@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.4.0]
+
+### feat
+
+- [`e17bbf0`](https://github.com/andogq/qubit/commit/e17bbf0fb8adce5f488247f298278342add2e478) refactor client to introduct plugins, simplify types, and prepare for future work
+
 ## \[0.3.3]
 
 ### feat
