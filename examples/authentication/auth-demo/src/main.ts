@@ -1,11 +1,11 @@
-import { ws } from "@qubit-rs/client";
+import { build_client, ws } from "@qubit-rs/client";
 import type { QubitServer } from "./bindings";
 
 async function main() {
   console.log("----- Beginning Authentication Flow -----");
 
-  function build_api(): QubitServer {
-    return ws<QubitServer>(`ws://${window.location.host}/rpc`);
+  function build_api() {
+    return build_client<QubitServer>(ws(`ws://${window.location.host}/rpc`));
   }
 
   document.cookie += "qubit-auth=;expires=Thu, 01 Jan 1970 00:00:01 GMT;SameSite=Lax";
