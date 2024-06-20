@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       '@qubit-rs/client':
-        specifier: file:../../packages/client
+        specifier: link:../../packages/client
         version: link:../../packages/client
       '@types/node':
         specifier: ^20.11.25
