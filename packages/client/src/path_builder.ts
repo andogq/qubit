@@ -1,7 +1,7 @@
 /**
  * A handler function which must always take the path, represented as an array of strings.
  */
-type HandlerFn<TArgs extends any[], TReturn> = (path: string[], ...args: TArgs) => TReturn;
+export type HandlerFn<TArgs extends any[], TReturn> = (path: string[], ...args: TArgs) => TReturn;
 
 /**
  * Strips the `path` parameter (first parameter) from a `HandlerFn`. This represents the function
@@ -12,13 +12,13 @@ type StripPath<F> = F extends HandlerFn<infer TArgs, infer TReturn> ? (...args: 
 /**
  * A collection of raw handlers, meaning handlers that include the path parameter.
  */
-type RawHandlers = Record<string, HandlerFn<any[], any>>;
+export type RawHandlers = Record<string, HandlerFn<any[], any>>;
 
 /**
  * For all available handlers, will produce a handler that has the `path` parameter stripped from
  * it.
  */
-type Handlers<THandlers extends RawHandlers> = {
+export type Handlers<THandlers extends RawHandlers> = {
   [K in keyof THandlers]: StripPath<THandlers[K]>;
 };
 

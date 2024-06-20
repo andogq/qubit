@@ -1,6 +1,6 @@
 import type { StreamHandler, StreamHandlers } from "./handler/subscription";
 import { type RpcResponse, create_payload } from "./jsonrpc";
-import { create_path_builder } from "./path_builder";
+import { type Handlers, type RawHandlers, create_path_builder } from "./path_builder";
 
 export type Client = {
   request: (id: string | number, payload: any) => Promise<RpcResponse<unknown> | null>;
@@ -47,7 +47,40 @@ function get_handlers(handler: StreamHandler<unknown>): StreamHandlers<unknown> 
   return { on_data, on_error, on_end };
 }
 
-export function build_client<Server>(client: Client): Server {
+/**
+ * Determines if the provided type has a nested object, or is just made up of functions.
+ */
+type HasNestedObject<T> = {
+  [K in keyof T]: T[K] extends (...args: any[]) => any ? T[K] : never;
+};
+type AtEdge<T, Yes, No> = T extends HasNestedObject<T> ? Yes : No;
+
+/**
+ * Inject the provided plugins into the edges of the server.
+ */
+type InjectPlugins<TServer, TPlugins extends RawHandlers> = AtEdge<
+  TServer,
+  // Is at edge, merge with plugins
+  TServer & TPlugins,
+  // Not at edge, recurse
+  { [K in keyof TServer]: InjectPlugins<TServer[K], TPlugins> }
+>;
+
+/**
+ * Build a new client for a server.
+ */
+export function build_client<Server>(client: Client): Server;
+/**
+ * Build a new client and inject the following plugins.
+ */
+export function build_client<Server, TPlugins extends RawHandlers>(
+  client: Client,
+  plugins: TPlugins,
+): InjectPlugins<Server, Handlers<TPlugins>>;
+export function build_client<Server, TPlugins extends RawHandlers>(
+  client: Client,
+  plugins?: TPlugins,
+): InjectPlugins<Server, Handlers<TPlugins>> {
   let next_id = 0;
 
   async function send(method: string[], args: unknown): Promise<unknown> {
@@ -64,6 +97,7 @@ export function build_client<Server>(client: Client): Server {
   }
 
   return create_path_builder({
+    ...(plugins ?? {}),
     query: (method, ...args: unknown[]) => {
       return send(method, args);
     },
