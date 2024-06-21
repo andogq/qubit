@@ -2,6 +2,7 @@ import type { RpcRequest, RpcResponse } from "../jsonrpc";
 
 export { ws } from "./ws";
 export { http, type HttpOptions } from "./http";
+export { multi, type MultiOptions } from "./multi";
 export type { SocketOptions } from "../util";
 
 export type ClientBuilder<Server> = (host: string) => Server;
