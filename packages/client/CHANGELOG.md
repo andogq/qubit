@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.4.1]
+
+### feat
+
+- [`886106b`](https://github.com/andogq/qubit/commit/886106b27b68fb1e2a24f7cd0f3a2e929032151b) support `GET` for queries in client
+
 ## \[0.4.0]
 
 ### feat

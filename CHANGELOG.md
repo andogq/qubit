@@ -1,5 +1,12 @@
 # Changelog
 
+## \[0.9.4]
+
+### feat
+
+- [`886106b`](https://github.com/andogq/qubit/commit/886106b27b68fb1e2a24f7cd0f3a2e929032151b) support `GET` for queries in client
+- [`3f6b12b`](https://github.com/andogq/qubit/commit/3f6b12ba8c088fc266b49ad51fb9d15acf223503) include `// @ts-nocheck` at top of generated files
+
 ## \[0.9.3]
 
 ### Dependencies
