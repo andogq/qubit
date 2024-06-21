@@ -11,8 +11,6 @@
 import type { Query } from "@qubit-rs/client";
 import type { Mutation } from "@qubit-rs/client";
 import type { Subscription } from "@qubit-rs/client";
-import type { StreamHandler } from "@qubit-rs/client";
-import type { StreamUnsubscribe } from "@qubit-rs/client";
 import type { NestedStruct } from "./NestedStruct.ts";
 import type { MyEnum } from "./MyEnum.ts";
 import type { Metadata } from "./Metadata.ts";

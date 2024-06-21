@@ -1,21 +1,20 @@
 {
   "compilerOptions": {
-    /* Base Options: */
-    "esModuleInterop": true,
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "module": "node16",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
-    "target": "es2022",
-    "verbatimModuleSyntax": true,
-    "allowJs": true,
+    /* Bundler mode */
+    "moduleResolution": "node16",
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
-    "moduleDetection": "force",
-    /* Strictness */
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    /* If NOT transpiling with TypeScript: */
-    "moduleResolution": "Bundler",
-    "module": "ESNext",
+    "isolatedModules": true,
     "noEmit": true,
-    /* If your code doesn't run in the DOM: */
-    "lib": ["es2022"]
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
   }
 }

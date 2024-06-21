@@ -2,9 +2,13 @@
   "name": "chaos",
   "version": "1.0.0",
   "private": true,
-  "main": "index.ts",
+  "main": "index.js",
+  "scripts": {
+    "start": "ts-node ./index.ts"
+  },
   "dependencies": {
     "@qubit-rs/client": "link:../../packages/client",
-    "@types/node": "^20.11.25"
+    "@types/node": "^20.11.25",
+    "ts-node": "^10.9.2"
   }
 }

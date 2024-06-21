@@ -1,6 +1,6 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Duration};
 
-use futures::{stream, Stream};
+use futures::{stream, Stream, StreamExt};
 use qubit::{handler, Router};
 use tokio::net::TcpListener;
 
@@ -35,7 +35,10 @@ async fn get(ctx: Ctx) -> i32 {
 // Handler that sets up a subscription, to continually stream data to the client.
 #[handler(subscription)]
 async fn countdown(ctx: Ctx) -> impl Stream<Item = i32> {
-    stream::iter((0..=ctx.get()).rev())
+    stream::iter((0..=ctx.get()).rev()).then(|item| async move {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        item
+    })
 }
 
 #[tokio::main]

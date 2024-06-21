@@ -1,10 +1,17 @@
-export function create_payload(id: number, method: string, params: any) {
-  return JSON.stringify({
+export type RpcRequest = {
+  jsonrpc: "2.0";
+  method: string;
+  id: string | number;
+  params: unknown;
+};
+
+export function create_payload(id: string | number, method: string, params: any): RpcRequest {
+  return {
     jsonrpc: "2.0",
     method,
     id,
     params,
-  });
+  };
 }
 
 /**

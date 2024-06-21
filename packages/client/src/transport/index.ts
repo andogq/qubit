@@ -1,4 +1,4 @@
-import type { RpcResponse } from "../jsonrpc";
+import type { RpcRequest, RpcResponse } from "../jsonrpc";
 
 export { ws } from "./ws";
 export { http, type HttpOptions } from "./http";
@@ -11,13 +11,16 @@ export type ClientBuilder<Server> = (host: string) => Server;
  */
 export type Transport = {
   /**
-   * Initiate a request, and receive a single response.
+   * Make a request that is a query, meaning that it is safe to be cached.
    */
-  request: (id: string | number, payload: any) => Promise<RpcResponse<unknown> | null>;
+  query: (id: string | number, payload: RpcRequest) => Promise<RpcResponse<unknown> | null>;
   /**
-   * Start a subscription, calling `on_data` for every message from the server, and `on_end` when
-   * the subscription terminates. An unsubscribe method must be returned, which must terminate the
-   * subscription when called.
+   * Make a request that is a mutation, meaning that it should not be cached.
    */
-  subscribe?: (id: string | number, on_data?: (value: any) => void, on_end?: () => void) => () => void;
+  mutate: (id: string | number, payload: RpcRequest) => Promise<RpcResponse<unknown> | null>;
+  /**
+   * Start a subscription, calling `on_data` for every message from the server. An unsubscribe
+   * method must be returned, which must terminate the subscription when called.
+   */
+  subscribe?: (id: string | number, on_data?: (value: any) => void) => () => void;
 };

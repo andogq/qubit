@@ -1,5 +1,5 @@
 import type { StreamHandler, StreamHandlers } from "./handler/subscription";
-import { create_payload } from "./jsonrpc";
+import { type RpcRequest, type RpcResponse, create_payload } from "./jsonrpc";
 import { type Handlers, type Plugins, create_path_builder } from "./path_builder";
 import type { Transport } from "./transport";
 
@@ -79,11 +79,15 @@ export function build_client<Server, TPlugins extends Plugins>(
 ): InjectPlugins<Server, Handlers<TPlugins>> {
   let next_id = 0;
 
-  async function send(method: string[], args: unknown): Promise<unknown> {
+  async function send(
+    method: string[],
+    sender: (id: string | number, payload: RpcRequest) => Promise<RpcResponse<unknown> | null>,
+    args: unknown,
+  ): Promise<unknown> {
     const id = next_id++;
 
     const payload = create_payload(id, method.join("."), args);
-    const response = await client.request(id, payload);
+    const response = await sender(id, payload);
 
     if (response === null || response.type !== "ok") {
       throw response;
@@ -95,16 +99,16 @@ export function build_client<Server, TPlugins extends Plugins>(
   return create_path_builder({
     ...(plugins ?? {}),
     query: (method, ...args: unknown[]) => {
-      return send(method, args);
+      return send(method, client.query, args);
     },
     mutate: async (method, ...args: unknown[]) => {
-      return send(method, args);
+      return send(method, client.mutate, args);
     },
     subscribe: (method, ...args: unknown[]) => {
       const { on_data, on_error, on_end } = get_handlers(args.pop() as StreamHandler<unknown>);
-      const p = send(method, args);
+      const p = send(method, client.mutate, args);
 
-      const unsubscribe = sync_promise(async () => {
+      const transport_unsubscribe = sync_promise(async () => {
         // Get the response of the request
         const subscription_id = await p;
 
@@ -124,30 +128,40 @@ export function build_client<Server, TPlugins extends Plugins>(
         }
 
         // Subscribe to incoming requests
-        return client.subscribe(
-          subscription_id,
-          (data) => {
-            if (typeof data === "object" && "close_stream" in data && data.close_stream === subscription_id) {
-              // Prepare to start closing the subscription
-              required_count = data.count;
-            } else {
-              // Keep a count of incoming messages
-              count += 1;
+        return client.subscribe(subscription_id, (data) => {
+          if (typeof data === "object" && "close_stream" in data && data.close_stream === subscription_id) {
+            // Prepare to start closing the subscription
+            required_count = data.count;
+          } else {
+            // Keep a count of incoming messages
+            count += 1;
 
-              // Forward the response onto the user
-              if (on_data) {
-                on_data(data);
-              }
+            // Forward the response onto the user
+            if (on_data) {
+              on_data(data);
             }
+          }
 
-            if (count === required_count) {
-              // The expected amount of messages have been recieved, so it is safe to terminate the connection
-              unsubscribe();
-            }
-          },
-          on_end,
-        );
+          if (count === required_count) {
+            // The expected amount of messages have been recieved, so it is safe to terminate the connection
+            unsubscribe();
+          }
+        });
       });
+
+      const unsubscribe = async () => {
+        // Send an unsubscribe message so the server knows we're not interested in the subscription
+        const unsubscribe_method = method.slice(0, -1);
+        const subscription_id = await p;
+        unsubscribe_method.push(`${method.at(-1)}_unsub`);
+        send(unsubscribe_method, client.query, [subscription_id]);
+
+        // Allow the transport to clean up
+        transport_unsubscribe();
+
+        // Notify the user
+        on_end();
+      };
 
       return unsubscribe;
     },

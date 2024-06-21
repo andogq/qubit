@@ -19,7 +19,7 @@ export function ws(host: string, socket_options?: SocketOptions) {
     socket_options,
   );
 
-  const send_request = (id: string | number, payload: any): Promise<RpcResponse<any>> => {
+  const send_request = (id: string | number, payload: string): Promise<RpcResponse<any>> => {
     // Send the data to the socket
     socket.send(payload);
 
@@ -28,8 +28,9 @@ export function ws(host: string, socket_options?: SocketOptions) {
   };
 
   return {
-    request: send_request,
-    subscribe: (id, on_data, on_end) => {
+    query: (id, payload) => send_request(id, JSON.stringify(payload)),
+    mutate: (id, payload) => send_request(id, JSON.stringify(payload)),
+    subscribe: (id, on_data) => {
       if (on_data) {
         // Subscribe to the events
         subscriptions.register(id, on_data);
@@ -39,14 +40,6 @@ export function ws(host: string, socket_options?: SocketOptions) {
       return () => {
         // Remove the subscription
         subscriptions.remove(id);
-
-        // Send an unsubscribe request
-        send_request(`${id}_unsubscribe`, [id]);
-
-        // Notify the subscriber
-        if (on_end) {
-          on_end();
-        }
       };
     },
   } satisfies Transport;

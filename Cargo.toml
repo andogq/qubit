@@ -32,3 +32,4 @@ ts-rs = "8.1.0"
 qubit-macros = { version = "0.6.3", path = "./crates/qubit-macros" }
 trait-variant = "0.1.2"
 serde_qs = "0.13.0"
+urlencoding = "2.1.3"

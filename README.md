@@ -96,11 +96,11 @@ qubit_handle.stop().unwrap();
 
 ```ts
 // Import transport from client, and generated server type
-import { build_client, ws } from "@qubit-rs/client";
+import { build_client, http } from "@qubit-rs/client";
 import type { QubitServer } from "./bindings";
 
 // Connect with the API
-const api = build_client<QubitServer>(ws("ws://localhost:9944/rpc"));
+const api = build_client<QubitServer>(http("http://localhost:9944/rpc"));
 
 // Call the handlers
 const message = await api.hello_world.query();

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::{collections::HashSet, convert::Infallible, fmt::Write as _, fs, path::Path};
 
 use axum::body::Body;
@@ -141,17 +142,6 @@ where
                     // be a query.
                     *req.method_mut() = Method::POST;
 
-                    // Parse out the query parameters, and turn them into the body
-                    let Some(query) = req.uri().query().map(|query| query.to_string()) else {
-                        return req;
-                    };
-                    let Ok(body) = serde_qs::from_str::<jsonrpsee::types::Request>(&query) else {
-                        return req;
-                    };
-                    let Ok(body) = serde_json::to_string(&body) else {
-                        return req;
-                    };
-
                     // Update the headers
                     let headers = req.headers_mut();
                     headers.insert(
@@ -163,8 +153,21 @@ where
                         HeaderValue::from_static("application/json"),
                     );
 
-                    // Reconstruct the body
-                    *req.body_mut() = Body::from(body);
+                    // Convert the `input` field of the query string into the request body
+                    if let Some(body) = req
+                        // Extract the query string
+                        .uri()
+                        .query()
+                        // Parse the query string
+                        .and_then(|query| serde_qs::from_str::<HashMap<String, String>>(query).ok())
+                        // Take out the input
+                        .and_then(|mut query| query.remove("input"))
+                        // URL decode the input
+                        .map(|input| urlencoding::decode(&input).unwrap_or_default().to_string())
+                    {
+                        // Set the request body
+                        *req.body_mut() = Body::from(body);
+                    }
 
                     RequestKind::Query
                 } else {

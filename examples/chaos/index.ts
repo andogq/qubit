@@ -1,7 +1,7 @@
-import { build_client, ws } from "@qubit-rs/client";
+import { http, build_client } from "@qubit-rs/client";
 import type { QubitServer } from "./bindings";
 
-const client = build_client<QubitServer>(ws("ws://localhost:9944/rpc"));
+const client = build_client<QubitServer>(http("http://localhost:9944/rpc"));
 
 client.version
   .query()
@@ -15,14 +15,3 @@ client.count
   .mutate()
   .then((value) => console.log({ value }))
   .catch(console.error);
-
-client.countdown.subscribe(1, 4, {
-  on_data: (data) => {
-    console.log("countdown: ", data);
-  },
-  on_end: () => {
-    console.log("countdown done");
-  },
-});
-
-client.countdown.subscribe(1, 4, (n) => console.log("number is", n));
