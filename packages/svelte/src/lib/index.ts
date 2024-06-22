@@ -17,27 +17,33 @@ type SvelteQubitOptions = MultiOptions & {
  * @param options - Configuration for the underlying transport.
  */
 export function create_qubit_api<Server>(host: string, options?: SvelteQubitOptions) {
+  let client: Server;
+
   function get_client(overrides?: { fetch: HttpOptions["fetch"] }) {
-    let transport: Transport;
+    if (!client) {
+      let transport: Transport;
 
-    if (options?.browser === true) {
-      // biome-ignore lint/style/noParameterAssign:
-      options ??= {};
-      options.http = options.http ?? ({} as HttpOptions);
-      options.http.fetch = overrides?.fetch;
+      if (options?.browser === true) {
+        // biome-ignore lint/style/noParameterAssign:
+        options ??= {};
+        options.http = options.http ?? ({} as HttpOptions);
+        options.http.fetch = overrides?.fetch;
 
-      transport = multi(host, options);
-    } else {
-      const http_options = options?.http ?? ({} as HttpOptions);
+        transport = multi(host, options);
+      } else {
+        const http_options = options?.http ?? ({} as HttpOptions);
 
-      if (overrides?.fetch) {
-        http_options.fetch = overrides.fetch;
+        if (overrides?.fetch) {
+          http_options.fetch = overrides.fetch;
+        }
+
+        transport = http(host, http_options);
       }
 
-      transport = http(host, http_options);
+      client = build_client<Server>(transport);
     }
 
-    return build_client<Server>(transport);
+    return client;
   }
 
   return {
