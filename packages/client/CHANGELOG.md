@@ -1,5 +1,12 @@
 # Changelog
 
+## \[0.4.2]
+
+### feat
+
+- [`0b7457a`](https://github.com/andogq/qubit/commit/0b7457ab5f2647892880fdb3d45ee4f2a9d3adfc) create multi tranasport
+- [`2591127`](https://github.com/andogq/qubit/commit/2591127f0cfb78b1917bac317552099475d1fc72) create svelte integration
+
 ## \[0.4.1]
 
 ### feat
