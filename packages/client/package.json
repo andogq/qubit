@@ -17,8 +17,8 @@
   },
   "type": "module",
   "scripts": {
-    "lint": "tsc",
-    "build": "tsup ./src/index.ts"
+    "build": "tsup ./src/index.ts",
+    "check": "tsc"
   },
   "files": [
     "dist"
