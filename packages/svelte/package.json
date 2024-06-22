@@ -63,6 +63,6 @@
   "types": "./dist/index.d.ts",
   "type": "module",
   "dependencies": {
-    "@qubit-rs/client": "0.4.2"
+    "@qubit-rs/client": "link:../client"
   }
 }
