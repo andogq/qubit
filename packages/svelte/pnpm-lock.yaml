@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@qubit-rs/client':
+        specifier: link:../client
+        version: link:../client
     devDependencies:
       '@sveltejs/adapter-auto':
         specifier: ^3.0.0

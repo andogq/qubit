@@ -36,6 +36,11 @@
       "path": "./packages/client",
       "manager": "javascript"
     },
+    "@qubit-rs/svelte": {
+      "path": "./packages/svelte",
+      "manager": "javascript",
+      "dependencies": ["@qubit-rs/client"]
+    },
     "qubit-macros": {
       "path": "./crates/qubit-macros",
       "manager": "rust"
