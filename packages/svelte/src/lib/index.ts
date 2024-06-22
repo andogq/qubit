@@ -1,11 +1,4 @@
-import {
-  type HttpOptions,
-  type MultiOptions,
-  type Transport,
-  build_client,
-  http,
-  multi,
-} from "@qubit-rs/client";
+import { http, type HttpOptions, type MultiOptions, type Transport, build_client, multi } from "@qubit-rs/client";
 import { getContext, hasContext, setContext } from "svelte";
 
 const CONTEXT_NAME = "__qubit-rs-svelte-context";
@@ -23,10 +16,7 @@ type SvelteQubitOptions = MultiOptions & {
  * @param host - Host URL where the Qubit server is running.
  * @param options - Configuration for the underlying transport.
  */
-export function create_qubit_api<Server>(
-  host: string,
-  options?: SvelteQubitOptions,
-) {
+export function create_qubit_api<Server>(host: string, options?: SvelteQubitOptions) {
   function get_client(overrides?: { fetch: HttpOptions["fetch"] }) {
     let transport: Transport;
 
@@ -64,14 +54,13 @@ export function create_qubit_api<Server>(
      */
     get_api: () => {
       if (!hasContext(CONTEXT_NAME)) {
-        throw new Error(
-          "@qubit-rs/svelte: ensure that `init_context` has been called at the root layout.",
-        );
+        throw new Error("@qubit-rs/svelte: ensure that `init_context` has been called at the root layout.");
       }
 
       return getContext<Server>(CONTEXT_NAME);
     },
 
+    // biome-ignore lint/correctness/noUnusedVariables:
     load_api: ({ fetch, depends }: LoadApiOptions): Server => {
       return get_client({ fetch });
     },

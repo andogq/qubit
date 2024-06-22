@@ -8,7 +8,7 @@
   },
   "files": {
     "include": ["*.ts", "*.tsx", "*.json"],
-    "ignore": ["bindings*", "package.json"]
+    "ignore": ["bindings*", "package.json", ".svelte-kit*"]
   },
   "organizeImports": {
     "enabled": true

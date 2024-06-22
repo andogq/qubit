@@ -14,10 +14,7 @@ export function http(host: string, http_options?: HttpOptions) {
       const temp_url = new URL(host, "http://example.com");
 
       // Set the search parameters, to let it do the processing for us
-      temp_url.searchParams.set(
-        "input",
-        encodeURIComponent(JSON.stringify(payload)),
-      );
+      temp_url.searchParams.set("input", encodeURIComponent(JSON.stringify(payload)));
 
       // Use the original host, but replace anything after the `?` with our modified query parameters
       const url = `${host.replace(/\?.*$/, "")}?${temp_url.searchParams.toString()}`;
