@@ -22,6 +22,7 @@ jobs:
       matrix:
         dir:
           - packages/client
+          - packages/svelte
           - examples/authentication/auth-demo
           - examples/chaos
           - examples/chat-room-react
@@ -42,7 +43,7 @@ jobs:
         if: ${{ matrix.dir != 'packages/client' }}
       - run: pnpm i
         working-directory: ${{ matrix.dir }}
-      - run: pnpm tsc
+      - run: pnpm check
         working-directory: ${{ matrix.dir }}
 
   clippy:

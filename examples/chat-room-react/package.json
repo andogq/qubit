@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "conc -rk \"cargo watch -C ./src-rust -x run -w ./src -w Cargo.toml\" \"vite --clearScreen=false\"",
-    "build": "tsc && vite build"
+    "build": "tsc && vite build",
+    "check": "tsc"
   },
   "dependencies": {
     "@qubit-rs/client": "link:../../packages/client",

@@ -4,10 +4,12 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "start": "ts-node ./index.ts"
+    "start": "ts-node ./index.ts",
+    "check": "tsc"
   },
   "dependencies": {
     "@qubit-rs/client": "link:../../packages/client",
+    "typescript": "^5.2.2",
     "ts-node": "^10.9.2"
   }
 }
