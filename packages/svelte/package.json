@@ -1,6 +1,29 @@
 {
 	"name": "@qubit-rs/svelte",
 	"version": "0.0.1",
+	"description": "Seamless RPC for Rust & TypeScript - Svelte style",
+	"keywords": [
+		"api",
+		"rust",
+		"svelte",
+		"svelte-kit",
+		"svelte-store",
+		"subscriptions",
+		"rpc-framework",
+		"jsonrpc",
+		"trpc"
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/andogq/qubit.git",
+		"directory": "pacakges/svelte"
+	},
+	"author": {
+		"name": "Tom Anderson",
+		"email": "tom@ando.gq",
+		"url": "https://ando.gq"
+	},
+	"license": "MIT",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && npm run package",
