@@ -2,10 +2,10 @@ use std::ops::Deref;
 
 use futures::{Future, Stream, StreamExt};
 use jsonrpsee::{
-    types::{ErrorCode, Params, ResponsePayload},
-    RpcModule, SubscriptionCloseResponse, SubscriptionMessage,
+    types::{ErrorCode, ErrorObject, Params, ResponsePayload},
+    IntoResponse, RpcModule, SubscriptionCloseResponse, SubscriptionMessage,
 };
-use serde::Serialize;
+use serde::{de::Error, Serialize};
 use serde_json::json;
 
 use crate::{FromRequestExtensions, RequestKind, RpcError};
@@ -50,7 +50,7 @@ where
         T: Serialize + Clone + 'static,
         C: FromRequestExtensions<Ctx>,
         F: Fn(C, Params<'static>) -> Fut + Send + Sync + Clone + 'static,
-        Fut: Future<Output = T> + Send + 'static,
+        Fut: Future<Output = Result<T, ErrorObject<'static>>> + Send + 'static,
     {
         self.register_handler(name, handler, RequestKind::Query)
     }
@@ -61,7 +61,7 @@ where
         T: Serialize + Clone + 'static,
         C: FromRequestExtensions<Ctx>,
         F: Fn(C, Params<'static>) -> Fut + Send + Sync + Clone + 'static,
-        Fut: Future<Output = T> + Send + 'static,
+        Fut: Future<Output = Result<T, ErrorObject<'static>>> + Send + 'static,
     {
         self.register_handler(name, handler, RequestKind::Mutation)
     }
@@ -78,7 +78,7 @@ where
         T: Serialize + Clone + 'static,
         C: FromRequestExtensions<Ctx>,
         F: Fn(C, Params<'static>) -> Fut + Send + Sync + Clone + 'static,
-        Fut: Future<Output = T> + Send + 'static,
+        Fut: Future<Output = Result<T, jsonrpsee::types::ErrorObject<'static>>> + Send + 'static,
     {
         self.module
             .register_async_method(self.namespace_str(name), move |params, ctx, extensions| {
@@ -114,7 +114,10 @@ where
                         };
 
                     // Run the actual handler
-                    ResponsePayload::success(handler(ctx, params).await)
+                    match handler(ctx, params).await {
+                        Ok(result) => ResponsePayload::success(result),
+                        Err(e) => ResponsePayload::error(e),
+                    }
                 }
             })
             .unwrap();

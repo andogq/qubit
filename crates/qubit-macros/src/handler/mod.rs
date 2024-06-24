@@ -237,7 +237,10 @@ impl From<Handler> for TokenStream {
             // Generate the parameter parsing implementation
             let parse_params = (!inputs.is_empty()).then(|| {
                 quote! {
-                    let (#(#param_names,)*) = #params_ident.parse::<(#(#param_tys,)*)>().unwrap();
+                    let (#(#param_names,)*) = match #params_ident.parse::<(#(#param_tys,)*)>() {
+                        ::std::result::Result::Ok(params) => params,
+                        ::std::result::Result::Err(e) => return ::std::result::Result::Err(e),
+                    };
                 }
             });
 
@@ -251,7 +254,8 @@ impl From<Handler> for TokenStream {
             let register_inner = quote! {
                 #parse_params
 
-                #handler_call
+                let result = #handler_call;
+                ::std::result::Result::Ok::<_, ::qubit::ErrorObject>(result)
             };
 
             let register_method = match kind {

@@ -9,3 +9,6 @@ pub use handler::Handler;
 pub(crate) use handler::HandlerCallbacks;
 pub use rpc_builder::RpcBuilder;
 pub use ty::*;
+
+pub use jsonrpsee::types::ErrorObject;
+pub use jsonrpsee::IntoResponse;
