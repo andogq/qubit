@@ -6,6 +6,7 @@
       "getPublishedVersion": "npm view ${ pkgFile.pkg.name } version",
       "prepublish": ["pnpm i", "pnpm build"],
       "publish": ["pnpm publish --access public --no-git-checks"],
+      "postversion": ["pnpm i"],
       "postpublish": [
         "git tag ${ pkg.pkg }-v${ pkgFile.versionMajor } -f",
         "git tag ${ pkg.pkg }-v${ pkgFile.versionMajor }.${ pkgFile.versionMinor } -f",
