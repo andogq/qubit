@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.0.3]
+
+### Dependencies
+
+- Upgraded to `@qubit-rs/client@0.4.3`
+
 ## \[0.0.2]
 
 ### Dependencies

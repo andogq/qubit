@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.4.3]
+
+### feat
+
+- [`e72078a`](https://github.com/andogq/qubit/commit/e72078a340b4f61703770036327b39a6abeedd5d) throw error value from RPC if encountered
+
 ## \[0.4.2]
 
 ### feat
