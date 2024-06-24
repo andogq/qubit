@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use futures::{Future, Stream, StreamExt};
 use jsonrpsee::{
-    types::{ErrorCode, ErrorObject, Params, ResponsePayload},
+    types::{ErrorCode, ErrorObject, ErrorObjectOwned, Params, ResponsePayload},
     RpcModule, SubscriptionCloseResponse, SubscriptionMessage,
 };
 use serde::Serialize;
@@ -140,7 +140,7 @@ where
         T: Serialize + Send + Clone + 'static,
         C: FromRequestExtensions<Ctx>,
         F: Fn(C, Params<'static>) -> Fut + Send + Sync + Clone + 'static,
-        Fut: Future<Output = S> + Send + 'static,
+        Fut: Future<Output = Result<S, ErrorObject<'static>>> + Send + 'static,
         S: Stream<Item = T> + Send + 'static,
     {
         self.module
@@ -153,32 +153,6 @@ where
                     let handler = handler.clone();
 
                     async move {
-                        // Accept the subscription
-                        let subscription = subscription.accept().await.unwrap();
-
-                        // Set up a channel to avoid cloning the subscription
-                        let (tx, mut rx) = tokio::sync::mpsc::channel(10);
-
-                        // Track the number of items emitted through the subscription
-                        let mut count = 0;
-                        let subscription_id = subscription.subscription_id();
-
-                        // Recieve values on a new thread, sending them onwards to the subscription
-                        tokio::spawn(async move {
-                            while let Some(value) = rx.recv().await {
-                                if subscription.is_closed() {
-                                    // Don't continue processing items once the web socket is
-                                    // closed
-                                    break;
-                                }
-
-                                subscription
-                                    .send(SubscriptionMessage::from_json(&value).unwrap())
-                                    .await
-                                    .unwrap();
-                            }
-                        });
-
                         // Build the context
                         // NOTE: It won't be held across await so that `C` doesn't have to be
                         // `Send`
@@ -189,22 +163,39 @@ where
                             Err(e) => {
                                 // Handle any error building the context by turning it into a
                                 // subscriptions close response
-                                return SubscriptionCloseResponse::NotifErr(
-                                    SubscriptionMessage::from_json(&e).unwrap(),
-                                );
+                                subscription.reject(ErrorObjectOwned::from(e)).await;
+                                return SubscriptionCloseResponse::None;
                             }
                         };
 
                         // Run the handler, capturing each of the values sand forwarding it onwards
                         // to the channel
-                        let mut stream = Box::pin(handler(ctx, params).await);
+                        let mut stream = match handler(ctx, params).await {
+                            Ok(s) => Box::pin(s),
+                            Err(e) => {
+                                subscription.reject(e).await;
+                                return SubscriptionCloseResponse::None;
+                            }
+                        };
+
+                        // Accept the subscription
+                        let subscription = subscription.accept().await.unwrap();
+
+                        // Track the number of items emitted through the subscription
+                        let mut count = 0;
+                        let subscription_id = subscription.subscription_id();
 
                         while let Some(value) = stream.next().await {
-                            if tx.send(value).await.is_ok() {
-                                count += 1;
-                            } else {
+                            if subscription.is_closed() {
                                 break;
                             }
+
+                            subscription
+                                .send(SubscriptionMessage::from_json(&value).unwrap())
+                                .await
+                                .unwrap();
+
+                            count += 1;
                         }
 
                         // Notify that stream is closing
