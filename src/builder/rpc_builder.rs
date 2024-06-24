@@ -3,9 +3,9 @@ use std::ops::Deref;
 use futures::{Future, Stream, StreamExt};
 use jsonrpsee::{
     types::{ErrorCode, ErrorObject, Params, ResponsePayload},
-    IntoResponse, RpcModule, SubscriptionCloseResponse, SubscriptionMessage,
+    RpcModule, SubscriptionCloseResponse, SubscriptionMessage,
 };
-use serde::{de::Error, Serialize};
+use serde::Serialize;
 use serde_json::json;
 
 use crate::{FromRequestExtensions, RequestKind, RpcError};
