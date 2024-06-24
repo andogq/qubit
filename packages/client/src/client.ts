@@ -89,8 +89,12 @@ export function build_client<Server, TPlugins extends Plugins>(
     const payload = create_payload(id, method.join("."), args);
     const response = await sender(id, payload);
 
-    if (response === null || response.type !== "ok") {
-      throw response;
+    if (response === null) {
+      throw new Error("malformed response from the API");
+    }
+    if (response.type !== "ok") {
+      // API returned an error, pass it on
+      throw response.value;
     }
 
     return response.value;
