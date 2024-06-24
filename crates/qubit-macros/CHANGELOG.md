@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.6.4]
+
+### feat
+
+- [`1fb61ac`](https://github.com/andogq/qubit/commit/1fb61acff0f4264a1e996d143f17ae5e89849ec7) ([#69](https://github.com/andogq/qubit/pull/69)) return parameter deserialising errors if they are encountered (close #69)
+
 ## \[0.6.3]
 
 ### feat
