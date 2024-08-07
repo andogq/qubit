@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 qubit = { path = "../../../" }
 
-ts-rs = "8.1.0"
+ts-rs = "9.0.1"
 serde = { version = "1.0", features = ["derive"] }
 futures = "0.3.30"
 

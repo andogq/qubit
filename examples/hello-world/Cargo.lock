@@ -371,7 +371,7 @@ dependencies = [
  "qubit",
  "serde",
  "tokio",
- "ts-rs",
+ "ts-rs 9.0.1",
 ]
 
 [[package]]
@@ -734,7 +734,7 @@ dependencies = [
  "tokio",
  "tower",
  "trait-variant",
- "ts-rs",
+ "ts-rs 9.0.1",
  "urlencoding",
 ]
 
@@ -745,7 +745,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
- "ts-rs",
+ "ts-rs 8.1.0",
 ]
 
 [[package]]
@@ -1143,7 +1143,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09d3fa4606cdab1e9b668cc65ce2545941d01f52bc27536a195c66c55b91cb84"
 dependencies = [
  "thiserror",
- "ts-rs-macros",
+ "ts-rs-macros 8.1.0",
+]
+
+[[package]]
+name = "ts-rs"
+version = "9.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b44017f9f875786e543595076374b9ef7d13465a518dd93d6ccdbf5b432dde8c"
+dependencies = [
+ "thiserror",
+ "ts-rs-macros 9.0.1",
 ]
 
 [[package]]
@@ -1153,6 +1163,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f86ae36cbb2d58b86677ad413054feeb0712e382e822131cf9a4a1e580c419b5"
 dependencies = [
  "Inflector",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "termcolor",
+]
+
+[[package]]
+name = "ts-rs-macros"
+version = "9.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c88cc88fd23b5a04528f3a8436024f20010a16ec18eb23c164b1242f65860130"
+dependencies = [
  "proc-macro2",
  "quote",
  "syn",
