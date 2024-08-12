@@ -6,12 +6,12 @@
 //! There are two primary features that a handler must implement:
 //!
 //! - Normalisation and registration: The handlers must register themselves against a
-//! [`RpcBuilder`] instance in a uniform manner, so any parameters for this handler must be
-//! transformed from the parameters provided by the server.
+//!   [`RpcBuilder`] instance in a uniform manner, so any parameters for this handler must be
+//!   transformed from the parameters provided by the server.
 //!
 //! - Type specification: The handlers must emit both the signature of the handler
-//! ([`Handler::get_type`]), as well as any dependencies that they rely on
-//! ([`Handler::add_dependencies`]).
+//!   ([`Handler::get_type`]), as well as any dependencies that they rely on
+//!   ([`Handler::add_dependencies`]).
 //!
 //! # Handler Erasure
 //!
