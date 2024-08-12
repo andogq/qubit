@@ -1,5 +1,12 @@
 # Changelog
 
+## \[0.10.0]
+
+### feat
+
+- [`7fe1372`](https://github.com/andogq/qubit/commit/7fe1372b9a7c985814a21b1893dc62943685cde5) Add `/* eslint-disable */` to generated bindings (#77, thanks @lucasavila00!)
+- [`7fe1372`](https://github.com/andogq/qubit/commit/7fe1372b9a7c985814a21b1893dc62943685cde5) Upgrade `ts-rs` to latest version (#76, thanks @lucasavila00!)
+
 ## \[0.9.5]
 
 ### Dependencies
