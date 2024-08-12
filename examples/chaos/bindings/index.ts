@@ -14,8 +14,9 @@ import type { Mutation } from "@qubit-rs/client";
 import type { Subscription } from "@qubit-rs/client";
 import type { NestedStruct } from "./NestedStruct.ts";
 import type { MyEnum } from "./MyEnum.ts";
+import type { UniqueType } from "./UniqueType.ts";
 import type { Metadata } from "./Metadata.ts";
 import type { User } from "./User.ts";
 import type { Test } from "./Test.ts";
 
-export type QubitServer = { version: Query<[], string>, count: Mutation<[], number>, countdown: Subscription<[min: number, max: number, ], number>, array: Query<[], Array<string>>, enum_test: Query<[], MyEnum>, user: { someHandler: Query<[_id: string, ], User>, create: Mutation<[name: string, email: string, age: number, ], User>, list: Query<[], Array<Test>>, asdf: Query<[], null> } };
+export type QubitServer = { version: Query<[], string>, count: Mutation<[], number>, countdown: Subscription<[min: number, max: number, ], number>, array: Query<[], Array<string>>, enum_test: Query<[], MyEnum>, array_type: Query<[], Array<UniqueType>>, user: { someHandler: Query<[_id: string, ], User>, create: Mutation<[name: string, email: string, age: number, ], User>, list: Query<[], Array<Test>>, asdf: Query<[], null> } };

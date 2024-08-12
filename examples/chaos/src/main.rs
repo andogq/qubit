@@ -167,6 +167,16 @@ async fn array() -> Vec<String> {
 }
 
 #[derive(Clone, Serialize, TS)]
+struct UniqueType {
+    value: usize,
+}
+
+#[handler(query)]
+async fn array_type() -> Vec<UniqueType> {
+    vec![]
+}
+
+#[derive(Clone, Serialize, TS)]
 struct NestedStruct {
     a: f32,
     b: bool,
@@ -194,6 +204,7 @@ async fn main() {
         .handler(countdown)
         .handler(array)
         .handler(enum_test)
+        .handler(array_type)
         .nest("user", user::create_router());
 
     // Save the router's bindings
