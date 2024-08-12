@@ -12,10 +12,10 @@ struct TypeListExporter {
 
 impl TypeListExporter {
     /// Create a new empty instance.
-    pub fn new(out_dir: impl AsRef<Path>, dependencies: Vec<Dependency>) -> Self {
+    pub fn new(out_dir: impl AsRef<Path>) -> Self {
         Self {
             out_dir: out_dir.as_ref().to_owned(),
-            dependencies,
+            dependencies: Vec::new(),
         }
     }
 
@@ -27,9 +27,8 @@ impl TypeListExporter {
 
 impl TypeVisitor for TypeListExporter {
     fn visit<T: TS + 'static + ?Sized>(&mut self) {
+        // Ensure that the type is an exportable type (otherwise likely just a primitive)
         let Some(dep) = Dependency::from_ty::<T>() else {
-            // Type must be a primitive, so recurse to ensure all generics are properly exported.
-
             return;
         };
 
@@ -52,8 +51,11 @@ impl TypeVisitor for TypeListExporter {
 pub fn export_with_dependencies<T: 'static + TS>(
     out_dir: impl AsRef<Path>,
 ) -> Result<Vec<Dependency>, ExportError> {
-    // Ensure any generics used in the type are exported
-    let mut exporter = TypeListExporter::new(&out_dir, T::dependencies());
+    // Set up an exporter
+    let mut exporter = TypeListExporter::new(&out_dir);
+
+    // Export all dependencies and generics for the type
+    T::visit_dependencies(&mut exporter);
     T::visit_generics(&mut exporter);
 
     let mut dependencies = exporter.into_inner();
