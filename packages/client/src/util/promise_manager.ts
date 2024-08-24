@@ -19,6 +19,7 @@ export function create_promise_manager() {
     resolve: (response: RpcResponse<unknown>) => {
       const handler = promises[response.id];
       if (handler) {
+        delete promises[response.id];
         handler(response);
       }
     },
