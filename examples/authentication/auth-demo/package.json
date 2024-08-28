@@ -12,6 +12,6 @@
   "dependencies": {
     "typescript": "^5.2.2",
     "vite": "^5.2.0",
-    "@qubit-rs/client": "link:../../../packages/client"
+    "@qubit-rs/client": "workspace:*"
   }
 }

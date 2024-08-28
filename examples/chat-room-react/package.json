@@ -9,7 +9,7 @@
     "check": "tsc"
   },
   "dependencies": {
-    "@qubit-rs/client": "link:../../packages/client",
+    "@qubit-rs/client": "workspace:*",
     "@tanstack/react-query": "^5.40.0",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",

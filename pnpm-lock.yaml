@@ -15,7 +15,7 @@ importers:
   examples/authentication/auth-demo:
     dependencies:
       '@qubit-rs/client':
-        specifier: link:../../../packages/client
+        specifier: workspace:*
         version: link:../../../packages/client
       typescript:
         specifier: ^5.2.2
@@ -27,7 +27,7 @@ importers:
   examples/chaos:
     dependencies:
       '@qubit-rs/client':
-        specifier: link:../../packages/client
+        specifier: workspace:*
         version: link:../../packages/client
       '@types/node':
         specifier: ^20.11.25
@@ -42,7 +42,7 @@ importers:
   examples/chat-room-react:
     dependencies:
       '@qubit-rs/client':
-        specifier: link:../../packages/client
+        specifier: workspace:*
         version: link:../../packages/client
       '@tanstack/react-query':
         specifier: ^5.40.0
@@ -75,7 +75,7 @@ importers:
   examples/counter:
     dependencies:
       '@qubit-rs/client':
-        specifier: link:../../packages/client
+        specifier: workspace:*
         version: link:../../packages/client
       '@types/ws':
         specifier: ^8.5.10
@@ -93,7 +93,7 @@ importers:
   examples/hello-world:
     dependencies:
       '@qubit-rs/client':
-        specifier: link:../../packages/client
+        specifier: workspace:*
         version: link:../../packages/client
       ts-node:
         specifier: ^10.9.2
@@ -114,8 +114,8 @@ importers:
   packages/svelte:
     dependencies:
       '@qubit-rs/client':
-        specifier: 0.4.3
-        version: 0.4.3
+        specifier: workspace:*
+        version: link:../client
     devDependencies:
       '@sveltejs/adapter-auto':
         specifier: ^3.2.2
@@ -627,9 +627,6 @@ packages:
 
   '@polka/url@1.0.0-next.25':
     resolution: {integrity: sha512-j7P6Rgr3mmtdkeDGTe0E/aYyWEWVtc5yFXtHCRHs28/jptDEWfaVOc5T7cblqy1XKPPfCxJc/8DwQ5YgLOZOVQ==}
-
-  '@qubit-rs/client@0.4.3':
-    resolution: {integrity: sha512-YoqVJZwSORDRrY52BQr2+fX7Blainb67tA2oJFvvjCPrfcxH8UgEFAZvzIibHLh8HkXfSBhf5j/UkLHhukXMsg==}
 
   '@rollup/rollup-android-arm-eabi@4.21.1':
     resolution: {integrity: sha512-2thheikVEuU7ZxFXubPDOtspKn1x0yqaYQwvALVtEcvFhMifPADBrgRPyHV0TF3b+9BgvgjgagVyvA/UqPZHmg==}
@@ -2162,8 +2159,6 @@ snapshots:
     optional: true
 
   '@polka/url@1.0.0-next.25': {}
-
-  '@qubit-rs/client@0.4.3': {}
 
   '@rollup/rollup-android-arm-eabi@4.21.1':
     optional: true

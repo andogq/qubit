@@ -8,7 +8,7 @@
     "check": "tsc"
   },
   "dependencies": {
-    "@qubit-rs/client": "link:../../packages/client",
+    "@qubit-rs/client": "workspace:*",
     "@types/node": "^20.11.25",
     "typescript": "^5.2.2",
     "ts-node": "^10.9.2"
