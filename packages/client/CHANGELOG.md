@@ -1,5 +1,11 @@
 # Changelog
 
+## \[0.4.4]
+
+### bug
+
+- [`ba75bd4`](https://github.com/andogq/qubit/commit/ba75bd43fab2b2421fcf27694fcf9deca59860ea) Fix memory leak in promise manager due to holding references to resolved promises.
+
 ## \[0.4.3]
 
 ### feat
