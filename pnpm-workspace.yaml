@@ -1,3 +1,8 @@
 packages:
     - packages/client
     - packages/svelte
+    - examples/authentication/auth-demo
+    - examples/chaos
+    - examples/chat-room-react
+    - examples/counter
+    - examples/hello-world
