@@ -1,6 +1,6 @@
 {
   "name": "@qubit-rs/svelte",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Seamless RPC for Rust & TypeScript - Svelte style",
   "keywords": [
     "api",
@@ -63,6 +63,6 @@
   "types": "./dist/index.d.ts",
   "type": "module",
   "dependencies": {
-    "@qubit-rs/client": "0.4.3"
+    "@qubit-rs/client": "0.4.4"
   }
 }
