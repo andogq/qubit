@@ -14,4 +14,8 @@ import type { Mutation } from "@qubit-rs/client";
 import type { Query } from "@qubit-rs/client";
 import type { Subscription } from "@qubit-rs/client";
 
+export type { Mutation } from "@qubit-rs/client";
+export type { Query } from "@qubit-rs/client";
+export type { Subscription } from "@qubit-rs/client";
+
 export type QubitServer = { increment: Mutation<[], null>, decrement: Mutation<[], null>, add: Mutation<[n: number, ], null>, get: Query<[], number>, countdown: Subscription<[], number> };
