@@ -9,9 +9,9 @@
   },
   "dependencies": {
     "@qubit-rs/client": "workspace:*",
-    "ws": "^8.17.0",
-    "@types/ws": "^8.5.10",
-    "typescript": "^5.2.2",
-    "ts-node": "^10.9.2"
+    "@types/ws": "^8.5.13",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2",
+    "ws": "^8.18.0"
   }
 }
