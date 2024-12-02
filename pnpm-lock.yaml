@@ -114,8 +114,8 @@ importers:
   packages/svelte:
     dependencies:
       '@qubit-rs/client':
-        specifier: workspace:*
-        version: link:../client
+        specifier: '0'
+        version: 0.4.4
     devDependencies:
       '@sveltejs/adapter-auto':
         specifier: ^3.3.1
@@ -607,6 +607,9 @@ packages:
 
   '@polka/url@1.0.0-next.28':
     resolution: {integrity: sha512-8LduaNlMZGwdZ6qWrKlfa+2M4gahzFkprZiAt2TF8uS0qQgBizKXpXURqvTJ4WtmupWxaLqjRb2UCTe72mu+Aw==}
+
+  '@qubit-rs/client@0.4.4':
+    resolution: {integrity: sha512-AdaF25aGRU4YkYYxxARH3eYlezzHhGECTFGZ5/zEc9y+iPxdIaaWf4/m8uEtdbzjMEsGaA4vVVd1kuriK6sDzQ==}
 
   '@rollup/rollup-android-arm-eabi@4.28.0':
     resolution: {integrity: sha512-wLJuPLT6grGZsy34g4N1yRfYeouklTgPhH1gWXCYspenKYD0s3cR99ZevOGw5BexMNywkbV3UkjADisozBmpPQ==}
@@ -2036,6 +2039,8 @@ snapshots:
     optional: true
 
   '@polka/url@1.0.0-next.28': {}
+
+  '@qubit-rs/client@0.4.4': {}
 
   '@rollup/rollup-android-arm-eabi@4.28.0':
     optional: true
