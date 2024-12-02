@@ -1,5 +1,9 @@
 # Changelog
 
+## \[0.10.2]
+
+- [`1aec8be`](https://github.com/andogq/qubit/commit/1aec8beb9f689015dce7eef64f7b99a835c9058a) Enable the `util` feature on `tower` to close #82
+
 ## \[0.10.1]
 
 - [`6998257`](https://github.com/andogq/qubit/commit/69982570ec2183ff1e639f78d71281de91bb733f) Alter router type generation to re-export all types.
