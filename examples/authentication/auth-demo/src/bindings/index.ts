@@ -12,4 +12,6 @@
 
 import type { Query } from "@qubit-rs/client";
 
+export type { Query } from "@qubit-rs/client";
+
 export type QubitServer = { echo_cookie: Query<[], string>, secret_endpoint: Query<[], string> };

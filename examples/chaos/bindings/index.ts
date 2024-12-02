@@ -20,4 +20,14 @@ import type { Metadata } from "./Metadata.ts";
 import type { User } from "./User.ts";
 import type { Test } from "./Test.ts";
 
+export type { Query } from "@qubit-rs/client";
+export type { Mutation } from "@qubit-rs/client";
+export type { Subscription } from "@qubit-rs/client";
+export type { NestedStruct } from "./NestedStruct.ts";
+export type { MyEnum } from "./MyEnum.ts";
+export type { UniqueType } from "./UniqueType.ts";
+export type { Metadata } from "./Metadata.ts";
+export type { User } from "./User.ts";
+export type { Test } from "./Test.ts";
+
 export type QubitServer = { version: Query<[], string>, count: Mutation<[], number>, countdown: Subscription<[min: number, max: number, ], number>, array: Query<[], Array<string>>, enum_test: Query<[], MyEnum>, array_type: Query<[], Array<UniqueType>>, user: { someHandler: Query<[_id: string, ], User>, create: Mutation<[name: string, email: string, age: number, ], User>, list: Query<[], Array<Test>>, asdf: Query<[], null> } };
