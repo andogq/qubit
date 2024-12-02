@@ -63,7 +63,7 @@ where
         let header = String::from(include_str!("../header.txt"));
 
         // Export all the dependencies, and create their import statements
-        let (imports, _types) = self
+        let (imports, exports, _types) = self
             .get_handlers()
             .into_iter()
             .flat_map(|handler| {
@@ -79,10 +79,10 @@ where
                     .chain((handler.qubit_types)().into_iter().map(|ty| ty.to_ts()))
             })
             .fold(
-                (String::new(), HashSet::new()),
-                |(mut imports, mut types), ty| {
+                (String::new(), String::new(), HashSet::new()),
+                |(mut imports, mut exports, mut types), ty| {
                     if types.contains(&ty) {
-                        return (imports, types);
+                        return (imports, exports, types);
                     }
 
                     let (package, ty_name) = ty;
@@ -93,9 +93,15 @@ where
                     )
                     .unwrap();
 
+                    writeln!(
+                        &mut exports,
+                        r#"export type {{ {ty_name} }} from "{package}";"#,
+                    )
+                    .unwrap();
+
                     types.insert((package, ty_name));
 
-                    (imports, types)
+                    (imports, exports, types)
                 },
             );
 
@@ -105,7 +111,7 @@ where
         // Write out index file
         fs::write(
             out_dir.join("index.ts"),
-            [header, imports, server_type]
+            [header, imports, exports, server_type]
                 .into_iter()
                 .filter(|part| !part.is_empty())
                 .collect::<Vec<_>>()
