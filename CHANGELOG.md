@@ -1,5 +1,10 @@
 # Changelog
 
+## \[0.10.1]
+
+- [`6998257`](https://github.com/andogq/qubit/commit/69982570ec2183ff1e639f78d71281de91bb733f) Alter router type generation to re-export all types.
+- [`88ef762`](https://github.com/andogq/qubit/commit/88ef76278452faf46e8cadd6f5b3011f68674169) ([#84](https://github.com/andogq/qubit/pull/84)) Update `ts-rs` to 10.1.0 (thanks @epatters)
+
 ## \[0.10.0]
 
 ### feat

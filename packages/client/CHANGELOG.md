@@ -1,5 +1,9 @@
 # Changelog
 
+## \[0.4.5]
+
+- [`b6ef950`](https://github.com/andogq/qubit/commit/b6ef95077345cb4db4143e364c48eef010f41fc8) Bump dependencies
+
 ## \[0.4.4]
 
 ### bug
