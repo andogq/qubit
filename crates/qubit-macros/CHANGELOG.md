@@ -1,5 +1,9 @@
 # Changelog
 
+## \[0.6.5]
+
+- [`a5f1638`](https://github.com/andogq/qubit/commit/a5f1638e4a21c9f5fd4e7d1dfa740f5522753e99) Update Axum to 0.8, and other dependencies (#94, thanks @epatters).
+
 ## \[0.6.4]
 
 ### feat
