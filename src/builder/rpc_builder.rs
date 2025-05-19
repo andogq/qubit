@@ -191,7 +191,7 @@ where
                             }
 
                             subscription
-                                .send(SubscriptionMessage::from_json(&value).unwrap())
+                                .send(serde_json::value::to_raw_value(&value).unwrap())
                                 .await
                                 .unwrap();
 
@@ -199,12 +199,12 @@ where
                         }
 
                         // Notify that stream is closing
-                        SubscriptionCloseResponse::Notif(
-                            SubscriptionMessage::from_json(
+                        SubscriptionCloseResponse::Notif(SubscriptionMessage::from(
+                            serde_json::value::to_raw_value(
                                 &json!({ "close_stream": subscription_id, "count": count }),
                             )
                             .unwrap(),
-                        )
+                        ))
                     }
                 },
             )
