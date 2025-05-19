@@ -1,5 +1,13 @@
 # Changelog
 
+## \[0.10.3]
+
+- [`a5f1638`](https://github.com/andogq/qubit/commit/a5f1638e4a21c9f5fd4e7d1dfa740f5522753e99) Update Axum to 0.8, and other dependencies (#94, thanks @epatters).
+
+### Dependencies
+
+- Upgraded to `qubit-macros@0.6.5`
+
 ## \[0.10.2]
 
 - [`1aec8be`](https://github.com/andogq/qubit/commit/1aec8beb9f689015dce7eef64f7b99a835c9058a) Enable the `util` feature on `tower` to close #82
