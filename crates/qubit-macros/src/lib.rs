@@ -1,5 +1,6 @@
 mod handler;
 mod macros;
+mod refactor;
 
 /// See [`qubit::builder::handler`] for more information.
 #[proc_macro_attribute]
