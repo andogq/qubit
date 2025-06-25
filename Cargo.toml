@@ -11,7 +11,7 @@ exclude = [
 [package]
 name = "qubit"
 version = "0.10.3"
-edition = "2021"
+edition = "2024"
 authors = ["Tom Anderson <tom@ando.gq>"]
 repository = "https://github.com/andogq/qubit"
 license = "MIT"
