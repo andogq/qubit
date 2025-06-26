@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Ident, Type};
 
-use crate::refactor::analyse::Implementation;
+use crate::analyse::Implementation;
 
 use super::lower::Ir;
 

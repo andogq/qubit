@@ -9,7 +9,7 @@ pub fn parse(tokens_attrs: TokenStream, tokens_item: TokenStream) -> Result<Ast,
     // Parse the handler.
     let handler = syn::parse2(tokens_item)?;
 
-    Ok(Ast { attrs, handler })
+    Ok(Ast::new(attrs, handler))
 }
 
 /// Simple representation of a handler, suitable for further processing by a macro.

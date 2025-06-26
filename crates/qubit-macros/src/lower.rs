@@ -122,13 +122,13 @@ pub struct Ir {
 
 #[cfg(test)]
 mod test {
-    use crate::refactor::analyse::ModelAssertion;
+    use crate::analyse::ModelAssertion;
 
     use super::*;
 
+    use proc_macro2::Span;
     use rstest::*;
     use syn::ItemFn;
-    use proc_macro2::Span;
 
     #[derive(Clone)]
     struct IrAssertion {

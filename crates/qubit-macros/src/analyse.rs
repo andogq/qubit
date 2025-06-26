@@ -1,7 +1,7 @@
 use proc_macro2::Span;
 use syn::{
-    Attribute, Block, Error, FnArg, Ident, ItemFn, Pat, PatIdent, ReturnType, Signature, Token,
-    Type, TypeImplTrait, Visibility, parse_quote, punctuated::Punctuated, spanned::Spanned,
+    Attribute, Block, Error, FnArg, Ident, ItemFn, Pat, PatIdent, ReturnType, Token, Type,
+    TypeImplTrait, Visibility, parse_quote, punctuated::Punctuated, spanned::Spanned,
 };
 
 use super::parse::{Ast, HandlerKind};
@@ -238,7 +238,7 @@ mod test {
     use rstest::*;
     use syn::Signature;
 
-    use crate::refactor::parse::Attributes;
+    use crate::parse::Attributes;
 
     #[derive(Clone)]
     pub struct ModelAssertion {
