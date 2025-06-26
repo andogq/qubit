@@ -1,8 +1,9 @@
 mod analyse;
+mod codegen;
 mod lower;
 mod parse;
 
-use self::{analyse::analyse, lower::lower, parse::parse};
+use self::{analyse::analyse, codegen::codegen, lower::lower, parse::parse};
 use proc_macro::TokenStream;
 use syn::Error;
 
@@ -21,6 +22,5 @@ fn handler_inner(
     let ast = parse(attrs, item)?;
     let model = analyse(ast)?;
     let ir = lower(model);
-
-    todo!()
+    Ok(codegen(ir))
 }

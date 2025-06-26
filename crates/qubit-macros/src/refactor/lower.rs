@@ -1,7 +1,7 @@
-use syn::{Expr, Ident, Path, Type, parse_quote};
+use syn::{Expr, Ident, Path, Type, Visibility, parse_quote};
 
 use super::{
-    analyse::{Implementation, Model},
+    analyse::{HandlerReturn, Implementation, Model},
     parse::HandlerKind,
 };
 
@@ -13,8 +13,12 @@ pub fn lower(model: Model) -> Ir {
     let ctx_ident: Ident = parse_quote! { ctx };
 
     Ir {
+        name: model.name.clone(),
+        visibility: model.visibility,
+
         // Use the user's ctx, or Qubit's ctx if not provided.
         ctx_ty: model.ctx_ty.as_ref().unwrap_or(&inner_ctx_ty).clone(),
+        inner_ctx_ty,
 
         // Set to `None` if the inputs list is empty, so no parsing takes place.
         parse_params: (!model.inputs.is_empty()).then(|| model.inputs.clone()),
@@ -29,6 +33,11 @@ pub fn lower(model: Model) -> Ir {
                 .chain(model.inputs.iter().map(|(ident, _)| ident.clone()))
                 .collect())
             .unwrap_or_default(),
+
+        handler_return_ty: match model.return_ty {
+            HandlerReturn::Return(ty) => ty,
+            HandlerReturn::Stream(ty) => ty,
+        },
 
         implementation: model.implementation,
 
@@ -65,19 +74,36 @@ pub fn lower(model: Model) -> Ir {
 
             vec![parse_quote!(::qubit::ty::util::QubitType::#ident)]
         },
+
+        handler_kind_str: match model.kind {
+            HandlerKind::Query => "Query".to_string(),
+            HandlerKind::Mutation => "Mutation".to_string(),
+            HandlerKind::Subscription => "Subscription".to_string(),
+        },
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Ir {
+    /// Handler name.
+    pub name: Ident,
+    /// Visibility provided by the user.
+    pub visibility: Visibility,
+
     /// Type to use as the ctx.
     pub ctx_ty: Type,
+    /// Name of the generic type for the inner context.
+    pub inner_ctx_ty: Type,
 
     /// Parameters to parse and pass to the handler. If [`None`], no parsing will be performed at
     /// all.
+    // TODO: See if this can be a vec directly (impacts generating param parsing)
     pub parse_params: Option<Vec<(Ident, Type)>>,
     /// Parameters to call the handler with.
     pub handler_params: Vec<Ident>,
+
+    /// Return type of the handler.
+    pub handler_return_ty: Type,
 
     /// Implementation of the handler.
     pub implementation: Implementation,
@@ -89,6 +115,9 @@ pub struct Ir {
 
     /// Builtin Qubit types that are depended on.
     pub qubit_types: Vec<Path>,
+
+    /// String representation of the handler kind.
+    pub handler_kind_str: String,
 }
 
 #[cfg(test)]
@@ -99,50 +128,66 @@ mod test {
 
     use rstest::*;
     use syn::ItemFn;
+    use proc_macro2::Span;
 
     #[derive(Clone)]
     struct IrAssertion {
+        name: Ident,
         ctx_ty: Type,
         parse_params: Option<Vec<(Ident, Type)>>,
         handler_params: Vec<Ident>,
         register_method: Ident,
         register_params: Vec<Expr>,
         qubit_types: Vec<Path>,
+        handler_kind_ts_type: String,
     }
 
     impl IrAssertion {
-        fn new(register_method: Ident, register_params: Vec<Expr>, qubit_type: Path) -> Self {
+        fn new(
+            name: Ident,
+            register_method: Ident,
+            register_params: Vec<Expr>,
+            qubit_type: Path,
+            handler_kind_ts_type: String,
+        ) -> Self {
             Self {
+                name,
                 ctx_ty: parse_quote! { __internal_AppCtx },
                 parse_params: None,
                 handler_params: Vec::new(),
                 register_method,
                 register_params,
                 qubit_types: vec![qubit_type],
+                handler_kind_ts_type,
             }
         }
 
         fn query(name: impl AsRef<str>) -> Self {
             let name = name.as_ref();
             Self::new(
+                Ident::new(name, Span::call_site()),
                 parse_quote!(query),
                 vec![parse_quote!(#name)],
                 parse_quote!(::qubit::ty::util::QubitType::Query),
+                "Query".to_string(),
             )
         }
 
         fn mutation(name: impl AsRef<str>) -> Self {
             let name = name.as_ref();
             Self::new(
+                Ident::new(name, Span::call_site()),
                 parse_quote!(mutation),
                 vec![parse_quote!(#name)],
                 parse_quote!(::qubit::ty::util::QubitType::Mutation),
+                "Mutation".to_string(),
             )
         }
 
         fn subscription(name: impl AsRef<str>) -> Self {
             let name = name.as_ref();
             Self::new(
+                Ident::new(name, Span::call_site()),
                 parse_quote!(subscription),
                 [
                     name.to_string(),
@@ -153,6 +198,7 @@ mod test {
                 .map(|lit| Expr::Lit(parse_quote!(#lit)))
                 .collect(),
                 parse_quote!(::qubit::ty::util::QubitType::Subscription),
+                "Subscription".to_string(),
             )
         }
 
@@ -222,11 +268,13 @@ mod test {
 
         let ir = lower(model);
 
+        assert_eq!(ir.name, expected.name);
         assert_eq!(ir.ctx_ty, expected.ctx_ty);
         assert_eq!(ir.parse_params, expected.parse_params);
         assert_eq!(ir.handler_params, expected.handler_params);
         assert_eq!(ir.register_method, expected.register_method);
         assert_eq!(ir.register_params, expected.register_params);
         assert_eq!(ir.qubit_types, expected.qubit_types);
+        assert_eq!(ir.handler_kind_str, expected.handler_kind_ts_type);
     }
 }

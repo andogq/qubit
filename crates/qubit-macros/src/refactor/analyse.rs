@@ -1,7 +1,7 @@
 use proc_macro2::Span;
 use syn::{
-    Attribute, Block, Error, FnArg, Ident, ItemFn, Pat, PatIdent, ReturnType, Signature, Type,
-    TypeImplTrait, Visibility, parse_quote, spanned::Spanned,
+    Attribute, Block, Error, FnArg, Ident, ItemFn, Pat, PatIdent, ReturnType, Signature, Token,
+    Type, TypeImplTrait, Visibility, parse_quote, punctuated::Punctuated, spanned::Spanned,
 };
 
 use super::parse::{Ast, HandlerKind};
@@ -195,8 +195,13 @@ pub struct Implementation {
     pub block: Block,
     /// Attributes attached to the function.
     pub attrs: Vec<Attribute>,
-    /// Signature of the function.
-    pub sig: Signature,
+
+    /// Optional async keyword attached to the function.
+    pub asyncness: Option<Token![async]>,
+    /// Input parameters for the function.
+    pub inputs: Punctuated<FnArg, Token![,]>,
+    /// Return type of the function.
+    pub output: ReturnType,
 }
 
 impl From<ItemFn> for Implementation {
@@ -204,11 +209,15 @@ impl From<ItemFn> for Implementation {
         Self {
             block: *item.block,
             attrs: item.attrs,
-            sig: item.sig,
+
+            asyncness: item.sig.asyncness,
+            inputs: item.sig.inputs,
+            output: item.sig.output,
         }
     }
 }
 
+// TODO: Work out if this is even required, and get rid of it if not.
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
 pub enum HandlerReturn {
