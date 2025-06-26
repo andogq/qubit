@@ -1,7 +1,7 @@
 use proc_macro2::Span;
 use syn::{
-    Block, Error, FnArg, Ident, Pat, PatIdent, ReturnType, Type, TypeImplTrait, Visibility,
-    parse_quote, spanned::Spanned,
+    Attribute, Block, Error, FnArg, Ident, ItemFn, Pat, PatIdent, ReturnType, Signature, Type,
+    TypeImplTrait, Visibility, parse_quote, spanned::Spanned,
 };
 
 use super::parse::{Ast, HandlerKind};
@@ -23,19 +23,19 @@ pub fn analyse(ast: Ast) -> Result<Model, AnalyseError> {
 
     let kind = ast.attrs.kind;
 
-    let visibility = ast.handler.vis;
+    let visibility = ast.handler.vis.clone();
 
     // Process all of the inputs from the signature.
-    let mut inputs = process_inputs(ast.handler.sig.inputs)?;
+    let mut inputs = process_inputs(ast.handler.sig.inputs.iter())?;
 
     // Assume the first parameter is the ctx.
     let ctx_ty = (!inputs.is_empty()).then(|| inputs.remove(0).1);
 
     // TODO: This complex analysis doesn't need to take place. This can be handled by trait
     // implementations that this code expands into.
-    let return_ty = process_return_ty(ast.handler.sig.output, ast.attrs.kind)?;
+    let return_ty = process_return_ty(&ast.handler.sig.output, ast.attrs.kind)?;
 
-    let implementation = *ast.handler.block;
+    let implementation = ast.handler.into();
 
     Ok(Model {
         name,
@@ -88,11 +88,10 @@ impl From<InputError> for Error {
     }
 }
 
-fn process_inputs(
-    inputs: impl IntoIterator<Item = FnArg>,
+fn process_inputs<'a>(
+    inputs: impl Iterator<Item = &'a FnArg>,
 ) -> Result<Vec<(Ident, Type)>, InputError> {
     inputs
-        .into_iter()
         .map(|arg| {
             let arg = match arg {
                 FnArg::Typed(arg) => arg,
@@ -101,11 +100,11 @@ fn process_inputs(
                 }
             };
 
-            let Pat::Ident(PatIdent { ident, .. }) = *arg.pat else {
+            let Pat::Ident(PatIdent { ref ident, .. }) = *arg.pat else {
                 return Err(InputError::Destructured(arg.pat.span()));
             };
 
-            Ok((ident, *arg.ty))
+            Ok((ident.clone(), (*arg.ty).clone()))
         })
         .collect()
 }
@@ -131,10 +130,10 @@ impl From<ReturnTyError> for Error {
 }
 
 fn process_return_ty(
-    return_ty: ReturnType,
+    return_ty: &ReturnType,
     handler_kind: HandlerKind,
 ) -> Result<HandlerReturn, ReturnTyError> {
-    let handler_return = match &return_ty {
+    let handler_return = match return_ty {
         ReturnType::Default => HandlerReturn::Return(parse_quote! { () }),
         ReturnType::Type(_, ty) => match &**ty {
             // BUG: Assuming that any trait implementation is a stream, which definitely isn't
@@ -165,28 +164,49 @@ fn process_return_ty(
 }
 
 #[derive(Clone, Debug)]
-#[cfg_attr(test, derive(Eq, PartialEq))]
 pub struct Model {
     /// Handler name.
-    name: Ident,
+    pub name: Ident,
 
     /// Kind of the handler.
-    kind: HandlerKind,
+    pub kind: HandlerKind,
 
     /// Visibility provided by the user.
-    visibility: Visibility,
+    pub visibility: Visibility,
 
     /// Context type of the handler.
-    ctx_ty: Option<Type>,
+    pub ctx_ty: Option<Type>,
 
     /// Handler parameters. Currently does not support any kind of destructuring.
-    inputs: Vec<(Ident, Type)>,
+    pub inputs: Vec<(Ident, Type)>,
 
     /// Return type of the handler.
-    return_ty: HandlerReturn,
+    pub return_ty: HandlerReturn,
 
     /// Implementation of the handler.
-    implementation: Block,
+    pub implementation: Implementation,
+}
+
+/// All relevant components of a handler implementation. Where possible the original components of
+/// the handler should be re-used, to ensure that any additional attributes are retained.
+#[derive(Clone, Debug)]
+pub struct Implementation {
+    /// Function body.
+    pub block: Block,
+    /// Attributes attached to the function.
+    pub attrs: Vec<Attribute>,
+    /// Signature of the function.
+    pub sig: Signature,
+}
+
+impl From<ItemFn> for Implementation {
+    fn from(item: ItemFn) -> Self {
+        Self {
+            block: *item.block,
+            attrs: item.attrs,
+            sig: item.sig,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -200,72 +220,75 @@ pub enum HandlerReturn {
 }
 
 #[cfg(test)]
+pub use test::ModelAssertion;
+
+#[cfg(test)]
 mod test {
     use super::*;
 
     use rstest::*;
+    use syn::Signature;
+
+    use crate::refactor::parse::Attributes;
+
+    #[derive(Clone)]
+    pub struct ModelAssertion {
+        pub name: Ident,
+        pub kind: HandlerKind,
+        pub visibility: Visibility,
+        pub ctx_ty: Option<Type>,
+        pub inputs: Vec<(Ident, Type)>,
+        pub return_ty: HandlerReturn,
+    }
+
+    impl ModelAssertion {
+        pub fn new(name: Ident, kind: HandlerKind) -> Self {
+            Self {
+                name,
+                kind,
+                visibility: Visibility::Inherited,
+                ctx_ty: None,
+                inputs: Vec::new(),
+                return_ty: HandlerReturn::Return(parse_quote!(())),
+            }
+        }
+
+        pub fn query(name: Ident) -> Self {
+            Self::new(name, HandlerKind::Query)
+        }
+
+        pub fn mutation(name: Ident) -> Self {
+            Self::new(name, HandlerKind::Mutation)
+        }
+
+        pub fn subscription(name: Ident) -> Self {
+            Self::new(name, HandlerKind::Subscription)
+        }
+
+        pub fn with_visibility(mut self, visibility: Visibility) -> Self {
+            self.visibility = visibility;
+            self
+        }
+
+        pub fn with_ctx_ty(mut self, ctx_ty: Option<Type>) -> Self {
+            self.ctx_ty = ctx_ty;
+            self
+        }
+
+        pub fn with_inputs(mut self, inputs: impl IntoIterator<Item = (Ident, Type)>) -> Self {
+            self.inputs = inputs.into_iter().collect();
+            self
+        }
+
+        pub fn with_return_ty(mut self, return_ty: HandlerReturn) -> Self {
+            self.return_ty = return_ty;
+            self
+        }
+    }
 
     mod analyse {
-        use syn::Signature;
-
-        use crate::refactor::parse::Attributes;
 
         use super::*;
-
-        #[derive(Clone)]
-        struct ModelAssertion {
-            name: Ident,
-            kind: HandlerKind,
-            visibility: Visibility,
-            ctx_ty: Option<Type>,
-            inputs: Vec<(Ident, Type)>,
-            return_ty: HandlerReturn,
-        }
-
-        impl ModelAssertion {
-            fn new(name: Ident, kind: HandlerKind) -> Self {
-                Self {
-                    name,
-                    kind,
-                    visibility: Visibility::Inherited,
-                    ctx_ty: None,
-                    inputs: Vec::new(),
-                    return_ty: HandlerReturn::Return(parse_quote!(())),
-                }
-            }
-
-            fn query(name: Ident) -> Self {
-                Self::new(name, HandlerKind::Query)
-            }
-
-            fn mutation(name: Ident) -> Self {
-                Self::new(name, HandlerKind::Mutation)
-            }
-
-            fn subscription(name: Ident) -> Self {
-                Self::new(name, HandlerKind::Subscription)
-            }
-
-            fn with_visibility(mut self, visibility: Visibility) -> Self {
-                self.visibility = visibility;
-                self
-            }
-
-            fn with_ctx_ty(mut self, ctx_ty: Option<Type>) -> Self {
-                self.ctx_ty = ctx_ty;
-                self
-            }
-
-            fn with_inputs(mut self, inputs: impl IntoIterator<Item = (Ident, Type)>) -> Self {
-                self.inputs = inputs.into_iter().collect();
-                self
-            }
-
-            fn with_return_ty(mut self, return_ty: HandlerReturn) -> Self {
-                self.return_ty = return_ty;
-                self
-            }
-        }
 
         #[rstest]
         #[case::simple_query(
@@ -443,25 +466,31 @@ mod test {
         use super::*;
 
         #[rstest]
-        #[case::empty(vec![], &[])]
-        #[case::single(vec![parse_quote!(n: usize)], &[(parse_quote!(n), parse_quote!(usize))])]
+        #[case::empty(&[], &[])]
+        #[case::single(&[parse_quote!(n: usize)], &[(parse_quote!(n), parse_quote!(usize))])]
         #[case::multiple(
-            vec![parse_quote!(n: usize), parse_quote!(name: String), parse_quote!(thing: bool)],
+            &[parse_quote!(n: usize), parse_quote!(name: String), parse_quote!(thing: bool)],
             &[(parse_quote!(n), parse_quote!(usize)), (parse_quote!(name), parse_quote!(String)), (parse_quote!(thing), parse_quote!(bool))]
         )]
-        #[case::type_path(vec![parse_quote!(value: some_crate::path::Type)], &[(parse_quote!(value), parse_quote!(some_crate::path::Type))])]
-        fn valid(#[case] inputs: Vec<FnArg>, #[case] expected: &[(Ident, Type)]) {
-            let inputs = process_inputs(inputs).unwrap();
+        #[case::type_path(&[parse_quote!(value: some_crate::path::Type)], &[(parse_quote!(value), parse_quote!(some_crate::path::Type))])]
+        fn valid<'a>(
+            #[case] inputs: impl IntoIterator<Item = &'a FnArg>,
+            #[case] expected: &[(Ident, Type)],
+        ) {
+            let inputs = process_inputs(inputs.into_iter()).unwrap();
             assert_eq!(inputs, expected);
         }
 
         #[rstest]
-        #[case::reject_self(vec![parse_quote!(self)], |e| matches!(e, InputError::SelfParameter(_)))]
-        #[case::reject_self_after_input(vec![parse_quote!(n: usize), parse_quote!(self)], |e| matches!(e, InputError::SelfParameter(_)))]
-        #[case::reject_wildcard(vec![parse_quote!(_: usize)], |e| matches!(e, InputError::Destructured(_)))]
-        #[case::reject_destructuring(vec![parse_quote!(SomeType { a, b }: SomeType)], |e| matches!(e, InputError::Destructured(_)))]
-        fn fail(#[case] inputs: Vec<FnArg>, #[case] err_check: fn(InputError) -> bool) {
-            let err = process_inputs(inputs).unwrap_err();
+        #[case::reject_self(&[parse_quote!(self)], |e| matches!(e, InputError::SelfParameter(_)))]
+        #[case::reject_self_after_input(&[parse_quote!(n: usize), parse_quote!(self)], |e| matches!(e, InputError::SelfParameter(_)))]
+        #[case::reject_wildcard(&[parse_quote!(_: usize)], |e| matches!(e, InputError::Destructured(_)))]
+        #[case::reject_destructuring(&[parse_quote!(SomeType { a, b }: SomeType)], |e| matches!(e, InputError::Destructured(_)))]
+        fn fail<'a>(
+            #[case] inputs: impl IntoIterator<Item = &'a FnArg>,
+            #[case] err_check: fn(InputError) -> bool,
+        ) {
+            let err = process_inputs(inputs.into_iter()).unwrap_err();
             assert!(err_check(err));
         }
     }
@@ -483,7 +512,7 @@ mod test {
             #[case] handler_kind: HandlerKind,
             #[case] expected: HandlerReturn,
         ) {
-            let return_ty = process_return_ty(return_ty, handler_kind).unwrap();
+            let return_ty = process_return_ty(&return_ty, handler_kind).unwrap();
             assert_eq!(return_ty, expected);
         }
 
@@ -499,7 +528,7 @@ mod test {
             #[case] handler_kind: HandlerKind,
             #[case] err_check: fn(ReturnTyError) -> bool,
         ) {
-            let err = process_return_ty(return_ty, handler_kind).unwrap_err();
+            let err = process_return_ty(&return_ty, handler_kind).unwrap_err();
             assert!(err_check(err));
         }
     }

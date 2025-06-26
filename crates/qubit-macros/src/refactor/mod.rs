@@ -1,7 +1,8 @@
 mod analyse;
+mod lower;
 mod parse;
 
-use self::{analyse::analyse, parse::parse};
+use self::{analyse::analyse, lower::lower, parse::parse};
 use proc_macro::TokenStream;
 use syn::Error;
 
@@ -19,6 +20,7 @@ fn handler_inner(
 ) -> Result<proc_macro2::TokenStream, Error> {
     let ast = parse(attrs, item)?;
     let model = analyse(ast)?;
+    let ir = lower(model);
 
     todo!()
 }
