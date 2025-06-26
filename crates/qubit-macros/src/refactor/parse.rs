@@ -1,20 +1,10 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use syn::{Error, Ident, ItemFn, LitStr, meta::ParseNestedMeta, spanned::Spanned};
 
+/// Parse the provided token streams into an AST.
 pub fn parse(tokens_attrs: TokenStream, tokens_item: TokenStream) -> Result<Ast, Error> {
     // Parse the attributes.
-    let attrs = {
-        let mut attrs = Attributes::builder();
-
-        let attrs_span = tokens_attrs.span();
-
-        let attrs_parser = syn::meta::parser(|meta| attrs.parse(meta));
-        syn::parse::Parser::parse2(attrs_parser, tokens_attrs)?;
-
-        attrs
-            .build()
-            .map_err(|e| Error::new(attrs_span, e.to_string()))?
-    };
+    let attrs = Attributes::parse(tokens_attrs)?;
 
     // Parse the handler.
     let handler = syn::parse2(tokens_item)?;
@@ -61,7 +51,7 @@ impl Attributes {
 
         let attrs_span = tokens.span();
 
-        let attrs_parser = syn::meta::parser(|meta| attrs.parse(meta));
+        let attrs_parser = syn::meta::parser(|meta| Ok(attrs.parse(meta)?));
         syn::parse::Parser::parse2(attrs_parser, tokens)?;
 
         attrs
@@ -72,28 +62,28 @@ impl Attributes {
 
 #[cfg(test)]
 impl Attributes {
-    fn query() -> Self {
+    pub(crate) fn query() -> Self {
         Self {
             kind: HandlerKind::Query,
             name: None,
         }
     }
 
-    fn mutation() -> Self {
+    pub(crate) fn mutation() -> Self {
         Self {
             kind: HandlerKind::Mutation,
             name: None,
         }
     }
 
-    fn subscription() -> Self {
+    pub(crate) fn subscription() -> Self {
         Self {
             kind: HandlerKind::Subscription,
             name: None,
         }
     }
 
-    fn with_name(mut self, name: impl AsRef<str>) -> Self {
+    pub(crate) fn with_name(mut self, name: impl AsRef<str>) -> Self {
         self.name = Some(Ident::new(name.as_ref(), proc_macro2::Span::call_site()));
         self
     }
@@ -113,16 +103,13 @@ impl AttributesBuilder {
         })
     }
 
-    fn parse(&mut self, meta: ParseNestedMeta) -> Result<(), Error> {
+    fn parse(&mut self, meta: ParseNestedMeta) -> Result<(), AttributesParseError> {
         if let Some(ident) = meta.path.get_ident() {
             // Try match the ident against a handler kind.
             if let Ok(kind) = HandlerKind::try_from(ident.to_string().as_str()) {
                 // Prevent redefining handler kind if it's already been passed.
                 if self.kind.is_some() {
-                    return Err(Error::new_spanned(
-                        ident,
-                        "handler kind has already been provided",
-                    ));
+                    return Err(AttributesParseError::KindProvided(ident.span()));
                 }
 
                 self.kind = Some(kind);
@@ -131,6 +118,8 @@ impl AttributesBuilder {
         }
 
         if meta.path.is_ident("name") {
+            let path_span = meta.path.span();
+
             // Fetch whatever is after the `=` (throwing an error if there isn't one).
             let value = meta.value()?;
 
@@ -142,14 +131,14 @@ impl AttributesBuilder {
 
             // Prevent redefining handler name if it's already been passed.
             if self.name.is_some() {
-                return Err(meta.error("handler name has already been provided"));
+                return Err(AttributesParseError::NameProvided(path_span));
             }
 
             self.name = Some(name);
             return Ok(());
         }
 
-        Err(meta.error("unsupported handler property"))
+        Err(AttributesParseError::UnsupportedProperty(meta.input.span()))
     }
 }
 
@@ -157,6 +146,32 @@ impl AttributesBuilder {
 pub enum AttributesBuilderError {
     #[error("`kind` attribute is required")]
     KindRequired,
+}
+
+#[derive(Clone, Debug, thiserror::Error)]
+pub enum AttributesParseError {
+    #[error("handler kind has already been provided")]
+    KindProvided(Span),
+    #[error("handler name has already been provided")]
+    NameProvided(Span),
+    #[error("unsupported handler property")]
+    UnsupportedProperty(Span),
+    #[error(transparent)]
+    ParseError(#[from] Error),
+}
+
+impl From<AttributesParseError> for Error {
+    fn from(err: AttributesParseError) -> Self {
+        Error::new(
+            match err {
+                AttributesParseError::KindProvided(span) => span,
+                AttributesParseError::NameProvided(span) => span,
+                AttributesParseError::UnsupportedProperty(span) => span,
+                AttributesParseError::ParseError(error) => return error,
+            },
+            err.to_string(),
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
