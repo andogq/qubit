@@ -1,8 +1,9 @@
+mod analyse;
 mod parse;
 
-use self::parse::parse;
+use self::{analyse::analyse, parse::parse};
 use proc_macro::TokenStream;
-use syn::{Error, ItemFn, Meta, Token, punctuated::Punctuated};
+use syn::Error;
 
 pub fn handler(attrs: TokenStream, item: TokenStream) -> TokenStream {
     match handler_inner(attrs.into(), item.into()) {
@@ -17,6 +18,7 @@ fn handler_inner(
     item: proc_macro2::TokenStream,
 ) -> Result<proc_macro2::TokenStream, Error> {
     let ast = parse(attrs, item)?;
+    let model = analyse(ast)?;
 
     todo!()
 }
