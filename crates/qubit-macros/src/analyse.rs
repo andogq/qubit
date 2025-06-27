@@ -1,7 +1,7 @@
-use proc_macro2::Span;
 use syn::{
-    Attribute, Block, Error, FnArg, Ident, ItemFn, Pat, PatIdent, ReturnType, Token, Type,
-    TypeImplTrait, Visibility, parse_quote, punctuated::Punctuated, spanned::Spanned,
+    parse_quote_spanned, punctuated::Punctuated, spanned::Spanned, Attribute, Block, Error, FnArg,
+    Ident, ItemFn, Pat, PatIdent, Receiver, ReturnType, Signature, Token, Type, TypeImplTrait,
+    Visibility,
 };
 
 use super::parse::{Ast, HandlerKind};
@@ -18,7 +18,7 @@ pub fn analyse(ast: Ast) -> Result<Model, AnalyseError> {
     // Assert that the handler is an async function.
     // TODO: Could this be relaxed?
     if ast.handler.sig.asyncness.is_none() {
-        return Err(AnalyseError::ExpectedAsyncHandler(ast.handler.span()));
+        return Err(AnalyseError::ExpectedAsyncHandler(Box::new(ast.handler.sig)));
     }
 
     let kind = ast.attrs.kind;
@@ -33,7 +33,7 @@ pub fn analyse(ast: Ast) -> Result<Model, AnalyseError> {
 
     // TODO: This complex analysis doesn't need to take place. This can be handled by trait
     // implementations that this code expands into.
-    let return_ty = process_return_ty(&ast.handler.sig.output, ast.attrs.kind)?;
+    let return_ty = process_return_ty(&ast.handler.sig, ast.attrs.kind)?;
 
     let implementation = ast.handler.into();
 
@@ -51,7 +51,7 @@ pub fn analyse(ast: Ast) -> Result<Model, AnalyseError> {
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum AnalyseError {
     #[error("handlers must be async")]
-    ExpectedAsyncHandler(Span),
+    ExpectedAsyncHandler(Box<Signature>),
     #[error(transparent)]
     Input(#[from] InputError),
     #[error(transparent)]
@@ -61,7 +61,9 @@ pub enum AnalyseError {
 impl From<AnalyseError> for Error {
     fn from(err: AnalyseError) -> Self {
         match err {
-            AnalyseError::ExpectedAsyncHandler(span) => Error::new(span, err.to_string()),
+            AnalyseError::ExpectedAsyncHandler(ref signature) => {
+                Error::new_spanned(signature, err.to_string())
+            }
             AnalyseError::Input(input_error) => input_error.into(),
             AnalyseError::ReturnTy(return_ty_error) => return_ty_error.into(),
         }
@@ -71,20 +73,17 @@ impl From<AnalyseError> for Error {
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum InputError {
     #[error("handlers cannot take `self` parameter")]
-    SelfParameter(Span),
+    SelfParameter(Receiver),
     #[error("destructured parameters are not supported in handlers")]
-    Destructured(Span),
+    Destructured(Box<Pat>),
 }
 
 impl From<InputError> for Error {
     fn from(err: InputError) -> Self {
-        Error::new(
-            match err {
-                InputError::SelfParameter(span) => span,
-                InputError::Destructured(span) => span,
-            },
-            err.to_string(),
-        )
+        match &err {
+            InputError::SelfParameter(receiver) => Error::new_spanned(receiver, err.to_string()),
+            InputError::Destructured(pat) => Error::new_spanned(pat, err.to_string()),
+        }
     }
 }
 
@@ -96,12 +95,12 @@ fn process_inputs<'a>(
             let arg = match arg {
                 FnArg::Typed(arg) => arg,
                 FnArg::Receiver(receiver) => {
-                    return Err(InputError::SelfParameter(receiver.span()));
+                    return Err(InputError::SelfParameter(receiver.clone()));
                 }
             };
 
             let Pat::Ident(PatIdent { ref ident, .. }) = *arg.pat else {
-                return Err(InputError::Destructured(arg.pat.span()));
+                return Err(InputError::Destructured(arg.pat.clone()));
             };
 
             Ok((ident.clone(), (*arg.ty).clone()))
@@ -112,53 +111,50 @@ fn process_inputs<'a>(
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum ReturnTyError {
     #[error("handler isn't a subscription, but a stream was returned")]
-    InvalidStream(Span),
+    InvalidStream(Box<Type>),
     #[error("a stream must be returned from a subscription")]
-    ExpectedStream(Span),
+    ExpectedStream(Box<Signature>),
 }
 
 impl From<ReturnTyError> for Error {
     fn from(err: ReturnTyError) -> Self {
-        Error::new(
-            match err {
-                ReturnTyError::InvalidStream(span) => span,
-                ReturnTyError::ExpectedStream(span) => span,
-            },
-            err.to_string(),
-        )
+        match &err {
+            ReturnTyError::InvalidStream(ty) => Error::new_spanned(ty, err.to_string()),
+            ReturnTyError::ExpectedStream(signature) => {
+                Error::new_spanned(signature, err.to_string())
+            }
+        }
     }
 }
 
 fn process_return_ty(
-    return_ty: &ReturnType,
+    signature: &Signature,
     handler_kind: HandlerKind,
 ) -> Result<HandlerReturn, ReturnTyError> {
-    let handler_return = match return_ty {
-        ReturnType::Default => HandlerReturn::Return(parse_quote! { () }),
-        ReturnType::Type(_, ty) => match &**ty {
+    match handler_kind {
+        HandlerKind::Query | HandlerKind::Mutation => {
+            let ty = match &signature.output {
+                ReturnType::Type(_, ty) if matches!(**ty, Type::ImplTrait(_)) => {
+                    return Err(ReturnTyError::InvalidStream(ty.clone()));
+                }
+                ReturnType::Type(_, ty) => *ty.clone(),
+                ReturnType::Default => parse_quote_spanned!(signature.output.span() => ()),
+            };
+
+            Ok(HandlerReturn::Return(ty))
+        }
+        HandlerKind::Subscription => {
             // BUG: Assuming that any trait implementation is a stream, which definitely isn't
             // the case.
-            Type::ImplTrait(TypeImplTrait { bounds, .. }) => {
-                HandlerReturn::Stream(parse_quote! { <dyn #bounds as ::futures::Stream>::Item })
+            if let ReturnType::Type(_, ty) = &signature.output {
+                if let Type::ImplTrait(TypeImplTrait { ref bounds, .. }) = **ty {
+                    return Ok(HandlerReturn::Stream(
+                        parse_quote_spanned! { ty.span() => <dyn #bounds as ::futures::Stream>::Item },
+                    ));
+                }
             }
-            // All other return types will be treated as a regular return type.
-            return_type => HandlerReturn::Return(return_type.clone()),
-        },
-    };
 
-    match (&handler_return, handler_kind) {
-        // Valid case, return type matches with handler annotation
-        (HandlerReturn::Stream(_), HandlerKind::Subscription)
-        | (HandlerReturn::Return(_), HandlerKind::Query | HandlerKind::Mutation) => {
-            Ok(handler_return)
-        }
-
-        // Mismatches
-        (HandlerReturn::Stream(_), HandlerKind::Query | HandlerKind::Mutation) => {
-            Err(ReturnTyError::InvalidStream(return_ty.span()))
-        }
-        (HandlerReturn::Return(_), HandlerKind::Subscription) => {
-            Err(ReturnTyError::ExpectedStream(return_ty.span()))
+            Err(ReturnTyError::ExpectedStream(Box::new(signature.clone())))
         }
     }
 }
@@ -236,7 +232,7 @@ mod test {
     use super::*;
 
     use rstest::*;
-    use syn::Signature;
+    use syn::parse_quote;
 
     use crate::parse::Attributes;
 
@@ -521,7 +517,8 @@ mod test {
             #[case] handler_kind: HandlerKind,
             #[case] expected: HandlerReturn,
         ) {
-            let return_ty = process_return_ty(&return_ty, handler_kind).unwrap();
+            let return_ty =
+                process_return_ty(&parse_quote!(fn my_handler() #return_ty), handler_kind).unwrap();
             assert_eq!(return_ty, expected);
         }
 
@@ -537,7 +534,8 @@ mod test {
             #[case] handler_kind: HandlerKind,
             #[case] err_check: fn(ReturnTyError) -> bool,
         ) {
-            let err = process_return_ty(&return_ty, handler_kind).unwrap_err();
+            let err = process_return_ty(&parse_quote!(fn my_handler() #return_ty), handler_kind)
+                .unwrap_err();
             assert!(err_check(err));
         }
     }

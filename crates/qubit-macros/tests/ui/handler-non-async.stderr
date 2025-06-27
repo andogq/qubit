@@ -1,0 +1,5 @@
+error: handlers must be async
+ --> tests/ui/handler-non-async.rs:4:1
+  |
+4 | fn my_handler() {}
+  | ^^^^^^^^^^^^^^^

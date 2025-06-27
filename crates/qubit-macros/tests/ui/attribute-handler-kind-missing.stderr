@@ -1,0 +1,7 @@
+error: one of `query`/`mutation`/`subscription` is required
+ --> tests/ui/attribute-handler-kind-missing.rs:3:1
+  |
+3 | #[handler]
+  | ^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `handler` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -1,0 +1,5 @@
+error: a stream must be returned from a subscription
+ --> tests/ui/handler-output-subscription-no-output.rs:4:1
+  |
+4 | async fn my_handler() {}
+  | ^^^^^^^^^^^^^^^^^^^^^

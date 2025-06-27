@@ -1,0 +1,5 @@
+error: handler isn't a subscription, but a stream was returned
+ --> tests/ui/handler-output-non-subscription-stream.rs:4:26
+  |
+4 | async fn my_handler() -> impl Stream<Item = u32> {}
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^
