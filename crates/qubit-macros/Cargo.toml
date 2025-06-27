@@ -17,3 +17,4 @@ ts-rs = "10.1.0"
 
 [dev-dependencies]
 rstest = "0.25.0"
+trybuild = "1.0.105"
