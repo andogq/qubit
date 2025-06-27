@@ -52,6 +52,7 @@ jobs:
       matrix:
         dir:
           - '.'
+          - crates/qubit-macros
           - examples/authentication
           - examples/chaos
           - examples/chat-room-react/src-rust
@@ -64,4 +65,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: cargo clippy
+        working-directory: ${{ matrix.dir }}
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        dir:
+          - '.'
+          - crates/qubit-macros
+
+    env:
+      RUSTFLAGS: "-Dwarnings" # Fail on warnings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo test
         working-directory: ${{ matrix.dir }}
