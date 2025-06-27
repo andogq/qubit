@@ -155,7 +155,13 @@ fn process_return_ty(
 
         // Mismatches
         (HandlerReturn::Stream(_), HandlerKind::Query | HandlerKind::Mutation) => {
-            Err(ReturnTyError::InvalidStream(return_ty.span()))
+            // Try pull out a better span for diagnostics.
+            let span = match return_ty {
+                ReturnType::Type(_, ty) => ty.span(),
+                _ => return_ty.span(),
+            };
+
+            Err(ReturnTyError::InvalidStream(span))
         }
         (HandlerReturn::Return(_), HandlerKind::Subscription) => {
             Err(ReturnTyError::ExpectedStream(return_ty.span()))
