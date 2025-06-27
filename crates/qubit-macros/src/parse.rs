@@ -144,7 +144,7 @@ impl AttributesBuilder {
 
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum AttributesBuilderError {
-    #[error("`kind` attribute is required")]
+    #[error("one of `query`/`mutation`/`subscription` is required")]
     KindRequired,
 }
 
