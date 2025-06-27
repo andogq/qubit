@@ -2,4 +2,4 @@ error: destructured parameters are not supported in handlers
  --> tests/ui/handler-input-destructuring.rs:4:21
   |
 4 | async fn my_handler(MyStruct { a, b }: MyStruct) {}
-  |                     ^^^^^^^^
+  |                     ^^^^^^^^^^^^^^^^^
