@@ -1,0 +1,5 @@
+error: unknown attribute
+ --> tests/ui/attribute-unknown.rs:3:18
+  |
+3 | #[handler(query, random_attribute)]
+  |                  ^^^^^^^^^^^^^^^^

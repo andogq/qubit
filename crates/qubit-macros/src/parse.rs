@@ -138,7 +138,7 @@ impl AttributesBuilder {
             return Ok(());
         }
 
-        Err(AttributesParseError::UnsupportedProperty(meta.input.span()))
+        Err(AttributesParseError::UnsupportedProperty(meta.path.span()))
     }
 }
 
@@ -154,7 +154,7 @@ pub enum AttributesParseError {
     KindProvided(Span),
     #[error("handler name has already been provided")]
     NameProvided(Span),
-    #[error("unsupported handler property")]
+    #[error("unknown attribute")]
     UnsupportedProperty(Span),
     #[error(transparent)]
     ParseError(#[from] Error),
