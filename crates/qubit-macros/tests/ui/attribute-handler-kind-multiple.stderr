@@ -1,0 +1,5 @@
+error: handler kind has already been provided
+ --> tests/ui/attribute-handler-kind-multiple.rs:3:18
+  |
+3 | #[handler(query, subscription)]
+  |                  ^^^^^^^^^^^^

@@ -1,0 +1,5 @@
+error: handler name has already been provided
+ --> tests/ui/attribute-name-duplicated.rs:3:42
+  |
+3 | #[handler(query, name = "other_handler", name = "other_handler")]
+  |                                          ^^^^

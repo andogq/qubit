@@ -1,0 +1,5 @@
+error: handlers cannot take `self` parameter
+ --> tests/ui/handler-input-self.rs:4:21
+  |
+4 | async fn my_handler(self) {}
+  |                     ^^^^
