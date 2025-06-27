@@ -146,6 +146,12 @@ fn process_return_ty(
         },
     };
 
+    // Try pull out a better span for diagnostics.
+    let span = match return_ty {
+        ReturnType::Type(_, ty) => ty.span(),
+        _ => return_ty.span(),
+    };
+
     match (&handler_return, handler_kind) {
         // Valid case, return type matches with handler annotation
         (HandlerReturn::Stream(_), HandlerKind::Subscription)
@@ -155,16 +161,10 @@ fn process_return_ty(
 
         // Mismatches
         (HandlerReturn::Stream(_), HandlerKind::Query | HandlerKind::Mutation) => {
-            // Try pull out a better span for diagnostics.
-            let span = match return_ty {
-                ReturnType::Type(_, ty) => ty.span(),
-                _ => return_ty.span(),
-            };
-
             Err(ReturnTyError::InvalidStream(span))
         }
         (HandlerReturn::Return(_), HandlerKind::Subscription) => {
-            Err(ReturnTyError::ExpectedStream(return_ty.span()))
+            Err(ReturnTyError::ExpectedStream(span))
         }
     }
 }
