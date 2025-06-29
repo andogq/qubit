@@ -1,5 +1,15 @@
 # Changelog
 
+## \[1.0.0]
+
+- [`91b3375`](https://github.com/andogq/qubit/commit/91b3375ffbe941007973689b96ba6e7da3a2fb2e) Generate better spans for errors in the `handler` macro, including UI tests to verify error
+  messages.
+- [`cd128d6`](https://github.com/andogq/qubit/commit/cd128d66d17913bb6dbfa97a3cdcb3e9e55b8f64) No longer require handlers to be `async`. The macro will automatically convert all handlers into
+  async functions upon expansion.
+- [`c4cd986`](https://github.com/andogq/qubit/commit/c4cd986bbfca64299e1a028726cf55a25f10c9fb) Rewrite `handler` macro to be easier to maintain and test. This isn't inherently a breaking change,
+  however there's no guarentee that the previous implementation wasn't broken or inconsistent in some
+  way.
+
 ## \[0.6.5]
 
 - [`a5f1638`](https://github.com/andogq/qubit/commit/a5f1638e4a21c9f5fd4e7d1dfa740f5522753e99) Update Axum to 0.8, and other dependencies (#94, thanks @epatters).
