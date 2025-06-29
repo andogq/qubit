@@ -19,7 +19,6 @@ pub fn codegen(ir: Ir) -> TokenStream {
             Implementation {
                 block: impl_block,
                 attrs: impl_attrs,
-                asyncness: impl_asyncness,
                 inputs: impl_inputs,
                 output: impl_output,
             },
@@ -68,7 +67,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
 
             fn register(rpc_builder: ::qubit::RpcBuilder<#inner_ctx_ty>) -> ::qubit::RpcBuilder<#inner_ctx_ty> {
                 #(#impl_attrs)*
-                #impl_asyncness fn handler(#impl_inputs) #impl_output #impl_block
+                async fn handler(#impl_inputs) #impl_output #impl_block
 
                 rpc_builder.#register_method(
                     #(#register_params,)*
