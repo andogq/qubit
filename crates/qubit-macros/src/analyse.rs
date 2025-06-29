@@ -15,12 +15,6 @@ pub fn analyse(ast: Ast) -> Result<Model, AnalyseError> {
         .unwrap_or(&ast.handler.sig.ident)
         .clone();
 
-    // Assert that the handler is an async function.
-    // TODO: Could this be relaxed?
-    if ast.handler.sig.asyncness.is_none() {
-        return Err(AnalyseError::ExpectedAsyncHandler(Box::new(ast.handler.sig)));
-    }
-
     let kind = ast.attrs.kind;
 
     let visibility = ast.handler.vis.clone();
@@ -50,8 +44,6 @@ pub fn analyse(ast: Ast) -> Result<Model, AnalyseError> {
 
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum AnalyseError {
-    #[error("handlers must be async")]
-    ExpectedAsyncHandler(Box<Signature>),
     #[error(transparent)]
     Input(#[from] InputError),
     #[error(transparent)]
@@ -61,9 +53,6 @@ pub enum AnalyseError {
 impl From<AnalyseError> for Error {
     fn from(err: AnalyseError) -> Self {
         match err {
-            AnalyseError::ExpectedAsyncHandler(ref signature) => {
-                Error::new_spanned(signature, err.to_string())
-            }
             AnalyseError::Input(input_error) => input_error.into(),
             AnalyseError::ReturnTy(return_ty_error) => return_ty_error.into(),
         }
@@ -192,8 +181,6 @@ pub struct Implementation {
     /// Attributes attached to the function.
     pub attrs: Vec<Attribute>,
 
-    /// Optional async keyword attached to the function.
-    pub asyncness: Option<Token![async]>,
     /// Input parameters for the function.
     pub inputs: Punctuated<FnArg, Token![,]>,
     /// Return type of the function.
@@ -206,7 +193,6 @@ impl From<ItemFn> for Implementation {
             block: *item.block,
             attrs: item.attrs,
 
-            asyncness: item.sig.asyncness,
             inputs: item.sig.inputs,
             output: item.sig.output,
         }
@@ -432,11 +418,6 @@ mod test {
         }
 
         #[rstest]
-        #[case::not_async(
-            Attributes::query(),
-            parse_quote!(fn my_handler()),
-            |e| matches!(e, AnalyseError::ExpectedAsyncHandler(_)),
-        )]
         #[case::self_param(
             Attributes::query(),
             parse_quote!(async fn my_handler(self)),
