@@ -1,5 +1,15 @@
 # Changelog
 
+## \[1.0.0]
+
+- [`c4cd986`](https://github.com/andogq/qubit/commit/c4cd986bbfca64299e1a028726cf55a25f10c9fb) Rewrite `handler` macro to be easier to maintain and test. This isn't inherently a breaking change,
+  however there's no guarentee that the previous implementation wasn't broken or inconsistent in some
+  way.
+
+### Dependencies
+
+- Upgraded to `qubit-macros@1.0.0`
+
 ## \[0.10.3]
 
 - [`a5f1638`](https://github.com/andogq/qubit/commit/a5f1638e4a21c9f5fd4e7d1dfa740f5522753e99) Update Axum to 0.8, and other dependencies (#94, thanks @epatters).
