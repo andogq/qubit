@@ -13,7 +13,6 @@ proc-macro2 = "1.0.95"
 quote = "1.0.40"
 syn = "2.0.101"
 thiserror = "2.0.12"
-ts-rs = "10.1.0"
 
 [dev-dependencies]
 rstest = "0.25.0"
