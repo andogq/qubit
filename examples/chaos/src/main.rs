@@ -74,7 +74,7 @@ mod user {
 
     pub fn create_router() -> Router<AppCtx> {
         Router::new()
-            .handler(someHandler)
+            .handler(get)
             .handler(create)
             .handler(list)
             .handler(nested::asdf)
