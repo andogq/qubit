@@ -1,9 +1,9 @@
-use futures::{stream, Stream};
+use futures::{Stream, stream};
 use serde::Serialize;
 use tokio::sync::mpsc;
-use ts_rs::TS;
 
-#[derive(Clone, Serialize, TS)]
+#[derive(Clone, Serialize)]
+#[qubit::ts]
 pub struct ChatMessage {
     user: char,
     content: String,

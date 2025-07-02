@@ -733,6 +733,7 @@ dependencies = [
  "syn",
  "thiserror 2.0.12",
  "trybuild",
+ "ts-rs-macros",
 ]
 
 [[package]]

@@ -153,7 +153,6 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "tokio",
- "ts-rs 10.1.0",
 ]
 
 [[package]]
@@ -534,12 +533,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lazy_static"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
-
-[[package]]
 name = "libc"
 version = "0.2.172"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -709,7 +702,7 @@ dependencies = [
  "tokio",
  "tower",
  "trait-variant",
- "ts-rs 11.0.1",
+ "ts-rs",
  "urlencoding",
 ]
 
@@ -721,6 +714,7 @@ dependencies = [
  "quote",
  "syn",
  "thiserror 2.0.12",
+ "ts-rs-macros",
 ]
 
 [[package]]
@@ -1162,35 +1156,12 @@ dependencies = [
 
 [[package]]
 name = "ts-rs"
-version = "10.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e640d9b0964e9d39df633548591090ab92f7a4567bc31d3891af23471a3365c6"
-dependencies = [
- "lazy_static",
- "thiserror 2.0.12",
- "ts-rs-macros 10.1.0",
-]
-
-[[package]]
-name = "ts-rs"
 version = "11.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ef1b7a6d914a34127ed8e1fa927eb7088903787bcded4fa3eef8f85ee1568be"
 dependencies = [
  "thiserror 2.0.12",
- "ts-rs-macros 11.0.1",
-]
-
-[[package]]
-name = "ts-rs-macros"
-version = "10.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e9d8656589772eeec2cf7a8264d9cda40fb28b9bc53118ceb9e8c07f8f38730"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
- "termcolor",
+ "ts-rs-macros",
 ]
 
 [[package]]

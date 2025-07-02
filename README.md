@@ -42,7 +42,6 @@ focus on building amazing applications.
 [dependencies]
 qubit = "0.6.1"
 
-ts-rs = "8.1.0" # Required to generate TS types
 serde = { version = "1.0", features = ["derive"] } # Required for serialisable types
 futures = "0.3.30" # Required for streaming functionality
 
