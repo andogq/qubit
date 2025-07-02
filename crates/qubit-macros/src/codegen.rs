@@ -9,6 +9,7 @@ use super::lower::Ir;
 pub fn codegen(ir: Ir) -> TokenStream {
     let Ir {
         name,
+        rpc_name,
         visibility,
         ctx_ty,
         inner_ctx_ty,
@@ -59,7 +60,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
         {
             fn get_type() -> ::qubit::HandlerType {
                 ::qubit::HandlerType {
-                    name: ::std::stringify!(#name).to_string(),
+                    name: #rpc_name.to_string(),
                     signature: #ts_type,
                     kind: #handler_kind_str.to_string(),
                 }

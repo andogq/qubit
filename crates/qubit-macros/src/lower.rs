@@ -13,7 +13,8 @@ pub fn lower(model: Model) -> Ir {
     let ctx_ident: Ident = parse_quote! { ctx };
 
     Ir {
-        name: model.name.clone(),
+        name: model.name,
+        rpc_name: model.rpc_name.clone(),
         visibility: model.visibility,
 
         // Use the user's ctx, or Qubit's ctx if not provided.
@@ -48,7 +49,7 @@ pub fn lower(model: Model) -> Ir {
             HandlerKind::Subscription => parse_quote!(subscription),
         },
         register_params: {
-            let name = model.name.to_string();
+            let name = model.rpc_name;
 
             let params = match model.kind {
                 HandlerKind::Query | HandlerKind::Mutation => &[name] as &[String],
@@ -87,6 +88,8 @@ pub fn lower(model: Model) -> Ir {
 pub struct Ir {
     /// Handler name.
     pub name: Ident,
+    /// Name of the RPC method.
+    pub rpc_name: String,
     /// Visibility provided by the user.
     pub visibility: Visibility,
 
@@ -133,6 +136,7 @@ mod test {
     #[derive(Clone)]
     struct IrAssertion {
         name: Ident,
+        rpc_name: String,
         ctx_ty: Type,
         parse_params: Option<Vec<(Ident, Type)>>,
         handler_params: Vec<Ident>,
@@ -145,6 +149,7 @@ mod test {
     impl IrAssertion {
         fn new(
             name: Ident,
+            rpc_name: impl ToString,
             register_method: Ident,
             register_params: Vec<Expr>,
             qubit_type: Path,
@@ -152,6 +157,7 @@ mod test {
         ) -> Self {
             Self {
                 name,
+                rpc_name: rpc_name.to_string(),
                 ctx_ty: parse_quote! { __internal_AppCtx },
                 parse_params: None,
                 handler_params: Vec::new(),
@@ -162,37 +168,40 @@ mod test {
             }
         }
 
-        fn query(name: impl AsRef<str>) -> Self {
-            let name = name.as_ref();
+        fn query(name: impl AsRef<str>, rpc_name: impl AsRef<str>) -> Self {
+            let rpc_name = rpc_name.as_ref();
             Self::new(
-                Ident::new(name, Span::call_site()),
+                Ident::new(name.as_ref(), Span::call_site()),
+                rpc_name,
                 parse_quote!(query),
-                vec![parse_quote!(#name)],
+                vec![parse_quote!(#rpc_name)],
                 parse_quote!(::qubit::ty::util::QubitType::Query),
                 "Query".to_string(),
             )
         }
 
-        fn mutation(name: impl AsRef<str>) -> Self {
-            let name = name.as_ref();
+        fn mutation(name: impl AsRef<str>, rpc_name: impl AsRef<str>) -> Self {
+            let rpc_name = rpc_name.as_ref();
             Self::new(
-                Ident::new(name, Span::call_site()),
+                Ident::new(name.as_ref(), Span::call_site()),
+                rpc_name,
                 parse_quote!(mutation),
-                vec![parse_quote!(#name)],
+                vec![parse_quote!(#rpc_name)],
                 parse_quote!(::qubit::ty::util::QubitType::Mutation),
                 "Mutation".to_string(),
             )
         }
 
-        fn subscription(name: impl AsRef<str>) -> Self {
-            let name = name.as_ref();
+        fn subscription(name: impl AsRef<str>, rpc_name: impl AsRef<str>) -> Self {
+            let rpc_name = rpc_name.as_ref();
             Self::new(
-                Ident::new(name, Span::call_site()),
+                Ident::new(name.as_ref(), Span::call_site()),
+                rpc_name,
                 parse_quote!(subscription),
                 [
-                    name.to_string(),
-                    format!("{name}_notif"),
-                    format!("{name}_unsub"),
+                    rpc_name.to_string(),
+                    format!("{rpc_name}_notif"),
+                    format!("{rpc_name}_unsub"),
                 ]
                 .into_iter()
                 .map(|lit| Expr::Lit(parse_quote!(#lit)))
@@ -224,20 +233,20 @@ mod test {
     #[rstest]
     #[case::simple_query(
         ModelAssertion::query(parse_quote!(my_handler)),
-        IrAssertion::query("my_handler")
+        IrAssertion::query("my_handler", "my_handler")
     )]
     #[case::simple_mutation(
         ModelAssertion::mutation(parse_quote!(my_handler)),
-        IrAssertion::mutation("my_handler")
+        IrAssertion::mutation("my_handler", "my_handler")
     )]
     #[case::simple_subscription(
         ModelAssertion::subscription(parse_quote!(my_handler)),
-        IrAssertion::subscription("my_handler")
+        IrAssertion::subscription("my_handler", "my_handler")
     )]
     #[case::user_ctx(
         ModelAssertion::query(parse_quote!(my_handler))
             .with_ctx_ty(Some(parse_quote!(MyCtx))),
-        IrAssertion::query("my_handler")
+        IrAssertion::query("my_handler", "my_handler")
             .with_ctx_ty(parse_quote!(MyCtx))
             .with_handler_params([parse_quote!(ctx)])
     )]
@@ -245,10 +254,15 @@ mod test {
         ModelAssertion::query(parse_quote!(my_handler))
             .with_ctx_ty(Some(parse_quote!(MyCtx)))
             .with_inputs([(parse_quote!(param_a), parse_quote!(usize)), (parse_quote!(param_b), parse_quote!(String))]),
-        IrAssertion::query("my_handler")
+        IrAssertion::query("my_handler", "my_handler")
             .with_ctx_ty(parse_quote!(MyCtx))
             .with_parse_params([(parse_quote!(param_a), parse_quote!(usize)), (parse_quote!(param_b), parse_quote!(String))])
             .with_handler_params([parse_quote!(ctx), parse_quote!(param_a), parse_quote!(param_b)])
+    )]
+    #[case::rename_handler(
+        ModelAssertion::query(parse_quote!(my_handler))
+            .with_rpc_name("other_name"),
+        IrAssertion::query("my_handler", "other_name")
     )]
     fn valid(#[case] model: ModelAssertion, #[case] expected: IrAssertion) {
         let name = model.name;
@@ -258,6 +272,7 @@ mod test {
         };
         let model = Model {
             name,
+            rpc_name: model.rpc_name,
             kind: model.kind,
             visibility: model.visibility,
             ctx_ty: model.ctx_ty,
@@ -269,6 +284,7 @@ mod test {
         let ir = lower(model);
 
         assert_eq!(ir.name, expected.name);
+        assert_eq!(ir.rpc_name, expected.rpc_name);
         assert_eq!(ir.ctx_ty, expected.ctx_ty);
         assert_eq!(ir.parse_params, expected.parse_params);
         assert_eq!(ir.handler_params, expected.handler_params);
