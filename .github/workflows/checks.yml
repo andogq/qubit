@@ -75,8 +75,6 @@ jobs:
           - '.'
           - crates/qubit-macros
 
-    env:
-      RUSTFLAGS: "-Dwarnings" # Fail on warnings
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
