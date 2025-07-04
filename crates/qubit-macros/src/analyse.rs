@@ -1,19 +1,20 @@
 use syn::{
-    parse_quote_spanned, punctuated::Punctuated, spanned::Spanned, Attribute, Block, Error, FnArg,
-    Ident, ItemFn, Pat, PatIdent, Receiver, ReturnType, Signature, Token, Type, TypeImplTrait,
-    Visibility,
+    Attribute, Block, Error, FnArg, Ident, ItemFn, Pat, PatIdent, Receiver, ReturnType, Signature,
+    Token, Type, TypeImplTrait, Visibility, parse_quote_spanned, punctuated::Punctuated,
+    spanned::Spanned,
 };
 
 use super::parse::{Ast, HandlerKind};
 
 pub fn analyse(ast: Ast) -> Result<Model, AnalyseError> {
-    // Determine the name of the handler.
-    let name = ast
+    // name of the handler.
+    let name = ast.handler.sig.ident.clone();
+
+    // Determine the name of the RPC method.
+    let rpc_name = ast
         .attrs
         .name
-        .as_ref()
-        .unwrap_or(&ast.handler.sig.ident)
-        .clone();
+        .unwrap_or_else(|| ast.handler.sig.ident.to_string());
 
     let kind = ast.attrs.kind;
 
@@ -33,6 +34,7 @@ pub fn analyse(ast: Ast) -> Result<Model, AnalyseError> {
 
     Ok(Model {
         name,
+        rpc_name,
         kind,
         visibility,
         ctx_ty,
@@ -153,6 +155,9 @@ pub struct Model {
     /// Handler name.
     pub name: Ident,
 
+    /// Identifier of the RPC method.
+    pub rpc_name: String,
+
     /// Kind of the handler.
     pub kind: HandlerKind,
 
@@ -225,6 +230,7 @@ mod test {
     #[derive(Clone)]
     pub struct ModelAssertion {
         pub name: Ident,
+        pub rpc_name: String,
         pub kind: HandlerKind,
         pub visibility: Visibility,
         pub ctx_ty: Option<Type>,
@@ -235,6 +241,7 @@ mod test {
     impl ModelAssertion {
         pub fn new(name: Ident, kind: HandlerKind) -> Self {
             Self {
+                rpc_name: name.to_string(),
                 name,
                 kind,
                 visibility: Visibility::Inherited,
@@ -254,6 +261,11 @@ mod test {
 
         pub fn subscription(name: Ident) -> Self {
             Self::new(name, HandlerKind::Subscription)
+        }
+
+        pub fn with_rpc_name(mut self, rpc_name: impl ToString) -> Self {
+            self.rpc_name = rpc_name.to_string();
+            self
         }
 
         pub fn with_visibility(mut self, visibility: Visibility) -> Self {
@@ -298,7 +310,8 @@ mod test {
             Attributes::query().with_name("other_name"),
             parse_quote!(),
             parse_quote!(async fn my_handler()),
-            ModelAssertion::query(parse_quote!(other_name))
+            ModelAssertion::query(parse_quote!(my_handler))
+                .with_rpc_name("other_name")
         )]
         #[case::visibility_pub(
             Attributes::query(),
@@ -362,7 +375,8 @@ mod test {
             Attributes::query().with_name("other_name"),
             parse_quote!(pub(in crate::some::path)),
             parse_quote!(async fn my_handler(ctx: usize, param_a: String, param_b: bool) -> f64),
-            ModelAssertion::query(parse_quote!(other_name))
+            ModelAssertion::query(parse_quote!(my_handler))
+                .with_rpc_name("other_name")
                 .with_visibility(parse_quote!(pub(in crate::some::path)))
                 .with_ctx_ty(Some(parse_quote!(usize)))
                 .with_inputs([
@@ -375,7 +389,8 @@ mod test {
             Attributes::mutation().with_name("other_name"),
             parse_quote!(pub(in crate::some::path)),
             parse_quote!(async fn my_handler(ctx: usize, param_a: String, param_b: bool) -> f64),
-            ModelAssertion::mutation(parse_quote!(other_name))
+            ModelAssertion::mutation(parse_quote!(my_handler))
+                .with_rpc_name("other_name")
                 .with_visibility(parse_quote!(pub(in crate::some::path)))
                 .with_ctx_ty(Some(parse_quote!(usize)))
                 .with_inputs([
@@ -388,7 +403,8 @@ mod test {
             Attributes::subscription().with_name("other_name"),
             parse_quote!(pub(in crate::some::path)),
             parse_quote!(async fn my_handler(ctx: usize, param_a: String, param_b: bool) -> impl Stream<Item = f64>),
-            ModelAssertion::subscription(parse_quote!(other_name))
+            ModelAssertion::subscription(parse_quote!(my_handler))
+                .with_rpc_name("other_name")
                 .with_visibility(parse_quote!(pub(in crate::some::path)))
                 .with_ctx_ty(Some(parse_quote!(usize)))
                 .with_inputs([
@@ -410,6 +426,7 @@ mod test {
             .unwrap();
 
             assert_eq!(model.name, expected.name);
+            assert_eq!(model.rpc_name, expected.rpc_name);
             assert_eq!(model.kind, expected.kind);
             assert_eq!(model.visibility, expected.visibility);
             assert_eq!(model.ctx_ty, expected.ctx_ty);

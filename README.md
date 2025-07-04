@@ -42,7 +42,6 @@ focus on building amazing applications.
 [dependencies]
 qubit = "0.6.1"
 
-ts-rs = "8.1.0" # Required to generate TS types
 serde = { version = "1.0", features = ["derive"] } # Required for serialisable types
 futures = "0.3.30" # Required for streaming functionality
 
@@ -110,6 +109,26 @@ console.log("received from server:", message);
 ## Examples
 
 Checkout all the examples in the [`examples`](./examples) directory.
+
+## Cargo Features
+
+| Feature            | Description                                                                                                                               |
+|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| `ts-format`        | Format generated TypeScript types. *Note:* This adds a lot of dependencies.                                                               |
+| `ts-esm`           | Ensure `import` statements conform with the ES Modules spec by appending `.js` to paths. This likely isn't needed if a bundler is in use. |
+| `ts-serde-json`    | Add TypeScript support for `serde_json`.                                                                                                  |
+| `ts-chrono`        | Add TypeScript support for `chrono`.                                                                                                      |
+| `ts-bigdecimal`    | Add TypeScript support for `bigdecimal`.                                                                                                  |
+| `ts-url`           | Add TypeScript support for `url`.                                                                                                         |
+| `ts-uuid`          | Add TypeScript support for `uuid`.                                                                                                        |
+| `ts-bson-uuid`     | Add TypeScript support for `bson-uuid`.                                                                                                   |
+| `ts-bytes`         | Add TypeScript support for `bytes`.                                                                                                       |
+| `ts-indexmap`      | Add TypeScript support for `indexmap`.                                                                                                    |
+| `ts-ordered-float` | Add TypeScript support for `ordered-float`.                                                                                               |
+| `ts-heapless`      | Add TypeScript support for `heapless`.                                                                                                    |
+| `ts-semver`        | Add TypeScript support for `semver`.                                                                                                      |
+| `ts-smol-str`      | Add TypeScript support for `smol_str`.                                                                                                    |
+| `ts-tokio`         | Add TypeScript support for `tokio`.                                                                                                       |
 
 ## FAQs
 

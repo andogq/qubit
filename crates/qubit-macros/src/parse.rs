@@ -1,5 +1,5 @@
 use proc_macro2::{Span, TokenStream};
-use syn::{Error, Ident, ItemFn, LitStr, meta::ParseNestedMeta, spanned::Spanned};
+use syn::{Error, ItemFn, LitStr, meta::ParseNestedMeta, spanned::Spanned};
 
 /// Parse the provided token streams into an AST.
 pub fn parse(tokens_attrs: TokenStream, tokens_item: TokenStream) -> Result<Ast, Error> {
@@ -34,7 +34,7 @@ impl Ast {
 #[cfg_attr(test, derive(Eq, PartialEq))]
 pub struct Attributes {
     /// Overriden name for the handler.
-    pub name: Option<Ident>,
+    pub name: Option<String>,
 
     /// Kind of the handler.
     pub kind: HandlerKind,
@@ -84,14 +84,14 @@ impl Attributes {
     }
 
     pub(crate) fn with_name(mut self, name: impl AsRef<str>) -> Self {
-        self.name = Some(Ident::new(name.as_ref(), proc_macro2::Span::call_site()));
+        self.name = Some(name.as_ref().to_string());
         self
     }
 }
 
 #[derive(Clone, Debug, Default)]
 struct AttributesBuilder {
-    name: Option<Ident>,
+    name: Option<String>,
     kind: Option<HandlerKind>,
 }
 
@@ -124,10 +124,7 @@ impl AttributesBuilder {
             let value = meta.value()?;
 
             // Parse as a string (surrounded in quotes).
-            let lit = value.parse::<LitStr>()?;
-
-            // Parse the contents of the string as an ident.
-            let name = lit.parse()?;
+            let name = value.parse::<LitStr>()?.value();
 
             // Prevent redefining handler name if it's already been passed.
             if self.name.is_some() {

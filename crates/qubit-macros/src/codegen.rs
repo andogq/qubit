@@ -9,6 +9,7 @@ use super::lower::Ir;
 pub fn codegen(ir: Ir) -> TokenStream {
     let Ir {
         name,
+        rpc_name,
         visibility,
         ctx_ty,
         inner_ctx_ty,
@@ -59,7 +60,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
         {
             fn get_type() -> ::qubit::HandlerType {
                 ::qubit::HandlerType {
-                    name: ::std::stringify!(#name).to_string(),
+                    name: #rpc_name.to_string(),
                     signature: #ts_type,
                     kind: #handler_kind_str.to_string(),
                 }
@@ -80,7 +81,7 @@ pub fn codegen(ir: Ir) -> TokenStream {
                 )
             }
 
-            fn export_all_dependencies_to(out_dir: &::std::path::Path) -> ::std::result::Result<::std::vec::Vec<::ts_rs::Dependency>, ::ts_rs::ExportError> {
+            fn export_all_dependencies_to(out_dir: &::std::path::Path) -> ::std::result::Result<::std::vec::Vec<::qubit::__private::ts_rs::Dependency>, ::qubit::__private::ts_rs::ExportError> {
                 // Export the return type
                 let mut dependencies = ::qubit::ty::util::export_with_dependencies::<#handler_return_ty>(out_dir)?;
 
@@ -105,10 +106,10 @@ fn generate_ts_signature(
     let handler_ty = handler_kind_str.as_ref();
     let params = params
         .map(|parse_params| {
-            let fmt_str = "{}: {}, ".repeat(parse_params.len());
+            let fmt_str = vec!["{}: {}"; parse_params.len()].join(", ");
             let fmt_params = parse_params.iter().map(|(ident, ty)| {
                 let ident = ident.to_string();
-                quote! { #ident, <#ty as ::ts_rs::TS>::name() }
+                quote! { #ident, <#ty as ::qubit::__private::ts_rs::TS>::name() }
             });
 
             quote! {
@@ -122,7 +123,7 @@ fn generate_ts_signature(
             "{handler_ty}<[{params}], {return_ty}>",
             handler_ty = #handler_ty,
             params = #params,
-            return_ty = <#return_ty as ::ts_rs::TS>::name()
+            return_ty = <#return_ty as ::qubit::__private::ts_rs::TS>::name()
         )
     }
 }

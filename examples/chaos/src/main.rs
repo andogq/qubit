@@ -13,9 +13,9 @@ use qubit::*;
 use axum::routing::get;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
-use ts_rs::TS;
 
-#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[ts(optional_fields)]
 pub struct Metadata {
     param_a: String,
     param_b: u32,
@@ -24,7 +24,8 @@ pub struct Metadata {
     more_metadata: Option<Box<Metadata>>,
 }
 
-#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[ts]
 pub struct User {
     name: String,
     email: String,
@@ -33,7 +34,8 @@ pub struct User {
     metadata: Metadata,
 }
 
-#[derive(ts_rs::TS, Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[ts]
 pub struct Test {
     a: usize,
     b: bool,
@@ -72,7 +74,7 @@ mod user {
 
     pub fn create_router() -> Router<AppCtx> {
         Router::new()
-            .handler(someHandler)
+            .handler(get)
             .handler(create)
             .handler(list)
             .handler(nested::asdf)
@@ -166,7 +168,8 @@ async fn array() -> Vec<String> {
     vec!["a".to_string(), "b".to_string(), "c".to_string()]
 }
 
-#[derive(Clone, Serialize, TS)]
+#[derive(Clone, Serialize)]
+#[ts]
 struct UniqueType {
     value: usize,
 }
@@ -176,13 +179,15 @@ async fn array_type() -> Vec<UniqueType> {
     vec![]
 }
 
-#[derive(Clone, Serialize, TS)]
+#[derive(Clone, Serialize)]
+#[ts]
 struct NestedStruct {
     a: f32,
     b: bool,
 }
 
-#[derive(Clone, Serialize, TS)]
+#[derive(Clone, Serialize)]
+#[ts]
 #[allow(dead_code)]
 enum MyEnum {
     A,

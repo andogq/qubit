@@ -26,3 +26,33 @@ fn handler_inner(
     let ir = lower(model);
     Ok(codegen(ir))
 }
+
+/// Mark a type to be exported to TypeScript.
+///
+/// See [`ts_rs::TS`] for available attributes.
+#[proc_macro_attribute]
+pub fn ts(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item: proc_macro2::TokenStream = item.into();
+    let attr: proc_macro2::TokenStream = attr.into();
+
+    let ts_rs_path = quote::quote!(::qubit::__private::ts_rs);
+    let ts_rs_path_str = ts_rs_path.to_string();
+
+    let attr = {
+        let crate_attr = quote::quote!(crate = #ts_rs_path_str);
+
+        // Append any user-provided arguments
+        if attr.is_empty() {
+            crate_attr
+        } else {
+            quote::quote!(#crate_attr, #attr)
+        }
+    };
+
+    quote::quote! {
+        #[derive(#ts_rs_path::TS)]
+        #[ts(#attr)]
+        #item
+    }
+    .into()
+}
