@@ -561,6 +561,92 @@ mod handler {
             }
         }
     }
+
+    #[cfg(test)]
+    mod test {
+        use serde_json::{Value, json};
+
+        use super::*;
+
+        /// Call a [`QubitHandler`], and return its return value.
+        fn call_handler<H, MParams, MReturn>(handler: H, params: Value) -> H::Return
+        where
+            H: QubitHandler<MParams, MReturn, Ctx = ()>,
+        {
+            let fut = QubitHandler::call(
+                &handler,
+                &(),
+                Params::new(Some(&serde_json::to_string(&params).unwrap())).into_owned(),
+            );
+            futures::executor::block_on(fut)
+        }
+
+        #[test]
+        fn call_paramless_handler() {
+            fn handler() {}
+            call_handler(handler, json!(()));
+        }
+
+        #[test]
+        fn call_handler_with_ctx() {
+            fn handler(_ctx: &()) {}
+            call_handler(handler, json!(()));
+        }
+
+        #[test]
+        fn call_handler_with_ctx_and_param() {
+            fn handler(_ctx: &(), param: u32) -> u32 {
+                param
+            }
+            assert_eq!(call_handler(handler, json!([123])), 123);
+        }
+
+        #[test]
+        fn call_handler_with_ctx_and_params() {
+            fn handler(_ctx: &(), param_1: u32, param_2: String) -> (u32, String) {
+                (param_1, param_2)
+            }
+            assert_eq!(
+                call_handler(handler, json!([123, "hello"])),
+                (123, "hello".to_string())
+            );
+        }
+
+        mod test_impl {
+            //! Some random trait assertions for [`QubitHandler`].
+
+            use crate::ts::handler::return_type::{IterMarker, StreamMarker, TsMarker};
+
+            use super::*;
+
+            use static_assertions::assert_impl_all;
+
+            // Handler with no inputs/outputs.
+            assert_impl_all!(
+                fn () -> (): QubitHandler<(), TsMarker, Ctx = (), Params = (), Return = ()>
+            );
+            // Handler with single Ctx param.
+            assert_impl_all!(
+                fn (&u32) -> (): QubitHandler<(u32,), TsMarker, Ctx = u32, Params = (), Return = ()>
+            );
+            // Handler with Ctx param, and other parameters.
+            assert_impl_all!(
+                fn (&u32, String, bool) -> (): QubitHandler<(u32, String, bool), TsMarker, Ctx = u32, Params = (String, bool), Return = ()>
+            );
+            // Handler with primitive return type.
+            assert_impl_all!(
+                fn () -> u32: QubitHandler<(), TsMarker, Ctx = (), Params = (), Return = u32>
+            );
+            // Handler with iterator return type.
+            assert_impl_all!(
+                fn () -> std::vec::IntoIter<u32> : QubitHandler<(), IterMarker>
+            );
+            // Handler with stream return type.
+            assert_impl_all!(
+                fn () -> futures::stream::Iter<std::vec::IntoIter<u32>> : QubitHandler<(), StreamMarker>
+            );
+        }
+    }
 }
 
 use handler::*;

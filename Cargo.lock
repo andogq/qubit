@@ -1414,6 +1414,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_qs",
+ "static_assertions",
  "tokio",
  "tower",
  "trait-variant",

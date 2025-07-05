@@ -57,3 +57,4 @@ ts-tokio = ["ts-rs/tokio-impl"]
 
 [dev-dependencies]
 rstest = "0.25.0"
+static_assertions = "1.1.0"
