@@ -1,21 +1,12 @@
-use std::{future::Future, marker::Send};
-
-use jsonrpsee::types::Params;
-use serde::Deserialize;
-use ts_rs::TS;
+use std::marker::Send;
 
 mod ts_type {
     //! Utilities for representing TypeScript types at runtime.
 
-    use std::{any::TypeId, convert::Infallible, ops::Deref, pin::pin};
+    use std::{any::TypeId, ops::Deref};
 
     use derive_more::Deref;
-    use futures::{Stream, StreamExt};
-    use jsonrpsee::RpcModule;
-    use serde::Serialize;
     use ts_rs::TS;
-
-    use super::QubitHandler;
 
     /// Common components of [`TsType`].
     #[derive(Clone, Debug)]
@@ -73,22 +64,6 @@ mod ts_type {
                 None => Self::Primitive(common),
             }
         }
-
-        /// Produce type information for the given handler return type.
-        ///
-        /// This is a utility to help avoid specifying the `Marker` generic present on
-        /// [`HandlerReturnValue`].
-        pub fn from_handler_return_type<T: HandlerReturnType<Marker>, Marker>() -> Self {
-            T::inner_ts_type()
-        }
-
-        /// Produce type information for the given handler return value.
-        ///
-        /// This is a utility for when the type cannot be specified and
-        /// [`Self::from_handler_return_type`] cannot be used.
-        pub fn from_handler_return_value<T: HandlerReturnType<Marker>, Marker>(_value: T) -> Self {
-            Self::from_handler_return_type::<T, _>()
-        }
     }
 
     impl Deref for TsType {
@@ -99,6 +74,177 @@ mod ts_type {
                 TsType::Primitive(ts_type_common) => ts_type_common,
                 TsType::User(ts_type_user) => ts_type_user,
             }
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+
+        mod ts_type {
+            use super::*;
+
+            #[test]
+            fn valid_primitive() {
+                let ts_type = TsType::from_type::<u32>();
+                assert_eq!(ts_type.name, "number");
+                assert!(ts_type.is_primitive());
+            }
+
+            #[test]
+            fn valid_user_defined() {
+                #[derive(TS)]
+                struct MyType;
+
+                let ts_type = TsType::from_type::<MyType>();
+                assert_eq!(ts_type.name, "MyType");
+                assert!(ts_type.is_user());
+            }
+        }
+    }
+}
+
+use ts_type::*;
+
+mod handler {
+    use std::{convert::Infallible, pin::pin};
+
+    use futures::{Stream, StreamExt};
+    use jsonrpsee::{RpcModule, types::Params};
+    use serde::{Deserialize, Serialize};
+    use ts_rs::TS;
+
+    use super::ts_type::TsType;
+
+    /// A handler suitable for use with Qubit.
+    ///
+    /// The `Marker` generic is a utility in order to provide implementations for `Fn` traits which
+    /// take generics as parameters.
+    pub trait QubitHandler<const PARAM_COUNT: usize, Marker, RMarker>:
+        'static + Send + Sync + Clone
+    {
+        /// Context type this handler expects.
+        type Ctx;
+
+        type R: HandlerReturnType<RMarker>;
+
+        /// Type information for parameters. This excludes the context parameter.
+        fn param_tys() -> [TsType; PARAM_COUNT];
+
+        /// Type information for the return type.
+        fn return_ty() -> TsType;
+
+        fn call(
+            &self,
+            ctx: &Self::Ctx,
+            params: Params<'static>,
+        ) -> impl Future<Output = Self::R> + Send + Sync;
+    }
+
+    macro_rules! impl_handlers {
+        (impl [$($ctx:ident, $($params:ident,)*)?]) => {
+            impl<F, R, RMarker, $($ctx, $($params),*)?> QubitHandler<
+                { impl_handlers!(count [$($($params,)*)?]) },
+                ($($ctx, $($params,)*)?),
+                RMarker
+            >
+            for F
+            where
+                F: 'static + Send + Sync + Clone + Fn($(&$ctx, $($params),*)?) -> R,
+                R: 'static + HandlerReturnType<RMarker>,
+                $(
+                    $ctx: 'static + Send + Sync,
+                    $($params: 'static + TS + Send + for<'a> Deserialize<'a>),*
+                )?
+            {
+                type Ctx = impl_handlers!(ctx_ty [$($ctx)?]);
+
+                type R = R;
+
+                fn param_tys() -> [TsType; { impl_handlers!(count [$($($params,)*)?]) }] {
+                    [
+                        $($(TsType::from_type::<$params>(),)*)?
+                    ]
+                }
+
+                fn return_ty() -> TsType {
+                    R::inner_ts_type()
+                }
+
+                fn call(&self, #[allow(unused)] ctx: &Self::Ctx, #[allow(unused)] params: Params<'static>) -> impl Future<Output = R> + Send + Sync {
+                    async move {
+                        $(
+                            #[allow(non_snake_case)]
+                            let ($($params,)*) = match params.parse::<($($params,)*)>() {
+                                Ok(params) => params,
+                                Err(_e) => {
+                                    // TODO: Something
+                                    panic!("fukc");
+                                }
+                            };
+                        )?
+
+                        self($(ctx, $($params,)*)?)
+                    }
+                }
+            }
+        };
+
+        (ctx_ty [$ctx:ty]) => {
+            $ctx
+        };
+
+        (ctx_ty []) => {
+            ()
+        };
+
+        (eat []) => {};
+
+        (eat [$param:ident, $($params:ident,)*]) => {
+            impl_handlers!($($params),*);
+        };
+
+        (count []) => { 0 };
+
+        (count [$param:ident, $($params:ident,)*]) => {
+            1 + impl_handlers!(count [$($params,)*])
+        };
+
+        ($($params:ident),* $(,)?) => {
+            impl_handlers!(impl [$($params,)*]);
+            impl_handlers!(eat [$($params,)*]);
+        };
+    }
+
+    impl_handlers!(
+        P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15
+    );
+
+    #[derive(Clone, Debug)]
+    pub enum HandlerKind {
+        Query,
+        Mutation,
+        Subscription,
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct HandlerMeta {
+        pub kind: HandlerKind,
+        pub name: &'static str,
+        pub param_names: &'static [&'static str],
+    }
+
+    #[derive(Clone)]
+    pub struct HandlerDef<F> {
+        pub handler: F,
+        pub meta: HandlerMeta,
+    }
+
+    impl<F> std::ops::Deref for HandlerDef<F> {
+        type Target = F;
+
+        fn deref(&self) -> &Self::Target {
+            &self.handler
         }
     }
 
@@ -264,48 +410,31 @@ mod ts_type {
     mod test {
         use super::*;
 
-        mod ts_type {
-            use super::*;
-
-            #[test]
-            fn valid_primitive() {
-                let ts_type = TsType::from_type::<u32>();
-                assert_eq!(ts_type.name, "number");
-                assert!(ts_type.is_primitive());
-            }
-
-            #[test]
-            fn valid_user_defined() {
-                #[derive(TS)]
-                struct MyType;
-
-                let ts_type = TsType::from_type::<MyType>();
-                assert_eq!(ts_type.name, "MyType");
-                assert!(ts_type.is_user());
-            }
-        }
-
         mod handler_return_type {
             use super::*;
 
+            /// Helper to produce the [`TsType`] of the 'inner' value of a return type.
+            fn ts_type_of_return_value<T: HandlerReturnType<M>, M>(_v: T) -> TsType {
+                T::inner_ts_type()
+            }
+
             #[test]
             fn ts() {
-                let ts_type = TsType::from_handler_return_type::<u32, _>();
+                let ts_type = ts_type_of_return_value(1u32);
                 assert_eq!(ts_type.name, "number");
                 assert!(ts_type.is_primitive());
             }
 
             #[test]
             fn iter() {
-                let ts_type = TsType::from_handler_return_value(std::iter::once(true));
+                let ts_type = ts_type_of_return_value(std::iter::once(true));
                 assert_eq!(ts_type.name, "Array<boolean>");
                 assert!(ts_type.is_primitive());
             }
 
             #[test]
             fn stream() {
-                let ts_type =
-                    TsType::from_handler_return_value(futures::stream::once(async { "hello" }));
+                let ts_type = ts_type_of_return_value(futures::stream::once(async { "hello" }));
                 assert_eq!(ts_type.name, "string");
                 assert!(ts_type.is_primitive());
             }
@@ -313,222 +442,7 @@ mod ts_type {
     }
 }
 
-use ts_type::*;
-
-/// A handler suitable for use with Qubit.
-///
-/// The `Marker` generic is a utility in order to provide implementations for `Fn` traits which
-/// take generics as parameters.
-trait QubitHandler<const PARAM_COUNT: usize, Marker, RMarker>: 'static + Send + Sync + Clone {
-    /// Context type this handler expects.
-    type Ctx;
-
-    type R: HandlerReturnType<RMarker>;
-
-    /// Type information for parameters. This excludes the context parameter.
-    fn param_tys() -> [TsType; PARAM_COUNT];
-
-    /// Type information for the return type.
-    fn return_ty() -> TsType;
-
-    fn call(
-        &self,
-        ctx: &Self::Ctx,
-        params: Params<'static>,
-    ) -> impl Future<Output = Self::R> + Send + Sync;
-}
-
-macro_rules! impl_handlers {
-    (impl [$($ctx:ident, $($params:ident,)*)?]) => {
-        impl<F, R, RMarker, $($ctx, $($params),*)?> QubitHandler<
-            { impl_handlers!(count [$($($params,)*)?]) },
-            ($($ctx, $($params,)*)?),
-            RMarker
-        >
-        for F
-        where
-            F: 'static + Send + Sync + Clone + Fn($(&$ctx, $($params),*)?) -> R,
-            R: 'static + HandlerReturnType<RMarker>,
-            $(
-                $ctx: 'static + Send + Sync,
-                $($params: 'static + TS + Send + for<'a> Deserialize<'a>),*
-            )?
-        {
-            type Ctx = impl_handlers!(ctx_ty [$($ctx)?]);
-
-            type R = R;
-
-            fn param_tys() -> [TsType; { impl_handlers!(count [$($($params,)*)?]) }] {
-                [
-                    $($(TsType::from_type::<$params>(),)*)?
-                ]
-            }
-
-            fn return_ty() -> TsType {
-                TsType::from_handler_return_type::<R, _>()
-            }
-
-            fn call(&self, #[allow(unused)] ctx: &Self::Ctx, #[allow(unused)] params: Params<'static>) -> impl Future<Output = R> + Send + Sync {
-                async move {
-                    $(
-                        #[allow(non_snake_case)]
-                        let ($($params,)*) = match params.parse::<($($params,)*)>() {
-                            Ok(params) => params,
-                            Err(_e) => {
-                                // TODO: Something
-                                panic!("fukc");
-                            }
-                        };
-                    )?
-
-                    self($(ctx, $($params,)*)?)
-                }
-            }
-        }
-    };
-
-    (ctx_ty [$ctx:ty]) => {
-        $ctx
-    };
-
-    (ctx_ty []) => {
-        ()
-    };
-
-    (eat []) => {};
-
-    (eat [$param:ident, $($params:ident,)*]) => {
-        impl_handlers!($($params),*);
-    };
-
-    (count []) => { 0 };
-
-    (count [$param:ident, $($params:ident,)*]) => {
-        1 + impl_handlers!(count [$($params,)*])
-    };
-
-    ($($params:ident),* $(,)?) => {
-        impl_handlers!(impl [$($params,)*]);
-        impl_handlers!(eat [$($params,)*]);
-    };
-}
-
-impl_handlers!(
-    P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15
-);
-
-#[derive(Clone, Debug)]
-enum HandlerKind {
-    Query,
-    Mutation,
-    Subscription,
-}
-
-#[derive(Clone, Debug)]
-struct HandlerMeta {
-    kind: HandlerKind,
-    name: &'static str,
-    param_names: &'static [&'static str],
-}
-
-#[derive(Clone)]
-struct HandlerDef<F> {
-    handler: F,
-    meta: HandlerMeta,
-}
-
-impl<F> std::ops::Deref for HandlerDef<F> {
-    type Target = F;
-
-    fn deref(&self) -> &Self::Target {
-        &self.handler
-    }
-}
-
-// mod router {
-//     use std::sync::Arc;
-
-//     use futures::FutureExt;
-//     use jsonrpsee::RpcModule;
-
-//     use super::*;
-
-//     type ErasedHandlerFn<Ctx> = Box<
-//         dyn Fn(
-//             Params<'static>,
-//             Arc<Ctx>,
-//             Extensions,
-//         ) -> Pin<
-//             Box<dyn Future<Output = ResponsePayload<'static, Value>> + Send + Sync + 'static>,
-//         >,
-//     >;
-//     struct HandlerErased<Ctx> {
-//         handler: ErasedHandlerFn<Ctx>,
-//         meta: HandlerMeta,
-//     }
-
-//     struct Router<Ctx> {
-//         nested_routers: Vec<(&'static str, Router<Ctx>)>,
-//         handlers: Vec<HandlerErased<Ctx>>,
-//     }
-
-//     impl<Ctx> Router<Ctx>
-//     where
-//         Ctx: Clone + Send + Sync + 'static,
-//     {
-//         pub fn new() -> Self {
-//             Self {
-//                 nested_routers: Vec::new(),
-//                 handlers: Vec::new(),
-//             }
-//         }
-
-//         pub fn handler<const PARAM_COUNT: usize, F, HandlerMarker>(
-//             mut self,
-//             handler: HandlerDef<F>,
-//         ) -> Self
-//         where
-//             F: QubitHandler<PARAM_COUNT, HandlerMarker, Ctx = Ctx> + Clone,
-//         {
-//             let HandlerDef { handler, meta } = handler;
-//             let handler = Arc::new(handler);
-
-//             self.handlers.push(HandlerErased {
-//                 handler: Box::new(move |params, ctx, extensions| {
-//                     let handler = handler.clone();
-
-//                     async move { handler.call(*ctx, params).await.into_response() }.boxed()
-//                 }),
-//                 meta,
-//             });
-
-//             self
-//         }
-
-//         // TODO: Allow `Ctx` to be `Arc` or not.
-//         fn to_module(self, ctx: Ctx) -> RpcModule<Ctx> {
-//             let mut module = RpcModule::new(ctx);
-
-//             self.visit_handlers(|name, handler| {
-//                 module.register_async_method(name.as_str(), handler);
-//             });
-
-//             module
-//         }
-
-//         fn visit_handlers(self, mut visitor: impl FnMut(String, ErasedHandlerFn<Ctx>)) {
-//             for erased in self.handlers {
-//                 visitor(erased.meta.name.to_string(), erased.handler);
-//             }
-
-//             for (prefix, router) in self.nested_routers {
-//                 router.visit_handlers(|name, handler| {
-//                     visitor(format!("{prefix}.{name}"), handler);
-//                 });
-//             }
-//         }
-//     }
-// }
+use handler::*;
 
 mod router {
     use jsonrpsee::RpcModule;
@@ -545,6 +459,7 @@ mod router {
     where
         Ctx: 'static + Send + Sync,
     {
+        /// Register the provided handler to this router.
         pub fn handler<F, const PARAM_COUNT: usize, M, RM>(mut self, handler: HandlerDef<F>) -> Self
         where
             F: QubitHandler<PARAM_COUNT, M, RM, Ctx = Ctx>,
@@ -568,23 +483,23 @@ mod router {
             self
         }
 
-        pub fn into_module(mut self, ctx: Ctx) -> RpcModule<Ctx> {
+        /// Consume this router, and produce an [`RpcModule`].
+        pub fn into_module(self, ctx: Ctx) -> RpcModule<Ctx> {
             let mut module = RpcModule::new(ctx);
-
-            // Add all nested routers first.
-            for (prefix, router) in std::mem::take(&mut self.nested_routers) {
-                router.add_to_module(&mut module, Some(&prefix));
-            }
-
-            // Finally, consume this router and add it.
             self.add_to_module(&mut module, None);
-
             module
         }
 
+        /// Consume this router, adding it to the provided [`RpcModule`].
         fn add_to_module(self, module: &mut RpcModule<Ctx>, prefix: Option<&str>) {
+            // Add the handlers for this router.
             for register in self.register_methods {
                 register(module, prefix);
+            }
+
+            // Add all nested routers.
+            for (prefix, router) in self.nested_routers {
+                router.add_to_module(module, Some(&prefix));
             }
         }
     }
