@@ -176,10 +176,13 @@ mod handler {
     pub trait QubitHandler<MParams, MReturn>: 'static + Send + Sync + Clone {
         /// Context type this handler expects.
         type Ctx;
-
+        /// Parameters that the handler will accept (excluding [`Ctx`](QubitHandler::Ctx)).
         type Params: TsTypeTuple;
+        /// Return type of the handler.
         type Return: ReturnType<MReturn>;
 
+        /// Call the handler with the provided `Ctx` and [`Params`]. The handler implementation
+        /// must deserialise the parameters as required.
         fn call(
             &self,
             ctx: &Self::Ctx,
@@ -213,6 +216,7 @@ mod handler {
                     #[allow(unused)] params: Params<'static>
                 ) -> impl Future<Output = Self::Return> + Send + Sync {
                     async move {
+                        // If parameters are included, deserialise them.
                         $(
                             #[allow(non_snake_case)]
                             let ($($params,)*) = match params.parse::<Self::Params>() {
@@ -224,6 +228,7 @@ mod handler {
                             };
                         )?
 
+                        // Call the handler, optionally with the context and any parameters.
                         self($(ctx, $($params,)*)?)
                     }
                 }
@@ -257,31 +262,51 @@ mod handler {
         P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15
     );
 
-    #[derive(Clone, Debug)]
-    pub enum HandlerKind {
-        Query,
-        Mutation,
-        Subscription,
-    }
+    pub mod meta {
+        //! Utilities for passing handlers and associated information at run time.
 
-    #[derive(Clone, Debug)]
-    pub struct HandlerMeta {
-        pub kind: HandlerKind,
-        pub name: &'static str,
-        pub param_names: &'static [&'static str],
-    }
+        /// Kind of the handler. This will correspond with the method the user must call from
+        /// TypeScript.
+        #[derive(Clone, Debug)]
+        pub enum HandlerKind {
+            Query,
+            Mutation,
+            Subscription,
+        }
 
-    #[derive(Clone)]
-    pub struct HandlerDef<F> {
-        pub handler: F,
-        pub meta: HandlerMeta,
-    }
+        /// Static metadata associated with handler.
+        ///
+        ///  This should be generated with the [`handler`](crate::handler) macro.
+        #[derive(Clone, Debug)]
+        pub struct HandlerMeta {
+            /// Kind of the handler.
+            pub kind: HandlerKind,
+            /// RPC name of the handler (this may differ from the name of the handler function).
+            pub name: &'static str,
+            /// Name of the parameters for this handler.
+            pub param_names: &'static [&'static str],
+        }
 
-    impl<F> std::ops::Deref for HandlerDef<F> {
-        type Target = F;
+        /// All components of a handler required to initialise the
+        /// [`RpcModule`](jsonrpsee::RpcModule), and generate TypeScript bindings for this handler.
+        /// Instances of this struct can be called directly in order to invoke the underlying
+        /// handler.
+        ///
+        /// This should be generated with the [`handler`](crate::handler) macro.
+        #[derive(Clone)]
+        pub struct HandlerDef<F> {
+            /// Handler implementation.
+            pub handler: F,
+            /// Metadata for the handler.
+            pub meta: HandlerMeta,
+        }
 
-        fn deref(&self) -> &Self::Target {
-            &self.handler
+        impl<F> std::ops::Deref for HandlerDef<F> {
+            type Target = F;
+
+            fn deref(&self) -> &Self::Target {
+                &self.handler
+            }
         }
     }
 
@@ -544,12 +569,33 @@ mod router {
     use crate::ts::handler::return_type::ReturnType;
     use jsonrpsee::RpcModule;
 
-    use super::*;
+    use super::{handler::meta::*, *};
 
+    /// A closure which will register a handler to the provided [`RpcModule`], with an optional
+    /// prefix. The registration is guarenteed to only take place once, so the closure is free to
+    /// move values without cloning.
+    type HandlerRegistration<Ctx> = Box<dyn FnOnce(&mut RpcModule<Ctx>, Option<&str>)>;
+
+    /// Collection of handlers and nested routers, which combine to create an RPC API, including
+    /// TypeScript bindings.
     struct Router<Ctx> {
+        /// Routers nested within this router, and the prefix they are located.
         nested_routers: Vec<(String, Router<Ctx>)>,
-        register_methods: Vec<Box<dyn FnOnce(&mut RpcModule<Ctx>, Option<&str>)>>,
+        /// Registration methods for all handlers present in this router.
+        handler_registrations: Vec<HandlerRegistration<Ctx>>,
+        /// [`HandlerMeta`] for all of the handlers registered to this router.
         handler_meta: Vec<HandlerMeta>,
+    }
+
+    impl<Ctx> Router<Ctx> {
+        /// Create an empty router.
+        pub fn new() -> Self {
+            Router {
+                nested_routers: Vec::new(),
+                handler_registrations: Vec::new(),
+                handler_meta: Vec::new(),
+            }
+        }
     }
 
     impl<Ctx> Router<Ctx>
@@ -557,11 +603,13 @@ mod router {
         Ctx: 'static + Send + Sync,
     {
         /// Register the provided handler to this router.
-        pub fn handler<F, M, RM>(mut self, handler: HandlerDef<F>) -> Self
+        pub fn handler<F, MParams, MReturn>(mut self, handler: HandlerDef<F>) -> Self
         where
-            F: QubitHandler<M, RM, Ctx = Ctx>,
+            F: QubitHandler<MParams, MReturn, Ctx = Ctx>,
         {
-            self.register_methods.push(Box::new(|module, prefix| {
+            // Create the registration function for this handler.
+            self.handler_registrations.push(Box::new(|module, prefix| {
+                // Build the method name, depending if there's a prefix or not.
                 let method_name = {
                     let handler_name = handler.meta.name.to_string();
 
@@ -572,10 +620,18 @@ mod router {
                     }
                 };
 
+                // Use the registration method derived from the `ReturnType` of this handler.
                 F::Return::register(module, handler.handler, method_name);
             }));
 
             self.handler_meta.push(handler.meta);
+
+            self
+        }
+
+        /// Nest a router at the provided prefix.
+        pub fn nest(mut self, prefix: impl ToString, router: Router<Ctx>) -> Self {
+            self.nested_routers.push((prefix.to_string(), router));
 
             self
         }
@@ -590,7 +646,7 @@ mod router {
         /// Consume this router, adding it to the provided [`RpcModule`].
         fn add_to_module(self, module: &mut RpcModule<Ctx>, prefix: Option<&str>) {
             // Add the handlers for this router.
-            for register in self.register_methods {
+            for register in self.handler_registrations {
                 register(module, prefix);
             }
 
@@ -598,6 +654,179 @@ mod router {
             for (prefix, router) in self.nested_routers {
                 router.add_to_module(module, Some(&prefix));
             }
+        }
+    }
+
+    impl<Ctx> Default for Router<Ctx> {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use serde::Deserialize;
+
+        use super::*;
+
+        fn run_handler<T>(module: &RpcModule<()>, method: &str) -> T
+        where
+            T: Clone + for<'a> Deserialize<'a>,
+        {
+            futures::executor::block_on(async { module.call(method, [] as [(); 0]).await.unwrap() })
+        }
+
+        #[test]
+        fn empty_router() {
+            let router = Router::new();
+            let module = router.into_module(());
+            // No methods should be present.
+            assert_eq!(module.method_names().count(), 0);
+        }
+
+        #[test]
+        fn single_handler() {
+            let module = Router::new()
+                .handler(HandlerDef {
+                    handler: || 123u32,
+                    meta: HandlerMeta {
+                        kind: HandlerKind::Query,
+                        name: "handler",
+                        param_names: &[],
+                    },
+                })
+                .into_module(());
+
+            assert_eq!(module.method_names().count(), 1);
+            assert_eq!(run_handler::<u32>(&module, "handler"), 123);
+        }
+
+        #[test]
+        fn multiple_handlers() {
+            let module = Router::new()
+                .handler(HandlerDef {
+                    handler: || 123u32,
+                    meta: HandlerMeta {
+                        kind: HandlerKind::Query,
+                        name: "handler_1",
+                        param_names: &[],
+                    },
+                })
+                .handler(HandlerDef {
+                    handler: || "hello",
+                    meta: HandlerMeta {
+                        kind: HandlerKind::Query,
+                        name: "handler_2",
+                        param_names: &[],
+                    },
+                })
+                .into_module(());
+
+            assert_eq!(module.method_names().count(), 2);
+            assert_eq!(run_handler::<u32>(&module, "handler_1"), 123);
+            assert_eq!(run_handler::<String>(&module, "handler_2"), "hello");
+        }
+
+        #[test]
+        fn nested_router() {
+            let module = Router::new()
+                .nest(
+                    "nested",
+                    Router::new().handler(HandlerDef {
+                        handler: || 123u32,
+                        meta: HandlerMeta {
+                            kind: HandlerKind::Query,
+                            name: "handler",
+                            param_names: &[],
+                        },
+                    }),
+                )
+                .into_module(());
+
+            assert_eq!(module.method_names().count(), 1);
+            assert_eq!(run_handler::<u32>(&module, "nested.handler"), 123);
+        }
+
+        #[test]
+        fn multiple_nested_router() {
+            let module = Router::new()
+                .nest(
+                    "nested_1",
+                    Router::new().handler(HandlerDef {
+                        handler: || 123u32,
+                        meta: HandlerMeta {
+                            kind: HandlerKind::Query,
+                            name: "handler",
+                            param_names: &[],
+                        },
+                    }),
+                )
+                .nest(
+                    "nested_2",
+                    Router::new().handler(HandlerDef {
+                        handler: || "hello",
+                        meta: HandlerMeta {
+                            kind: HandlerKind::Query,
+                            name: "handler",
+                            param_names: &[],
+                        },
+                    }),
+                )
+                .into_module(());
+
+            assert_eq!(module.method_names().count(), 2);
+            assert_eq!(run_handler::<u32>(&module, "nested_1.handler"), 123);
+            assert_eq!(run_handler::<String>(&module, "nested_2.handler"), "hello");
+        }
+
+        #[test]
+        fn everything() {
+            let module = Router::new()
+                .handler(HandlerDef {
+                    handler: || 123u32,
+                    meta: HandlerMeta {
+                        kind: HandlerKind::Query,
+                        name: "handler_1",
+                        param_names: &[],
+                    },
+                })
+                .handler(HandlerDef {
+                    handler: || "hello",
+                    meta: HandlerMeta {
+                        kind: HandlerKind::Query,
+                        name: "handler_2",
+                        param_names: &[],
+                    },
+                })
+                .nest(
+                    "nested_1",
+                    Router::new().handler(HandlerDef {
+                        handler: || 456u32,
+                        meta: HandlerMeta {
+                            kind: HandlerKind::Query,
+                            name: "handler",
+                            param_names: &[],
+                        },
+                    }),
+                )
+                .nest(
+                    "nested_2",
+                    Router::new().handler(HandlerDef {
+                        handler: || "world",
+                        meta: HandlerMeta {
+                            kind: HandlerKind::Query,
+                            name: "handler",
+                            param_names: &[],
+                        },
+                    }),
+                )
+                .into_module(());
+
+            assert_eq!(module.method_names().count(), 4);
+            assert_eq!(run_handler::<u32>(&module, "handler_1"), 123);
+            assert_eq!(run_handler::<String>(&module, "handler_2"), "hello");
+            assert_eq!(run_handler::<u32>(&module, "nested_1.handler"), 456);
+            assert_eq!(run_handler::<String>(&module, "nested_2.handler"), "world");
         }
     }
 }
