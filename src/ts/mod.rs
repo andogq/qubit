@@ -316,7 +316,7 @@ mod handler {
         //! defining custom behaviour to take advantage of RPC functionality (such as streaming),
         //! or additional runtime logic in order to prepare a value for transmission.
 
-        use std::{convert::Infallible, pin::pin};
+        use std::{convert::Infallible, marker::PhantomData, pin::pin};
 
         use futures::{Stream, StreamExt};
         use jsonrpsee::RpcModule;
@@ -324,6 +324,48 @@ mod handler {
         use ts_rs::TS;
 
         use super::QubitHandler;
+
+        /// A simple value that can be returned from a handler. Although additional processing can
+        /// be applied before returning it in a response, the entire value must be returned in one
+        /// go (unlike streams, for example).
+        pub trait ReturnValue<Marker>: 'static {
+            /// Representation of the value.
+            type Repr: 'static + Clone + TS + Serialize + Send;
+
+            /// Conversion from the return value into its representation.
+            fn to_repr(self) -> Self::Repr;
+        }
+
+        /// Marker for any type that implements [`TS`]. This will directly produce the [`TsType`]
+        /// as-is.
+        #[doc(hidden)]
+        pub struct TsMarker;
+        impl<T> ReturnValue<TsMarker> for T
+        where
+            T: 'static + Clone + TS + Serialize + Send,
+        {
+            type Repr = Self;
+
+            fn to_repr(self) -> Self::Repr {
+                self
+            }
+        }
+
+        /// Marker for any type that is an iterator of [`TS`] items. The iterator will
+        /// automatically be collected into a [`Vec`] before being returned.
+        #[doc(hidden)]
+        pub struct IterMarker<MReturnValue>(PhantomData<MReturnValue>);
+        impl<T, MReturnValue> ReturnValue<IterMarker<MReturnValue>> for T
+        where
+            T: 'static + Iterator,
+            T::Item: ReturnValue<MReturnValue>,
+        {
+            type Repr = Vec<<T::Item as ReturnValue<MReturnValue>>::Repr>;
+
+            fn to_repr(self) -> Self::Repr {
+                self.map(|item| item.to_repr()).collect()
+            }
+        }
 
         /// Represents any type of value that may be returned from a handler. These may be Rust
         /// native types without a direct representation in TypeScript, and can use RPC-specific
@@ -335,61 +377,30 @@ mod handler {
         /// conflict in implementations, an error will be produced at the call site, rather than
         /// when implementing the trait.
         pub trait ReturnType<Marker>: 'static {
-            /// Representation of the return value which will be serialised and sent to the client.
+            /// Representation of the return value which will be serialised and sent to the
+            /// client.
             type Repr: 'static + Clone + TS + Serialize + Send;
 
-            fn register<Ctx, M2, RMarker>(
+            /// Register the provided handler which returns this [`ReturnType`] against the
+            /// module.
+            fn register<Ctx, MParams, MReturn>(
                 module: &mut RpcModule<Ctx>,
-                handler: impl QubitHandler<M2, RMarker, Ctx = Ctx, Return = Self>,
+                handler: impl QubitHandler<MParams, MReturn, Ctx = Ctx, Return = Self>,
                 method_name: String,
             ) where
                 Ctx: 'static + Send + Sync;
         }
 
-        /// Marker for any type that implements [`TS`]. This will directly produce the [`TsType`]
-        /// as-is.
-        #[doc(hidden)]
-        pub struct TsMarker;
-        impl<T> ReturnType<TsMarker> for T
+        pub struct ReturnValueMarker<MReturnValue>(PhantomData<MReturnValue>);
+        impl<T, MReturnValue> ReturnType<ReturnValueMarker<MReturnValue>> for T
         where
-            T: 'static + Clone + TS + Serialize + Send,
+            T: ReturnValue<MReturnValue>,
         {
-            type Repr = T;
+            type Repr = T::Repr;
 
-            fn register<Ctx, M2, RMarker>(
+            fn register<Ctx, MParams, MReturn>(
                 module: &mut RpcModule<Ctx>,
-                handler: impl QubitHandler<M2, RMarker, Ctx = Ctx, Return = Self>,
-                method_name: String,
-            ) where
-                Ctx: 'static + Send + Sync,
-            {
-                module
-                    .register_async_method(
-                        Box::leak(method_name.into_boxed_str()),
-                        move |params, ctx, _extensions| {
-                            let f = handler.clone();
-
-                            async move { Ok::<_, Infallible>(f.call(&ctx, params).await) }
-                        },
-                    )
-                    .unwrap();
-            }
-        }
-
-        /// Marker for any type that is an iterator of [`TS`] items. The iterator will
-        /// automatically be collected into a [`Vec`] before being returned.
-        #[doc(hidden)]
-        pub struct IterMarker;
-        impl<T> ReturnType<IterMarker> for T
-        where
-            T: 'static + Iterator,
-            T::Item: 'static + Clone + TS + Serialize + Send,
-        {
-            type Repr = Vec<T::Item>;
-
-            fn register<Ctx, M2, RMarker>(
-                module: &mut RpcModule<Ctx>,
-                handler: impl QubitHandler<M2, RMarker, Ctx = Ctx, Return = Self>,
+                handler: impl QubitHandler<MParams, MReturn, Ctx = Ctx, Return = Self>,
                 method_name: String,
             ) where
                 Ctx: 'static + Send + Sync,
@@ -401,7 +412,8 @@ mod handler {
                             let f = handler.clone();
 
                             async move {
-                                Ok::<_, Infallible>(f.call(&ctx, params).await.collect::<Vec<_>>())
+                                let return_value = f.call(&ctx, params).await;
+                                Ok::<_, Infallible>(return_value.to_repr())
                             }
                         },
                     )
@@ -412,19 +424,19 @@ mod handler {
         /// Marker for a stream of [`TS`] items. Currently this just returns the [`TsType`] of the
         /// item, however it'd likely make more sense if it returned the `Subscription<...>` helper.
         #[doc(hidden)]
-        pub struct StreamMarker;
-        impl<T> ReturnType<StreamMarker> for T
+        pub struct StreamMarker<MReturnValue>(PhantomData<MReturnValue>);
+        impl<T, MReturnValue> ReturnType<StreamMarker<MReturnValue>> for T
         where
             T: 'static + Stream + Send,
-            T::Item: 'static + Clone + TS + Serialize + Send,
+            T::Item: ReturnValue<MReturnValue> + Send,
         {
             // TODO: This should likely be a wrapper type of `Stream<T::Item>`, so that the types
             // can be correctly generated.
-            type Repr = T::Item;
+            type Repr = <T::Item as ReturnValue<MReturnValue>>::Repr;
 
-            fn register<Ctx, M2, RMarker>(
+            fn register<Ctx, MParams, MReturn>(
                 module: &mut RpcModule<Ctx>,
-                handler: impl QubitHandler<M2, RMarker, Ctx = Ctx, Return = Self>,
+                handler: impl QubitHandler<MParams, MReturn, Ctx = Ctx, Return = Self>,
                 method_name: String,
             ) where
                 Ctx: 'static + Send + Sync,
@@ -446,7 +458,8 @@ mod handler {
                                 let mut stream = pin!(f.call(&ctx, params).await);
 
                                 while let Some(item) = stream.next().await {
-                                    let item = serde_json::value::to_raw_value(&item).unwrap();
+                                    let item =
+                                        serde_json::value::to_raw_value(&item.to_repr()).unwrap();
                                     sink.send(item).await.unwrap();
                                 }
 
@@ -615,7 +628,9 @@ mod handler {
         mod test_impl {
             //! Some random trait assertions for [`QubitHandler`].
 
-            use crate::ts::handler::return_type::{IterMarker, StreamMarker, TsMarker};
+            use crate::ts::handler::return_type::{
+                IterMarker, ReturnValueMarker, StreamMarker, TsMarker,
+            };
 
             use super::*;
 
@@ -623,27 +638,31 @@ mod handler {
 
             // Handler with no inputs/outputs.
             assert_impl_all!(
-                fn () -> (): QubitHandler<(), TsMarker, Ctx = (), Params = (), Return = ()>
+                fn () -> (): QubitHandler<(), ReturnValueMarker<TsMarker>, Ctx = (), Params = (), Return = ()>
             );
             // Handler with single Ctx param.
             assert_impl_all!(
-                fn (&u32) -> (): QubitHandler<(u32,), TsMarker, Ctx = u32, Params = (), Return = ()>
+                fn (&u32) -> (): QubitHandler<(u32,), ReturnValueMarker<TsMarker>, Ctx = u32, Params = (), Return = ()>
             );
             // Handler with Ctx param, and other parameters.
             assert_impl_all!(
-                fn (&u32, String, bool) -> (): QubitHandler<(u32, String, bool), TsMarker, Ctx = u32, Params = (String, bool), Return = ()>
+                fn (&u32, String, bool) -> (): QubitHandler<(u32, String, bool), ReturnValueMarker<TsMarker>, Ctx = u32, Params = (String, bool), Return = ()>
             );
             // Handler with primitive return type.
             assert_impl_all!(
-                fn () -> u32: QubitHandler<(), TsMarker, Ctx = (), Params = (), Return = u32>
+                fn () -> u32: QubitHandler<(), ReturnValueMarker<TsMarker>, Ctx = (), Params = (), Return = u32>
             );
             // Handler with iterator return type.
             assert_impl_all!(
-                fn () -> std::vec::IntoIter<u32> : QubitHandler<(), IterMarker>
+                fn () -> std::vec::IntoIter<u32> : QubitHandler<(), ReturnValueMarker<IterMarker<TsMarker>>>
             );
             // Handler with stream return type.
             assert_impl_all!(
-                fn () -> futures::stream::Iter<std::vec::IntoIter<u32>> : QubitHandler<(), StreamMarker>
+                fn () -> futures::stream::Iter<std::vec::IntoIter<u32>> : QubitHandler<(), StreamMarker<TsMarker>>
+            );
+            // Handler returning a stream of iterators of iterators.
+            assert_impl_all!(
+                fn () -> futures::stream::Iter<std::vec::IntoIter<std::vec::IntoIter<u32>>> : QubitHandler<(), StreamMarker<IterMarker<TsMarker>>>
             );
         }
     }
