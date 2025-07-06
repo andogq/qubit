@@ -183,11 +183,7 @@ mod handler {
 
         /// Call the handler with the provided `Ctx` and [`Params`]. The handler implementation
         /// must deserialise the parameters as required.
-        fn call(
-            &self,
-            ctx: &Self::Ctx,
-            params: Params<'static>,
-        ) -> impl Future<Output = Self::Return> + Send + Sync;
+        fn call(&self, ctx: &Self::Ctx, params: Params<'static>) -> Self::Return;
     }
 
     macro_rules! impl_handlers {
@@ -214,23 +210,21 @@ mod handler {
                     &self,
                     #[allow(unused)] ctx: &Self::Ctx,
                     #[allow(unused)] params: Params<'static>
-                ) -> impl Future<Output = Self::Return> + Send + Sync {
-                    async move {
-                        // If parameters are included, deserialise them.
-                        $(
-                            #[allow(non_snake_case)]
-                            let ($($params,)*) = match params.parse::<Self::Params>() {
-                                Ok(params) => params,
-                                Err(_e) => {
-                                    // TODO: Something
-                                    panic!("fukc");
-                                }
-                            };
-                        )?
+                ) -> Self::Return {
+                    // If parameters are included, deserialise them.
+                    $(
+                        #[allow(non_snake_case)]
+                        let ($($params,)*) = match params.parse::<Self::Params>() {
+                            Ok(params) => params,
+                            Err(_e) => {
+                                // TODO: Something
+                                panic!("fukc");
+                            }
+                        };
+                    )?
 
-                        // Call the handler, optionally with the context and any parameters.
-                        self($(ctx, $($params,)*)?)
-                    }
+                    // Call the handler, optionally with the context and any parameters.
+                    self($(ctx, $($params,)*)?)
                 }
             }
         };
@@ -412,7 +406,7 @@ mod handler {
                             let f = handler.clone();
 
                             async move {
-                                let return_value = f.call(&ctx, params).await;
+                                let return_value = f.call(&ctx, params);
                                 Ok::<_, Infallible>(return_value.to_repr())
                             }
                         },
@@ -455,7 +449,7 @@ mod handler {
                             async move {
                                 let sink = pending.accept().await.unwrap();
 
-                                let mut stream = pin!(f.call(&ctx, params).await);
+                                let mut stream = pin!(f.call(&ctx, params));
 
                                 while let Some(item) = stream.next().await {
                                     let item =
@@ -586,12 +580,11 @@ mod handler {
         where
             H: QubitHandler<MParams, MReturn, Ctx = ()>,
         {
-            let fut = QubitHandler::call(
+            QubitHandler::call(
                 &handler,
                 &(),
                 Params::new(Some(&serde_json::to_string(&params).unwrap())).into_owned(),
-            );
-            futures::executor::block_on(fut)
+            )
         }
 
         #[test]
