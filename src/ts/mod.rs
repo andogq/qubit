@@ -166,7 +166,6 @@ mod handler {
     use serde::Deserialize;
     use ts_rs::TS;
 
-    use self::return_type::ReturnType;
     use super::ts_type::TsTypeTuple;
 
     /// A handler suitable for use with Qubit.
@@ -304,106 +303,11 @@ mod handler {
     }
 
     mod async_shit {
-        use std::{
-            convert::Infallible,
-            iter,
-            marker::PhantomData,
-            pin::{Pin, pin},
-        };
+        use std::{convert::Infallible, marker::PhantomData, pin::pin};
 
-        use futures::{Stream, StreamExt, stream};
+        use futures::{Stream, StreamExt};
         use jsonrpsee::RpcModule;
         use ts_rs::TS;
-
-        mod handler_output {
-            use super::*;
-
-            /// Possible types that a handler may return. This is to normalise the 'asyncness' of
-            /// handlers.
-            ///
-            /// Ideally this trait would be implemented for [`Future`] (where
-            /// `type Output = Future::Output`), and a blanket implementation for all other `T` (where
-            /// `type Output = T`). Unfortunately it's not possible to have multiple blanket
-            /// implementations, so [a workaround](https://stackoverflow.com/a/78916922) with marker
-            /// generics must be used.
-            pub trait HandlerOutput<M> {
-                /// Output of the handler, after any futures are resolved.
-                ///
-                /// For synchronous handlers, this is the return type. For asynchronous handlers, this
-                /// is the type of the awaited future.
-                type Output;
-            }
-
-            /// Marker for anything that implements [`ResponseValue`].
-            ///
-            /// This allows common types (notably, anything that implements [`TS`]) to be returned
-            /// from handlers. These values are returned as-is, without additional transformation.
-            pub struct MResponseValue<MValue>(PhantomData<MValue>);
-            impl<T, MValue> HandlerOutput<MResponseValue<MValue>> for T
-            where
-                T: ResponseValue<MValue>,
-            {
-                type Output = T;
-            }
-
-            /// Marker for anything that implements [`Stream`].
-            ///
-            /// [`Stream`] has different ergonomics than [`ResponseValue`], therefore it must have it's
-            /// own implementation.
-            pub struct MStream;
-            impl<T> HandlerOutput<MStream> for T
-            where
-                T: Stream,
-            {
-                type Output = T;
-            }
-
-            /// Marker for all [`Future`] values.
-            ///
-            /// For handlers that return a [`Future`], the 'useful' output is [`Future::Output`].
-            pub struct MFuture;
-            impl<T> HandlerOutput<MFuture> for T
-            where
-                T: Future,
-            {
-                type Output = T::Output;
-            }
-        }
-        use handler_output::*;
-
-        mod handler_kind {
-            use super::*;
-
-            /// A marker trait to link data types with a certain RPC behaviour, notably to distinguish
-            /// between methods and subscriptions.
-            pub trait HandlerKind<M> {
-                // Type of the returned item.
-                //
-                // The meaning of this will differ depending on the handler.
-                type Item;
-            }
-
-            /// Marker for methods, which produce a single [`ResponseValue`].
-            pub struct MMethod<MValue>(PhantomData<MValue>);
-            impl<T, MValue> HandlerKind<MMethod<MValue>> for T
-            where
-                T: ResponseValue<MValue>,
-            {
-                type Item = T;
-            }
-
-            /// Marker for subscriptions, which produce a continuous stream of [`ResponseValue`]s.
-            /// [`HandlerKind::Item`] corresponds to the type that's emitted from the stream.
-            pub struct MSubscription<MValue>(PhantomData<MValue>);
-            impl<T, MValue> HandlerKind<MSubscription<MValue>> for T
-            where
-                T: Stream,
-                T::Item: ResponseValue<MValue>,
-            {
-                type Item = T::Item;
-            }
-        }
-        use handler_kind::*;
 
         mod response_value {
             use serde::Serialize;
@@ -465,21 +369,31 @@ mod handler {
                 }
             }
         }
-        use response_value::*;
+        pub use response_value::*;
 
         use super::QubitHandler;
 
-        trait R3<MParams, MReturn, M>: QubitHandler<MParams, MReturn> {
+        /// Registration implementation differs depending on the return type of the handler. This
+        /// is to account for handlers which may return futures, streams, or values directly.
+        pub trait RegisterableHandler<MParams, MReturn, MValue, M>:
+            QubitHandler<MParams, MReturn>
+        {
+            type Output: ResponseValue<MValue>;
+
             fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String);
         }
 
-        struct ActualValue<MValue>(PhantomData<MValue>);
-        impl<T, MValue, MParams, MReturn> R3<MParams, MReturn, ActualValue<MValue>> for T
+        pub struct ActualValue<MValue>(PhantomData<MValue>);
+        impl<T, MValue, MParams, MReturn>
+            RegisterableHandler<MParams, MReturn, MValue, ActualValue<MValue>> for T
         where
             T: QubitHandler<MParams, MReturn>,
             T::Return: ResponseValue<MValue>,
         {
+            type Output = T::Return;
+
             fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String) {
+                println!("registering actual value");
                 module
                     .register_blocking_method(
                         Box::leak(method_name.into_boxed_str()),
@@ -492,14 +406,18 @@ mod handler {
             }
         }
 
-        struct MFuture<MOut>(PhantomData<MOut>);
-        impl<T, MValue, MParams, MReturn> R3<MParams, MReturn, MFuture<ActualValue<MValue>>> for T
+        pub struct MFuture<MOut>(PhantomData<MOut>);
+        impl<T, MValue, MParams, MReturn>
+            RegisterableHandler<MParams, MReturn, MValue, MFuture<ActualValue<MValue>>> for T
         where
             T: QubitHandler<MParams, MReturn>,
             T::Return: Future + Send,
             <T::Return as Future>::Output: ResponseValue<MValue>,
         {
+            type Output = <T::Return as Future>::Output;
+
             fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String) {
+                println!("registering future");
                 module
                     .register_async_method(
                         Box::leak(method_name.into_boxed_str()),
@@ -516,13 +434,16 @@ mod handler {
             }
         }
 
-        struct MStream<MItem>(PhantomData<MItem>);
-        impl<T, MValue, MParams, MReturn> R3<MParams, MReturn, MStream<ActualValue<MValue>>> for T
+        pub struct MStream<MItem>(PhantomData<MItem>);
+        impl<T, MValue, MParams, MReturn>
+            RegisterableHandler<MParams, MReturn, MValue, MStream<ActualValue<MValue>>> for T
         where
             T: QubitHandler<MParams, MReturn>,
             T::Return: Stream + Send,
             <T::Return as Stream>::Item: Send + ResponseValue<MValue>,
         {
+            type Output = <T::Return as Stream>::Item;
+
             fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String) {
                 let notif_method_name = format!("{method_name}_notif");
                 let unsub_method_name = format!("{method_name}_unsub");
@@ -555,13 +476,16 @@ mod handler {
         }
 
         impl<T, MValue, MParams, MReturn>
-            R3<MParams, MReturn, MFuture<MStream<ActualValue<MValue>>>> for T
+            RegisterableHandler<MParams, MReturn, MValue, MFuture<MStream<ActualValue<MValue>>>>
+            for T
         where
             T: QubitHandler<MParams, MReturn>,
             T::Return: Send + Future,
             <T::Return as Future>::Output: Stream + Send,
             <<T::Return as Future>::Output as Stream>::Item: Send + ResponseValue<MValue>,
         {
+            type Output = <<T::Return as Future>::Output as Stream>::Item;
+
             fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String) {
                 let notif_method_name = format!("{method_name}_notif");
                 let unsub_method_name = format!("{method_name}_unsub");
@@ -593,542 +517,14 @@ mod handler {
             }
         }
 
-        fn register_fn_3<Ctx, MParams, MReturn, MWhatever>(
+        fn register_fn_3<Ctx, MParams, MReturn, MWhatever, MValue>(
             module: &mut RpcModule<Ctx>,
             method_name: String,
-            handler: impl R3<MParams, MReturn, MWhatever, Ctx = Ctx>,
+            handler: impl RegisterableHandler<MParams, MReturn, MValue, MWhatever, Ctx = Ctx>,
         ) where
             Ctx: 'static + Send + Sync,
         {
             handler.register(module, method_name);
-        }
-
-        mod junk {
-            use super::*;
-            // fn register_fn<Ctx, R, MParams, MReturn, MSyncness, MHandlerKind, MValue>(
-            //     module: &mut RpcModule<Ctx>,
-            //     method_name: String,
-            //     handler: impl QubitHandler<MParams, MReturn, Ctx = Ctx, Return = R>,
-            // ) where
-            //     Ctx: 'static + Send + Sync,
-            //     R: HandlerOutput<MSyncness>,
-            //     R::Output: HandlerKind<MHandlerKind>,
-            //     <R::Output as HandlerKind<MHandlerKind>>::Item: ResponseValue<MValue>,
-            //     (MSyncness, MHandlerKind): Registration,
-            // {
-            //     <(MSyncness, MHandlerKind)>::register(module, method_name, handler);
-            // }
-
-            // trait R2<MHandlerOutput, MHandlerKind, MParams, MReturn>:
-            //     QubitHandler<MParams, MReturn>
-            // where
-            //     Self::Return: HandlerOutput<MHandlerOutput> + HandlerKind<MHandlerKind>,
-            //     Self::Ctx: 'static + Send + Sync,
-            // {
-            //     fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String);
-            // }
-
-            // impl<F, MValue, MParams, MReturn>
-            //     R2<MResponseValue<MValue>, MMethod<MValue>, MParams, MReturn> for F
-            // where
-            //     F: QubitHandler<MParams, MReturn>,
-            //     F::Return: HandlerOutput<MResponseValue<MValue>> + HandlerKind<MMethod<MValue>>,
-            //     F::Ctx: 'static + Send + Sync,
-            // {
-            //     fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String) {
-            //         module
-            //             .register_blocking_method(
-            //                 Box::leak(method_name.into_boxed_str()),
-            //                 move |params, ctx, _extensions| {
-            //                     let result: F::Return = self.call(&ctx, params);
-
-            //                     // let d1 =
-            //                     //     &result
-            //                     //         as &dyn HandlerOutput<
-            //                     //             MResponseValue<MValue>,
-            //                     //             Output = <F::Return as HandlerOutput<
-            //                     //                 MResponseValue<MValue>,
-            //                     //             >>::Output,
-            //                     //         >;
-            //                     // let d2 = &result
-            //                     //     as &dyn ResponseValue<
-            //                     //         MValue,
-            //                     //         Value = <F::Return as ResponseValue<MValue>>::Value,
-            //                     //     >;
-
-            //                     Ok::<_, Infallible>(result.transform())
-            //                 },
-            //             )
-            //             .unwrap();
-            //     }
-            // }
-
-            // trait Registration<MValue> {
-            //     fn register<Ctx, R, MParams, MReturn>(
-            //         module: &mut RpcModule<Ctx>,
-            //         method_name: String,
-            //         handler: impl QubitHandler<MParams, MReturn, Ctx = Ctx, Return = R>,
-            //     ) where
-            //         Ctx: 'static + Send + Sync,
-            //         R: HandlerOutput<MResponseValue<MValue>> + HandlerKind<MMethod<MValue>>;
-            // }
-
-            // impl<MValue> Registration<MValue> for (MResponseValue<MValue>, MMethod<MValue>) {
-            //     fn register<Ctx, R, MParams, MReturn>(
-            //         module: &mut RpcModule<Ctx>,
-            //         method_name: String,
-            //         handler: impl QubitHandler<MParams, MReturn, Ctx = Ctx, Return = R>,
-            //     ) where
-            //         Ctx: 'static + Send + Sync,
-            //         R: HandlerOutput<MResponseValue<MValue>> + HandlerKind<MMethod<MValue>>,
-            //     {
-            //         module
-            //             .register_blocking_method(
-            //                 Box::leak(method_name.into_boxed_str()),
-            //                 move |params, ctx, _extensions| {
-            //                     let result = handler.call(&ctx, params);
-
-            //                     Ok::<_, Infallible>(result.transform())
-            //                 },
-            //             )
-            //             .unwrap();
-            //     }
-            // }
-
-            // impl<MValue> Registration for (MFuture, MMethod<MValue>) {
-            //     fn register<T, MValue2>()
-            //     where
-            //         T: ResponseValue<MValue2>,
-            //     {
-            //         println!("registering future method: {}", T::debug());
-            //     }
-            // }
-
-            // impl<MValue> Registration for (MStream, MSubscription<MValue>) {
-            //     fn register<T, MValue2>()
-            //     where
-            //         T: ResponseValue<MValue2>,
-            //     {
-            //         println!("registering stream subscription: {}", T::debug());
-            //     }
-            // }
-
-            // impl<MValue> Registration for (MFuture, MSubscription<MValue>) {
-            //     fn register<T, MValue2>()
-            //     where
-            //         T: ResponseValue<MValue2>,
-            //     {
-            //         println!("registering future subscription: {}", T::debug());
-            //     }
-            // }
-        }
-
-        #[test]
-        fn do_something() {
-            let mut module = RpcModule::new(());
-
-            register_fn_3(&mut module, "test".to_string(), || 123);
-            register_fn_3(&mut module, "test".to_string(), || async { 123 });
-            register_fn_3(&mut module, "test".to_string(), || {
-                stream::once(async { 123 })
-            });
-            register_fn_3(&mut module, "test".to_string(), || async {
-                stream::once(async { 123 })
-            });
-            println!("-----");
-
-            register_fn_3(&mut module, "test".to_string(), || iter::once(123));
-            register_fn_3(&mut module, "test".to_string(), || async {
-                iter::once(123)
-            });
-            register_fn_3(&mut module, "test".to_string(), || {
-                stream::once(async { iter::once(123) })
-            });
-            register_fn_3(&mut module, "test".to_string(), || async {
-                stream::once(async { iter::once(123) })
-            });
-            println!("-----");
-
-            register_fn_3(&mut module, "test".to_string(), || {
-                iter::once(iter::once(123))
-            });
-            register_fn_3(&mut module, "test".to_string(), || async {
-                iter::once(iter::once(123))
-            });
-            register_fn_3(&mut module, "test".to_string(), || {
-                stream::once(async { iter::once(iter::once(123)) })
-            });
-            register_fn_3(&mut module, "test".to_string(), || async {
-                stream::once(async { iter::once(iter::once(123)) })
-            });
-            println!("-----");
-
-            panic!("yay");
-        }
-    }
-
-    pub mod handler_stuff {
-        use std::convert::Infallible;
-
-        use jsonrpsee::RpcModule;
-        use kind::{Kind, Method};
-        use serde_json::json;
-        use syncness::{Async, Sync, Syncness};
-        use value::Value;
-
-        use super::QubitHandler;
-
-        mod value {
-            use serde::Serialize;
-            use ts_rs::TS;
-
-            pub trait Value<MValue> {
-                type Repr: 'static + Clone + TS + Serialize + Send + std::marker::Sync;
-
-                fn into_repr(self) -> Self::Repr;
-            }
-
-            pub struct Ts;
-            impl<T> Value<Ts> for T
-            where
-                T: 'static + Clone + TS + Serialize + Send + std::marker::Sync,
-            {
-                type Repr = T;
-
-                fn into_repr(self) -> Self::Repr {
-                    self
-                }
-            }
-
-            pub struct Iter;
-            impl<T> Value<Iter> for T
-            where
-                T: 'static + Iterator,
-                T::Item: 'static + Clone + TS + Serialize + Send + std::marker::Sync,
-            {
-                type Repr = Vec<T::Item>;
-
-                fn into_repr(self) -> Self::Repr {
-                    self.collect()
-                }
-            }
-        }
-
-        mod kind {
-            use std::marker::PhantomData;
-
-            use futures::Stream;
-
-            use super::value::Value;
-
-            pub trait Kind<MKind> {}
-
-            pub struct Method<MValue>(PhantomData<MValue>);
-            impl<T, MValue> Kind<Method<MValue>> for T where T: Value<MValue> {}
-
-            pub struct Subscription<MValue>(PhantomData<MValue>);
-            impl<T, MValue> Kind<Subscription<MValue>> for T
-            where
-                T: Stream,
-                T::Item: Value<MValue>,
-            {
-            }
-        }
-
-        mod syncness {
-            use std::marker::PhantomData;
-
-            use super::value::Value;
-
-            pub trait Syncness<MSync, MValue> {
-                type Result: Value<MValue>;
-            }
-
-            pub struct Sync<MValue>(PhantomData<MValue>);
-            impl<T, MValue> Syncness<Sync<MValue>, MValue> for T
-            where
-                T: Value<MValue>,
-            {
-                type Result = Self;
-            }
-
-            pub struct Async<MValue>(PhantomData<MValue>);
-            impl<T, MValue> Syncness<Async<MValue>, MValue> for T
-            where
-                T: Future,
-                T::Output: Value<MValue>,
-            {
-                type Result = T::Output;
-            }
-        }
-
-        trait Register<MValue, MKind, MSyncness, MParams, MReturn>:
-            QubitHandler<MParams, MReturn>
-        {
-            fn register(module: &mut RpcModule<Self::Ctx>, handler: Self, method_name: String)
-            where
-                Self::Return: 'static + Syncness<MSyncness, MValue>;
-        }
-
-        impl<H, MValue, MParams, MReturn>
-            Register<MValue, Method<MValue>, Sync<MValue>, MParams, MReturn> for H
-        where
-            H: QubitHandler<MParams, MReturn>,
-        {
-            fn register(module: &mut RpcModule<Self::Ctx>, handler: Self, method_name: String)
-            where
-                Self::Return: 'static + Syncness<Sync<MValue>, MValue>,
-            {
-                module
-                    .register_method(
-                        Box::leak(method_name.into_boxed_str()),
-                        move |params, ctx, _extensions| {
-                            let f = handler.clone();
-                            let return_value = f.call(ctx, params);
-                            // Ok::<_, Infallible>(return_value.into_repr())
-                            Ok::<_, Infallible>(json!(null))
-                        },
-                    )
-                    .unwrap();
-            }
-        }
-
-        // impl<H, MValue, MParams, MReturn>
-        //     Register<MValue, Method<MValue>, Async<MValue>, MParams, MReturn> for H
-        // where
-        //     H: QubitHandler<MParams, MReturn>,
-        // {
-        //     fn register(module: &mut RpcModule<Self::Ctx>, handler: Self, method_name: String)
-        //     where
-        //         Self::Return: 'static + Kind<Method<MValue>> + Syncness<Async<MValue>>,
-        //     {
-        //         module
-        //             .register_method(
-        //                 Box::leak(method_name.into_boxed_str()),
-        //                 move |params, ctx, _extensions| {
-        //                     let f = handler.clone();
-
-        //                     async move {
-        //                         let return_value = f.call(ctx, params).await;
-        //                         Ok::<_, Infallible>(return_value.into_repr())
-        //                     }
-        //                 },
-        //             )
-        //             .unwrap();
-        //     }
-        // }
-
-        // struct Thing;
-        // impl<MValue> Register<MValue, Method<MValue>, Sync<MValue>> for Thing {
-        //     fn register<H, Ctx, MParams, MReturn>(
-        //         module: &mut RpcModule<Ctx>,
-        //         handler: H,
-        //         method_name: String,
-        //     ) where
-        //         Ctx: 'static + Send + std::marker::Sync,
-        //         H: QubitHandler<MParams, MReturn, Ctx = Ctx>,
-        //         H::Return: Value<MValue> + Kind<Method<MValue>> + Syncness<Sync<MValue>>,
-        //     {
-        //         module
-        //             .register_method(
-        //                 Box::leak(method_name.into_boxed_str()),
-        //                 move |params, ctx, _extensions| {
-        //                     let f = handler.clone();
-
-        //                     let return_value = f.call(ctx, params);
-        //                     Ok::<_, Infallible>(return_value.into_repr())
-        //                 },
-        //             )
-        //             .unwrap();
-        //     }
-        // }
-        // impl<MValue> Register<MValue, Method<MValue>, Async<MValue>> for Thing {
-        //     fn register<H, Ctx, MParams, MReturn>(
-        //         module: &mut RpcModule<Ctx>,
-        //         handler: H,
-        //         method_name: String,
-        //     ) where
-        //         Ctx: 'static + Send + std::marker::Sync,
-        //         H: QubitHandler<MParams, MReturn, Ctx = Ctx>,
-        //         H::Return: Future,
-        //         <H::Return as Future>::Output: Value<MValue> + Kind<Method<MValue>>,
-        //     {
-        //         module
-        //             .register_async_method(
-        //                 Box::leak(method_name.into_boxed_str()),
-        //                 move |params, ctx, _extensions| {
-        //                     let f = handler.clone();
-
-        //                     async move {
-        //                         let return_value = f.call(&ctx, params).await;
-        //                         Ok::<_, Infallible>(return_value.into_repr())
-        //                     }
-        //                 },
-        //             )
-        //             .unwrap();
-        //     }
-        // }
-    }
-
-    pub mod return_type {
-        //! Handlers can return a wide range of different types, which may not be trivial to
-        //! serialise or generate a TypeScript type for. The [`ReturnType`] trait allows for
-        //! defining custom behaviour to take advantage of RPC functionality (such as streaming),
-        //! or additional runtime logic in order to prepare a value for transmission.
-
-        use std::{convert::Infallible, marker::PhantomData, pin::pin};
-
-        use futures::{Stream, StreamExt};
-        use jsonrpsee::RpcModule;
-        use serde::Serialize;
-        use ts_rs::TS;
-
-        use super::QubitHandler;
-
-        /// A simple value that can be returned from a handler. Although additional processing can
-        /// be applied before returning it in a response, the entire value must be returned in one
-        /// go (unlike streams, for example).
-        pub trait ReturnValue<Marker>: 'static {
-            /// Representation of the value.
-            type Repr: 'static + Clone + TS + Serialize + Send;
-
-            /// Conversion from the return value into its representation.
-            fn to_repr(self) -> Self::Repr;
-        }
-
-        /// Marker for any type that implements [`TS`]. This will directly produce the [`TsType`]
-        /// as-is.
-        #[doc(hidden)]
-        pub struct TsMarker;
-        impl<T> ReturnValue<TsMarker> for T
-        where
-            T: 'static + Clone + TS + Serialize + Send,
-        {
-            type Repr = Self;
-
-            fn to_repr(self) -> Self::Repr {
-                self
-            }
-        }
-
-        /// Marker for any type that is an iterator of [`TS`] items. The iterator will
-        /// automatically be collected into a [`Vec`] before being returned.
-        #[doc(hidden)]
-        pub struct IterMarker<MReturnValue>(PhantomData<MReturnValue>);
-        impl<T, MReturnValue> ReturnValue<IterMarker<MReturnValue>> for T
-        where
-            T: 'static + Iterator,
-            T::Item: ReturnValue<MReturnValue>,
-        {
-            type Repr = Vec<<T::Item as ReturnValue<MReturnValue>>::Repr>;
-
-            fn to_repr(self) -> Self::Repr {
-                self.map(|item| item.to_repr()).collect()
-            }
-        }
-
-        /// Represents any type of value that may be returned from a handler. These may be Rust
-        /// native types without a direct representation in TypeScript, and can use RPC-specific
-        /// functionality in order to send the value (such as streaming). Therefore, `Repr` is the
-        /// TypeScript-safe type which this value will be transformed to, and will be exposed in
-        /// the generated types.
-        ///
-        /// The `Marker` allows this trait to be implemented on multiple traits. If there is a
-        /// conflict in implementations, an error will be produced at the call site, rather than
-        /// when implementing the trait.
-        pub trait ReturnType<Marker>: 'static {
-            /// Representation of the return value which will be serialised and sent to the
-            /// client.
-            type Repr: 'static + Clone + TS + Serialize + Send;
-
-            /// Register the provided handler which returns this [`ReturnType`] against the
-            /// module.
-            fn register<Ctx, MParams, MReturn>(
-                module: &mut RpcModule<Ctx>,
-                handler: impl QubitHandler<MParams, MReturn, Ctx = Ctx, Return = Self>,
-                method_name: String,
-            ) where
-                Ctx: 'static + Send + Sync;
-        }
-
-        pub struct ReturnValueMarker<MReturnValue>(PhantomData<MReturnValue>);
-        impl<T, MReturnValue> ReturnType<ReturnValueMarker<MReturnValue>> for T
-        where
-            T: ReturnValue<MReturnValue>,
-        {
-            type Repr = T::Repr;
-
-            fn register<Ctx, MParams, MReturn>(
-                module: &mut RpcModule<Ctx>,
-                handler: impl QubitHandler<MParams, MReturn, Ctx = Ctx, Return = Self>,
-                method_name: String,
-            ) where
-                Ctx: 'static + Send + Sync,
-            {
-                module
-                    .register_async_method(
-                        Box::leak(method_name.into_boxed_str()),
-                        move |params, ctx, _extensions| {
-                            let f = handler.clone();
-
-                            async move {
-                                let return_value = f.call(&ctx, params);
-                                Ok::<_, Infallible>(return_value.to_repr())
-                            }
-                        },
-                    )
-                    .unwrap();
-            }
-        }
-
-        /// Marker for a stream of [`TS`] items. Currently this just returns the [`TsType`] of the
-        /// item, however it'd likely make more sense if it returned the `Subscription<...>` helper.
-        #[doc(hidden)]
-        pub struct StreamMarker<MReturnValue>(PhantomData<MReturnValue>);
-        impl<T, MReturnValue> ReturnType<StreamMarker<MReturnValue>> for T
-        where
-            T: 'static + Stream + Send,
-            T::Item: ReturnValue<MReturnValue> + Send,
-        {
-            // TODO: This should likely be a wrapper type of `Stream<T::Item>`, so that the types
-            // can be correctly generated.
-            type Repr = <T::Item as ReturnValue<MReturnValue>>::Repr;
-
-            fn register<Ctx, MParams, MReturn>(
-                module: &mut RpcModule<Ctx>,
-                handler: impl QubitHandler<MParams, MReturn, Ctx = Ctx, Return = Self>,
-                method_name: String,
-            ) where
-                Ctx: 'static + Send + Sync,
-            {
-                let notif_method_name = format!("{method_name}_notif");
-                let unsub_method_name = format!("{method_name}_unsub");
-
-                module
-                    .register_subscription(
-                        Box::leak(method_name.into_boxed_str()),
-                        Box::leak(notif_method_name.into_boxed_str()),
-                        Box::leak(unsub_method_name.into_boxed_str()),
-                        move |params, pending, ctx, _extensions| {
-                            let f = handler.clone();
-
-                            async move {
-                                let sink = pending.accept().await.unwrap();
-
-                                let mut stream = pin!(f.call(&ctx, params));
-
-                                while let Some(item) = stream.next().await {
-                                    let item =
-                                        serde_json::value::to_raw_value(&item.to_repr()).unwrap();
-                                    sink.send(item).await.unwrap();
-                                }
-
-                                Ok(())
-                            }
-                        },
-                    )
-                    .unwrap();
-            }
         }
 
         #[cfg(test)]
@@ -1148,42 +544,46 @@ mod handler {
 
                 /// Register a handler to a module, and return the module. The handler will be
                 /// registered at `handler`.
-                fn register_handler<T, M>(handler: fn() -> T) -> RpcModule<()>
+                fn register_handler<F, MParams, MReturn, MValue, M>(handler: F) -> RpcModule<()>
                 where
-                    T: ReturnType<M>,
+                    F: RegisterableHandler<MParams, MReturn, MValue, M, Ctx = ()>,
                 {
                     let mut module = RpcModule::new(());
-                    T::register(&mut module, handler, "handler".to_string());
+                    F::register(handler, &mut module, "handler".to_string());
                     module
                 }
 
                 /// Register a handler to a module, and call it, returning the value that was
                 /// returned from the handler according to [`ReturnType`].
-                fn test_handler<T, M>(handler: fn() -> T) -> T::Repr
+                async fn test_handler<F, MParams, MReturn, MValue, M>(
+                    handler: F,
+                ) -> <F::Output as ResponseValue<MValue>>::Value
                 where
-                    T: ReturnType<M>,
-                    T::Repr: for<'a> Deserialize<'a>,
+                    F: RegisterableHandler<MParams, MReturn, MValue, M, Ctx = ()>,
+                    <F::Output as ResponseValue<MValue>>::Value: for<'a> Deserialize<'a>,
                 {
                     let module = register_handler(handler);
 
-                    let fut = module.call::<[(); 0], T::Repr>("handler", []);
-                    futures::executor::block_on(fut).unwrap()
+                    let fut = module.call::<[(); 0], <F::Output as ResponseValue<MValue>>::Value>(
+                        "handler",
+                        [],
+                    );
+                    fut.await.unwrap()
                 }
 
                 /// Primitive `TS` values should be returned as-is.
-                #[test]
-                fn ts() {
-                    assert_eq!(test_handler(|| 123u32), 123);
+                #[tokio::test]
+                async fn ts() {
+                    assert_eq!(test_handler(|| 123u32).await, 123);
                 }
 
                 /// Iterators should be collected and returned as a `Vec`.
-                #[test]
-                fn iter() {
-                    assert_eq!(test_handler(simple_iter), vec![0, 1, 2]);
+                #[tokio::test]
+                async fn iter() {
+                    assert_eq!(test_handler(simple_iter).await, vec![0, 1, 2]);
                 }
 
                 /// Stream should be consumed and each value returned one at a time.
-                /// NOTE: Unfortunately, it's not possible to subscribe to a module when running outside of Tokio.
                 #[tokio::test]
                 async fn stream() {
                     let module = register_handler(|| futures::stream::iter(simple_iter()));
@@ -1201,39 +601,34 @@ mod handler {
                 }
             }
 
-            mod ts_type {
-                use crate::ts::ts_type::TsType;
+            #[test]
+            fn do_something() {
+                use futures::stream;
+                use std::iter;
 
-                use super::*;
-
-                /// Helper to produce the [`TsType`] of the 'inner' value of a return type.
-                fn ts_type_of_return_value<T: ReturnType<M>, M>(_v: T) -> TsType {
-                    TsType::from_type::<T::Repr>()
+                fn register_fn<MParams, MReturn, MWhatever, MValue>(
+                    handler: impl RegisterableHandler<MParams, MReturn, MValue, MWhatever, Ctx = ()>,
+                ) {
+                    register_fn_3(&mut RpcModule::new(()), "handler".to_string(), handler);
                 }
 
-                #[test]
-                fn ts() {
-                    let ts_type = ts_type_of_return_value(1u32);
-                    assert_eq!(ts_type.name, "number");
-                    assert!(ts_type.is_primitive());
-                }
-
-                #[test]
-                fn iter() {
-                    let ts_type = ts_type_of_return_value(std::iter::once(true));
-                    assert_eq!(ts_type.name, "Array<boolean>");
-                    assert!(ts_type.is_primitive());
-                }
-
-                #[test]
-                fn stream() {
-                    let ts_type = ts_type_of_return_value(futures::stream::once(async { "hello" }));
-                    assert_eq!(ts_type.name, "string");
-                    assert!(ts_type.is_primitive());
-                }
+                register_fn(|| 123);
+                register_fn(|| async { 123 });
+                register_fn(|| stream::once(async { 123 }));
+                register_fn(|| async { stream::once(async { 123 }) });
+                register_fn(|| iter::once(123));
+                register_fn(|| async { iter::once(123) });
+                register_fn(|| stream::once(async { iter::once(123) }));
+                register_fn(|| async { stream::once(async { iter::once(123) }) });
+                register_fn(|| iter::once(iter::once(123)));
+                register_fn(|| async { iter::once(iter::once(123)) });
+                register_fn(|| stream::once(async { iter::once(iter::once(123)) }));
+                register_fn(|| async { stream::once(async { iter::once(iter::once(123)) }) });
             }
         }
     }
+
+    pub use async_shit::*;
 
     #[cfg(test)]
     mod test {
@@ -1326,7 +721,6 @@ mod handler {
 use handler::*;
 
 mod router {
-    use crate::ts::handler::return_type::ReturnType;
     use jsonrpsee::RpcModule;
 
     use super::{handler::meta::*, *};
@@ -1363,9 +757,9 @@ mod router {
         Ctx: 'static + Send + Sync,
     {
         /// Register the provided handler to this router.
-        pub fn handler<F, MParams, MReturn>(mut self, handler: HandlerDef<F>) -> Self
+        pub fn handler<F, MParams, MReturn, MValue, M>(mut self, handler: HandlerDef<F>) -> Self
         where
-            F: QubitHandler<MParams, MReturn, Ctx = Ctx>,
+            F: RegisterableHandler<MParams, MReturn, MValue, M, Ctx = Ctx>,
         {
             // Create the registration function for this handler.
             self.handler_registrations.push(Box::new(|module, prefix| {
@@ -1381,8 +775,7 @@ mod router {
                 };
 
                 // Use the registration method derived from the `ReturnType` of this handler.
-                // TODO: this
-                // F::Return::register(module, handler.handler, method_name);
+                handler.handler.register(module, method_name);
             }));
 
             self.handler_meta.push(handler.meta);
@@ -1430,11 +823,11 @@ mod router {
 
         use super::*;
 
-        fn run_handler<T>(module: &RpcModule<()>, method: &str) -> T
+        async fn run_handler<T>(module: &RpcModule<()>, method: &str) -> T
         where
             T: Clone + for<'a> Deserialize<'a>,
         {
-            futures::executor::block_on(async { module.call(method, [] as [(); 0]).await.unwrap() })
+            module.call(method, [] as [(); 0]).await.unwrap()
         }
 
         #[test]
@@ -1445,8 +838,8 @@ mod router {
             assert_eq!(module.method_names().count(), 0);
         }
 
-        #[test]
-        fn single_handler() {
+        #[tokio::test]
+        async fn single_handler() {
             let module = Router::new()
                 .handler(HandlerDef {
                     handler: || 123u32,
@@ -1459,11 +852,11 @@ mod router {
                 .into_module(());
 
             assert_eq!(module.method_names().count(), 1);
-            assert_eq!(run_handler::<u32>(&module, "handler"), 123);
+            assert_eq!(run_handler::<u32>(&module, "handler").await, 123);
         }
 
-        #[test]
-        fn multiple_handlers() {
+        #[tokio::test]
+        async fn multiple_handlers() {
             let module = Router::new()
                 .handler(HandlerDef {
                     handler: || 123u32,
@@ -1484,12 +877,12 @@ mod router {
                 .into_module(());
 
             assert_eq!(module.method_names().count(), 2);
-            assert_eq!(run_handler::<u32>(&module, "handler_1"), 123);
-            assert_eq!(run_handler::<String>(&module, "handler_2"), "hello");
+            assert_eq!(run_handler::<u32>(&module, "handler_1").await, 123);
+            assert_eq!(run_handler::<String>(&module, "handler_2").await, "hello");
         }
 
-        #[test]
-        fn nested_router() {
+        #[tokio::test]
+        async fn nested_router() {
             let module = Router::new()
                 .nest(
                     "nested",
@@ -1505,11 +898,11 @@ mod router {
                 .into_module(());
 
             assert_eq!(module.method_names().count(), 1);
-            assert_eq!(run_handler::<u32>(&module, "nested.handler"), 123);
+            assert_eq!(run_handler::<u32>(&module, "nested.handler").await, 123);
         }
 
-        #[test]
-        fn multiple_nested_router() {
+        #[tokio::test]
+        async fn multiple_nested_router() {
             let module = Router::new()
                 .nest(
                     "nested_1",
@@ -1536,12 +929,15 @@ mod router {
                 .into_module(());
 
             assert_eq!(module.method_names().count(), 2);
-            assert_eq!(run_handler::<u32>(&module, "nested_1.handler"), 123);
-            assert_eq!(run_handler::<String>(&module, "nested_2.handler"), "hello");
+            assert_eq!(run_handler::<u32>(&module, "nested_1.handler").await, 123);
+            assert_eq!(
+                run_handler::<String>(&module, "nested_2.handler").await,
+                "hello"
+            );
         }
 
-        #[test]
-        fn everything() {
+        #[tokio::test]
+        async fn everything() {
             let module = Router::new()
                 .handler(HandlerDef {
                     handler: || 123u32,
@@ -1584,10 +980,13 @@ mod router {
                 .into_module(());
 
             assert_eq!(module.method_names().count(), 4);
-            assert_eq!(run_handler::<u32>(&module, "handler_1"), 123);
-            assert_eq!(run_handler::<String>(&module, "handler_2"), "hello");
-            assert_eq!(run_handler::<u32>(&module, "nested_1.handler"), 456);
-            assert_eq!(run_handler::<String>(&module, "nested_2.handler"), "world");
+            assert_eq!(run_handler::<u32>(&module, "handler_1").await, 123);
+            assert_eq!(run_handler::<String>(&module, "handler_2").await, "hello");
+            assert_eq!(run_handler::<u32>(&module, "nested_1.handler").await, 456);
+            assert_eq!(
+                run_handler::<String>(&module, "nested_2.handler").await,
+                "world"
+            );
         }
     }
 }
@@ -1597,23 +996,21 @@ mod test {
     use futures::{Stream, stream};
 
     use super::{
-        handler::return_type::ReturnType,
         ts_type::{TsType, TsTypeTuple},
         *,
     };
 
-    fn assert_handler<F, HandlerMarker, ReturnMarker>(
+    fn assert_handler<F, HandlerMarker, ReturnMarker, MValue, M>(
         _handler: F,
         _expected_ctx: F::Ctx,
     ) -> (Vec<TsType>, TsType)
     where
-        F: QubitHandler<HandlerMarker, ReturnMarker>,
+        F: RegisterableHandler<HandlerMarker, ReturnMarker, MValue, M>,
     {
-        todo!()
-        // (
-        //     F::Params::get_ts_types(),
-        //     TsType::from_type::<<F::Return as ReturnType<_>>::Repr>(),
-        // )
+        (
+            F::Params::get_ts_types(),
+            TsType::from_type::<<F::Output as ResponseValue<_>>::Value>(),
+        )
     }
 
     #[test]
