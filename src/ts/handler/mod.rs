@@ -1,6 +1,7 @@
 pub mod marker;
 pub mod reflection;
 pub mod response;
+pub mod ts;
 
 use futures::{Stream, StreamExt};
 use jsonrpsee::{RpcModule, types::Params};
@@ -9,9 +10,7 @@ use ts_rs::TS;
 
 use std::{convert::Infallible, pin::pin};
 
-use super::ts_type::TsTypeTuple;
-
-use self::response::ResponseValue;
+use self::{response::ResponseValue, ts::TsTypeTuple};
 
 /// A handler suitable for use with Qubit.
 ///
@@ -31,69 +30,69 @@ pub trait QubitHandler<MSig>: 'static + Send + Sync + Clone {
 }
 
 macro_rules! impl_handlers {
-        (impl [$($ctx:ident, $($params:ident,)*)?]) => {
-            impl<F, R, $($ctx, $($params),*)?> QubitHandler<(
-                ($($ctx, $($params,)*)?),
-                R
-            )>
-            for F
-            where
-                F: 'static + Send + Sync + Clone + Fn($(&$ctx, $($params),*)?) -> R,
+    (impl [$($ctx:ident, $($params:ident,)*)?]) => {
+        impl<F, R, $($ctx, $($params),*)?> QubitHandler<(
+            ($($ctx, $($params,)*)?),
+            R
+        )>
+        for F
+        where
+            F: 'static + Send + Sync + Clone + Fn($(&$ctx, $($params),*)?) -> R,
+            $(
+                $ctx: 'static + Send + Sync,
+                $($params: 'static + TS + Send + for<'a> Deserialize<'a>),*
+            )?
+        {
+            type Ctx = impl_handlers!(ctx_ty [$($ctx)?]);
+
+            type Params = ($($($params,)*)?);
+            type Return = R;
+
+            fn call(
+                &self,
+                #[allow(unused)] ctx: &Self::Ctx,
+                #[allow(unused)] params: Params
+            ) -> Self::Return {
+                // If parameters are included, deserialise them.
                 $(
-                    $ctx: 'static + Send + Sync,
-                    $($params: 'static + TS + Send + for<'a> Deserialize<'a>),*
+                    #[allow(non_snake_case)]
+                    let ($($params,)*) = match params.parse::<Self::Params>() {
+                        Ok(params) => params,
+                        Err(_e) => {
+                            // TODO: Something
+                            panic!("fukc");
+                        }
+                    };
                 )?
-            {
-                type Ctx = impl_handlers!(ctx_ty [$($ctx)?]);
 
-                type Params = ($($($params,)*)?);
-                type Return = R;
-
-                fn call(
-                    &self,
-                    #[allow(unused)] ctx: &Self::Ctx,
-                    #[allow(unused)] params: Params
-                ) -> Self::Return {
-                    // If parameters are included, deserialise them.
-                    $(
-                        #[allow(non_snake_case)]
-                        let ($($params,)*) = match params.parse::<Self::Params>() {
-                            Ok(params) => params,
-                            Err(_e) => {
-                                // TODO: Something
-                                panic!("fukc");
-                            }
-                        };
-                    )?
-
-                    // Call the handler, optionally with the context and any parameters.
-                    self($(ctx, $($params,)*)?)
-                }
+                // Call the handler, optionally with the context and any parameters.
+                self($(ctx, $($params,)*)?)
             }
-        };
+        }
+    };
 
-        (ctx_ty [$ctx:ty]) => {
-            $ctx
-        };
-        (ctx_ty []) => {
-            ()
-        };
+    (ctx_ty [$ctx:ty]) => {
+        $ctx
+    };
+    (ctx_ty []) => {
+        ()
+    };
 
-        (recurse []) => {};
-        (recurse [$param:ident, $($params:ident,)*]) => {
-            impl_handlers!($($params),*);
-        };
+    (recurse []) => {};
+    (recurse [$param:ident, $($params:ident,)*]) => {
+        impl_handlers!($($params),*);
+    };
 
-        (count []) => { 0 };
-        (count [$param:ident, $($params:ident,)*]) => {
-            1 + impl_handlers!(count [$($params,)*])
-        };
+    (count []) => { 0 };
+    (count [$param:ident, $($params:ident,)*]) => {
+        1 + impl_handlers!(count [$($params,)*])
+    };
 
-        ($($params:ident),* $(,)?) => {
-            impl_handlers!(impl [$($params,)*]);
-            impl_handlers!(recurse [$($params,)*]);
-        };
-    }
+    ($($params:ident),* $(,)?) => {
+        impl_handlers!(impl [$($params,)*]);
+        impl_handlers!(recurse [$($params,)*]);
+    };
+}
 
 impl_handlers!(
     P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15
@@ -266,7 +265,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use super::{ts::TsType, *};
 
     use futures::stream;
     use rstest::rstest;
@@ -381,7 +380,7 @@ mod test {
         handler.register(&mut RpcModule::new(()), "handler".to_string());
     }
 
-    // Call some handlers, and assert the output.
+    /// Call some handlers, and assert the output.
     #[rstest]
     #[case(|| {}, json!(()), ())]
     #[case(|_ctx: &()| {}, json!(()), ())]
@@ -398,6 +397,43 @@ mod test {
         );
 
         assert_eq!(output, expected);
+    }
+
+    /// Sample CTX for [`handler_ts_type`].
+    struct SampleCtx;
+
+    /// Assert that a handler implements [`RegisterableHandler`], and the reflected TS types are correct.
+    #[rstest]
+    #[case::unit_handler(|| {}, (), [], "null")]
+    #[case::single_ctx_param(|_ctx: &SampleCtx| {}, SampleCtx, [], "null")]
+    #[case::only_return_ty(|| -> bool { todo!() }, (), [], "boolean")]
+    #[case::ctx_and_param(|_ctx: &SampleCtx, _a: u32| {}, SampleCtx, ["number"], "null")]
+    #[case::ctx_and_param_and_return(|_ctx: &SampleCtx, _a: u32| -> bool { todo!() }, SampleCtx, ["number"], "boolean")]
+    #[case::ctx_and_multi_param(|_ctx: &SampleCtx, _a: u32, _b: String, _c: bool| {}, SampleCtx, ["number", "string", "boolean"], "null")]
+    #[case::ctx_and_multi_param_return(|_ctx: &SampleCtx, _a: u32, _b: String, _c: bool| -> bool { todo!() }, SampleCtx, ["number", "string", "boolean"], "boolean")]
+    #[case::produce_iter(|| { [1, 2, 3].into_iter() }, (), [], "Array<number>")]
+    #[case::produce_stream(|| { stream::iter([1, 2, 3]) }, (), [], "number")]
+    fn handler_ts_type<H, MSig, MValue, MReturn>(
+        #[case] _handler: H,
+        #[case] _ctx: H::Ctx,
+        #[case] expected_params: impl IntoIterator<Item = &'static str>,
+        #[case] expected_return: &'static str,
+    ) where
+        MValue: marker::ResponseMarker,
+        MReturn: marker::HandlerReturnMarker,
+        H: RegisterableHandler<MSig, MValue, MReturn>,
+    {
+        assert_eq!(
+            H::Params::get_ts_types()
+                .into_iter()
+                .map(|ty| ty.name.clone())
+                .collect::<Vec<_>>(),
+            expected_params.into_iter().collect::<Vec<_>>()
+        );
+        assert_eq!(
+            TsType::from_type::<<H::Response as ResponseValue<_>>::Value>().name,
+            expected_return
+        );
     }
 
     mod handler_traits {
