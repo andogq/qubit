@@ -1,0 +1,439 @@
+pub mod marker;
+pub mod reflection;
+pub mod response;
+
+use futures::{Stream, StreamExt};
+use jsonrpsee::{RpcModule, types::Params};
+use serde::Deserialize;
+use ts_rs::TS;
+
+use std::{convert::Infallible, pin::pin};
+
+use super::ts_type::TsTypeTuple;
+
+use self::response::ResponseValue;
+
+/// A handler suitable for use with Qubit.
+///
+/// The `Marker` generic is a utility in order to provide implementations for `Fn` traits which
+/// take generics as parameters.
+pub trait QubitHandler<MSig>: 'static + Send + Sync + Clone {
+    /// Context type this handler expects.
+    type Ctx: 'static + Send + Sync;
+    /// Parameters that the handler will accept (excluding [`Ctx`](QubitHandler::Ctx)).
+    type Params: TsTypeTuple;
+    /// Return type of the handler.
+    type Return;
+
+    /// Call the handler with the provided `Ctx` and [`Params`]. The handler implementation
+    /// must deserialise the parameters as required.
+    fn call(&self, ctx: &Self::Ctx, params: Params) -> Self::Return;
+}
+
+macro_rules! impl_handlers {
+        (impl [$($ctx:ident, $($params:ident,)*)?]) => {
+            impl<F, R, $($ctx, $($params),*)?> QubitHandler<(
+                ($($ctx, $($params,)*)?),
+                R
+            )>
+            for F
+            where
+                F: 'static + Send + Sync + Clone + Fn($(&$ctx, $($params),*)?) -> R,
+                $(
+                    $ctx: 'static + Send + Sync,
+                    $($params: 'static + TS + Send + for<'a> Deserialize<'a>),*
+                )?
+            {
+                type Ctx = impl_handlers!(ctx_ty [$($ctx)?]);
+
+                type Params = ($($($params,)*)?);
+                type Return = R;
+
+                fn call(
+                    &self,
+                    #[allow(unused)] ctx: &Self::Ctx,
+                    #[allow(unused)] params: Params
+                ) -> Self::Return {
+                    // If parameters are included, deserialise them.
+                    $(
+                        #[allow(non_snake_case)]
+                        let ($($params,)*) = match params.parse::<Self::Params>() {
+                            Ok(params) => params,
+                            Err(_e) => {
+                                // TODO: Something
+                                panic!("fukc");
+                            }
+                        };
+                    )?
+
+                    // Call the handler, optionally with the context and any parameters.
+                    self($(ctx, $($params,)*)?)
+                }
+            }
+        };
+
+        (ctx_ty [$ctx:ty]) => {
+            $ctx
+        };
+        (ctx_ty []) => {
+            ()
+        };
+
+        (recurse []) => {};
+        (recurse [$param:ident, $($params:ident,)*]) => {
+            impl_handlers!($($params),*);
+        };
+
+        (count []) => { 0 };
+        (count [$param:ident, $($params:ident,)*]) => {
+            1 + impl_handlers!(count [$($params,)*])
+        };
+
+        ($($params:ident),* $(,)?) => {
+            impl_handlers!(impl [$($params,)*]);
+            impl_handlers!(recurse [$($params,)*]);
+        };
+    }
+
+impl_handlers!(
+    P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15
+);
+
+/// Registration implementation differs depending on the return type of the handler. This
+/// is to account for handlers which may return futures, streams, or values directly.
+pub trait RegisterableHandler<
+    MSig,
+    MValue: marker::ResponseMarker,
+    MReturn: marker::HandlerReturnMarker,
+>: QubitHandler<MSig>
+{
+    /// The 'response' of the handler, which might not necessarily be the direct return type of the
+    /// handler. It may be the [`Future::Output`], a [`Stream::Item`], or some other value that is
+    /// derived from a handler return value.
+    type Response: ResponseValue<MValue>;
+
+    /// Register this handler against the provided RPC module.
+    fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String);
+}
+
+/// Register any handler that directly returns a [`ResponseValue`]. This will generally be the
+/// simplest of handlers, without any streaming or futures.
+impl<T, MSig, MValue> RegisterableHandler<MSig, MValue, marker::MResponse<MValue>> for T
+where
+    MValue: marker::ResponseMarker,
+    T: QubitHandler<MSig>,
+    T::Return: ResponseValue<MValue>,
+{
+    /// The response is whatever is returned from the handler (plus any additional processing from
+    /// [`ResponseValue::transform`]).
+    type Response = T::Return;
+
+    /// These handlers will be registered using [`RpcModule::register_blocking_method`], so that
+    /// the handler can be run on a new thread without blocking the server.
+    fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String) {
+        module
+            .register_blocking_method(
+                Box::leak(method_name.into_boxed_str()),
+                move |params, ctx, _extensions| {
+                    let result = self.call(&ctx, params);
+                    Ok::<_, Infallible>(result.transform())
+                },
+            )
+            .unwrap();
+    }
+}
+
+/// Register any handler that returns a [`Future`] which outputs a [`ResponseValue`]. This
+/// implementation covers `async` handlers.
+impl<T, MSig, MValue> RegisterableHandler<MSig, MValue, marker::MFuture<marker::MResponse<MValue>>>
+    for T
+where
+    MValue: marker::ResponseMarker,
+    T: QubitHandler<MSig>,
+    T::Return: Future + Send,
+    <T::Return as Future>::Output: ResponseValue<MValue>,
+{
+    /// The response will be the `await`ed value of the returned future.
+    type Response = <T::Return as Future>::Output;
+
+    /// These handlers will be registered using [`RpcModule::register_async_method`].
+    fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String) {
+        module
+            .register_async_method(
+                Box::leak(method_name.into_boxed_str()),
+                move |params, ctx, _extensions| {
+                    let f = self.clone();
+
+                    async move {
+                        let result = f.call(&ctx, params).await;
+                        Ok::<_, Infallible>(result.transform())
+                    }
+                },
+            )
+            .unwrap();
+    }
+}
+
+/// Register any handler that returns a [`Stream`] containing items implementing [`ResponseValue`].
+/// This implementation will only handle [`Stream`]s which are directly returned from a handler
+/// (not async handlers).
+impl<T, MValue, MSig> RegisterableHandler<MSig, MValue, marker::MStream<MValue>> for T
+where
+    MValue: marker::ResponseMarker,
+    T: QubitHandler<MSig>,
+    T::Return: Stream + Send,
+    <T::Return as Stream>::Item: Send + ResponseValue<MValue>,
+{
+    /// The response is the [`Stream::Item`] of the resulting stream. This response value will be
+    /// produced multiple times.
+    type Response = <T::Return as Stream>::Item;
+
+    /// These handlers will be registered usig [`RpcModule::register_subscription`].
+    fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String) {
+        let notif_method_name = format!("{method_name}_notif");
+        let unsub_method_name = format!("{method_name}_unsub");
+
+        module
+            .register_subscription(
+                Box::leak(method_name.into_boxed_str()),
+                Box::leak(notif_method_name.into_boxed_str()),
+                Box::leak(unsub_method_name.into_boxed_str()),
+                move |params, pending, ctx, _extensions| {
+                    let f = self.clone();
+
+                    async move {
+                        let sink = pending.accept().await.unwrap();
+
+                        let mut stream = pin!(f.call(&ctx, params));
+
+                        while let Some(item) = stream.next().await {
+                            let item = serde_json::value::to_raw_value(&item.transform()).unwrap();
+                            sink.send(item).await.unwrap();
+                        }
+
+                        Ok(())
+                    }
+                },
+            )
+            .unwrap();
+    }
+}
+
+// TODO: Combine the duplicated `register_subscription` logic between sync and async streams.
+
+/// Register any handler that returns a [`Future`] that outputs a [`Stream`] containing items
+/// implementing [`ResponseValue`]. This implementation only supports async handlers.
+impl<T, MValue, MSig> RegisterableHandler<MSig, MValue, marker::MFuture<marker::MStream<MValue>>>
+    for T
+where
+    MValue: marker::ResponseMarker,
+    T: QubitHandler<MSig>,
+    T::Return: Send + Future,
+    <T::Return as Future>::Output: Stream + Send,
+    <<T::Return as Future>::Output as Stream>::Item: Send + ResponseValue<MValue>,
+{
+    type Response = <<T::Return as Future>::Output as Stream>::Item;
+
+    fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String) {
+        let notif_method_name = format!("{method_name}_notif");
+        let unsub_method_name = format!("{method_name}_unsub");
+
+        module
+            .register_subscription(
+                Box::leak(method_name.into_boxed_str()),
+                Box::leak(notif_method_name.into_boxed_str()),
+                Box::leak(unsub_method_name.into_boxed_str()),
+                move |params, pending, ctx, _extensions| {
+                    let f = self.clone();
+
+                    async move {
+                        let sink = pending.accept().await.unwrap();
+
+                        let mut stream = pin!(f.call(&ctx, params).await);
+
+                        while let Some(item) = stream.next().await {
+                            let item = serde_json::value::to_raw_value(&item.transform()).unwrap();
+                            sink.send(item).await.unwrap();
+                        }
+
+                        Ok(())
+                    }
+                },
+            )
+            .unwrap();
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use futures::stream;
+    use rstest::rstest;
+    use serde_json::{Value, json};
+
+    use std::{fmt::Debug, iter};
+
+    mod register {
+        //! Test registering different kinds of handlers to a [`RpcModule`], and call them to
+        //! ensure they produce the correct response.
+
+        use jsonrpsee::RpcModule;
+        use serde::Deserialize;
+
+        use super::*;
+
+        /// Produce an iterator counting from 0 to 2 (inclusive).
+        fn simple_iter() -> impl Iterator<Item = usize> {
+            0..3
+        }
+
+        /// Register a handler to a module, and return the module. The handler will be
+        /// registered at `handler`.
+        fn register_handler<
+            F,
+            MSig,
+            MValue: marker::ResponseMarker,
+            MReturn: marker::HandlerReturnMarker,
+        >(
+            handler: F,
+        ) -> RpcModule<()>
+        where
+            F: RegisterableHandler<MSig, MValue, MReturn, Ctx = ()>,
+        {
+            let mut module = RpcModule::new(());
+            F::register(handler, &mut module, "handler".to_string());
+            module
+        }
+
+        /// Register a handler to a module, and call it, returning the value that was
+        /// returned from the handler according to [`ReturnType`].
+        async fn test_handler<
+            F,
+            MSig,
+            MValue: marker::ResponseMarker,
+            MReturn: marker::HandlerReturnMarker,
+        >(
+            handler: F,
+        ) -> <F::Response as ResponseValue<MValue>>::Value
+        where
+            F: RegisterableHandler<MSig, MValue, MReturn, Ctx = ()>,
+            <F::Response as ResponseValue<MValue>>::Value: for<'a> Deserialize<'a>,
+        {
+            let module = register_handler(handler);
+
+            let fut = module
+                .call::<[(); 0], <F::Response as ResponseValue<MValue>>::Value>("handler", []);
+            fut.await.unwrap()
+        }
+
+        /// Primitive `TS` values should be returned as-is.
+        #[tokio::test]
+        async fn ts() {
+            assert_eq!(test_handler(|| 123u32).await, 123);
+        }
+
+        /// Iterators should be collected and returned as a `Vec`.
+        #[tokio::test]
+        async fn iter() {
+            assert_eq!(test_handler(simple_iter).await, vec![0, 1, 2]);
+        }
+
+        /// Stream should be consumed and each value returned one at a time.
+        #[tokio::test]
+        async fn stream() {
+            let module = register_handler(|| futures::stream::iter(simple_iter()));
+            let mut subs = module.subscribe("handler", [] as [(); 0], 3).await.unwrap();
+
+            let mut next = async || subs.next::<usize>().await.unwrap().unwrap().0;
+
+            // Values should be produced in-order.
+            assert_eq!(0, next().await);
+            assert_eq!(1, next().await);
+            assert_eq!(2, next().await);
+
+            // Stream should be over, since there's no more items to be returned.
+            assert!(subs.next::<usize>().await.is_none());
+        }
+    }
+
+    /// Register a bunch of different complex handler types.
+    #[rstest]
+    #[case::ts_value(|| 123)]
+    #[case::async_ts_value(|| async { 123 })]
+    #[case::stream(|| stream::once(async { 123 }))]
+    #[case::async_stream(|| async { stream::once(async { 123 }) })]
+    #[case::iter(|| iter::once(123))]
+    #[case::async_iter(|| async { iter::once(123) })]
+    #[case::stream_iter(|| stream::once(async { iter::once(123) }))]
+    #[case::async_stream_iter(|| async { stream::once(async { iter::once(123) }) })]
+    #[case::iter_iter(|| iter::once(iter::once(123)))]
+    #[case::async_iter_iter(|| async { iter::once(iter::once(123)) })]
+    #[case::stream_iter_iter(|| stream::once(async { iter::once(iter::once(123)) }))]
+    #[case::async_stream_iter_iter(|| async { stream::once(async { iter::once(iter::once(123)) }) })]
+    fn register_handler<
+        MSig,
+        MValue: marker::ResponseMarker,
+        MReturn: marker::HandlerReturnMarker,
+    >(
+        #[case] handler: impl RegisterableHandler<MSig, MValue, MReturn, Ctx = ()>,
+    ) {
+        handler.register(&mut RpcModule::new(()), "handler".to_string());
+    }
+
+    // Call some handlers, and assert the output.
+    #[rstest]
+    #[case(|| {}, json!(()), ())]
+    #[case(|_ctx: &()| {}, json!(()), ())]
+    #[case(|_ctx: &(), param: u32| param, json!([123]), 123)]
+    #[case(|_ctx: &(), param_1: u32, param_2: String| -> (u32, String) { (param_1, param_2) }, json!([123, "hello"]), (123, "hello".to_string()))]
+    fn call_handler<H, MSig>(#[case] handler: H, #[case] params: Value, #[case] expected: H::Return)
+    where
+        H: QubitHandler<MSig, Ctx = ()>,
+        H::Return: Debug + PartialEq,
+    {
+        let output = handler.call(
+            &(),
+            Params::new(Some(&serde_json::to_string(&params).unwrap())).into_owned(),
+        );
+
+        assert_eq!(output, expected);
+    }
+
+    mod handler_traits {
+        //! Some random trait assertions for [`QubitHandler`].
+
+        use super::*;
+
+        use static_assertions::assert_impl_all;
+
+        // Handler with no inputs/outputs.
+        assert_impl_all!(
+            fn () -> (): QubitHandler<((), ()), Ctx = (), Params = (), Return = ()>
+        );
+        // Handler with single Ctx param.
+        assert_impl_all!(
+            fn (&u32) -> (): QubitHandler<((u32,), ()), Ctx = u32, Params = (), Return = ()>
+        );
+        // Handler with Ctx param, and other parameters.
+        assert_impl_all!(
+            fn (&u32, String, bool) -> (): QubitHandler<((u32, String, bool), ()), Ctx = u32, Params = (String, bool), Return = ()>
+        );
+        // Handler with primitive return type.
+        assert_impl_all!(
+            fn () -> u32: QubitHandler<((), u32), Ctx = (), Params = (), Return = u32>
+        );
+        // Handler with iterator return type.
+        assert_impl_all!(
+            fn () -> std::vec::IntoIter<u32> : QubitHandler<((), std::vec::IntoIter<u32>)>
+        );
+        // Handler with stream return type.
+        assert_impl_all!(
+            fn () -> futures::stream::Iter<std::vec::IntoIter<u32>> : QubitHandler<((), futures::stream::Iter<std::vec::IntoIter<u32>>)>
+        );
+        // Handler returning a stream of iterators of iterators.
+        assert_impl_all!(
+            fn () -> futures::stream::Iter<std::vec::IntoIter<std::vec::IntoIter<u32>>> : QubitHandler<((), futures::stream::Iter<std::vec::IntoIter<std::vec::IntoIter<u32>>>)>
+        );
+    }
+}
