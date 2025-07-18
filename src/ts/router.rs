@@ -1,6 +1,9 @@
 use jsonrpsee::RpcModule;
 
-use super::handler::{RegisterableHandler, marker, reflection::*};
+use super::{
+    handler::{RegisterableHandler, marker, reflection::*},
+    ts::TsRouter,
+};
 
 /// A closure which will register a handler to the provided [`RpcModule`], with an optional
 /// prefix. The registration is guarenteed to only take place once, so the closure is free to
@@ -10,21 +13,18 @@ type HandlerRegistration<Ctx> = Box<dyn FnOnce(&mut RpcModule<Ctx>, Option<&str>
 /// Collection of handlers and nested routers, which combine to create an RPC API, including
 /// TypeScript bindings.
 struct Router<Ctx> {
-    /// Routers nested within this router, and the prefix they are located.
-    nested_routers: Vec<(String, Router<Ctx>)>,
     /// Registration methods for all handlers present in this router.
-    handler_registrations: Vec<HandlerRegistration<Ctx>>,
-    /// [`HandlerMeta`] for all of the handlers registered to this router.
-    handler_meta: Vec<HandlerMeta>,
+    handler_registrations: Vec<(Option<String>, HandlerRegistration<Ctx>)>,
+    /// Type information for generating TypeScript type for the router.
+    ts_module: TsRouter,
 }
 
 impl<Ctx> Router<Ctx> {
     /// Create an empty router.
     pub fn new() -> Self {
         Router {
-            nested_routers: Vec::new(),
             handler_registrations: Vec::new(),
-            handler_meta: Vec::new(),
+            ts_module: TsRouter::new(),
         }
     }
 }
@@ -41,53 +41,65 @@ where
     where
         F: RegisterableHandler<MSig, MValue, MReturn, Ctx = Ctx>,
     {
+        self.ts_module.add_handler(
+            handler.meta.name,
+            handler.meta.param_names,
+            &handler.handler,
+        );
+
         // Create the registration function for this handler.
-        self.handler_registrations.push(Box::new(|module, prefix| {
-            // Build the method name, depending if there's a prefix or not.
-            let method_name = {
-                let handler_name = handler.meta.name.to_string();
+        self.handler_registrations.push((
+            None,
+            Box::new(|module, prefix| {
+                // Build the method name, depending if there's a prefix or not.
+                let method_name = {
+                    let handler_name = handler.meta.name.to_string();
 
-                if let Some(prefix) = prefix {
-                    format!("{prefix}.{}", handler_name)
-                } else {
-                    handler_name
-                }
-            };
+                    if let Some(prefix) = prefix {
+                        format!("{prefix}.{}", handler_name)
+                    } else {
+                        handler_name
+                    }
+                };
 
-            // Use the registration method derived from the `ReturnType` of this handler.
-            handler.handler.register(module, method_name);
-        }));
-
-        self.handler_meta.push(handler.meta);
+                // Use the registration method derived from the `ReturnType` of this handler.
+                handler.handler.register(module, method_name);
+            }),
+        ));
 
         self
     }
 
     /// Nest a router at the provided prefix.
-    pub fn nest(mut self, prefix: impl ToString, router: Router<Ctx>) -> Self {
-        self.nested_routers.push((prefix.to_string(), router));
+    pub fn nest(mut self, prefix: impl AsRef<str>, router: Router<Ctx>) -> Self {
+        let prefix = prefix.as_ref();
+
+        self.handler_registrations
+            .extend(router.handler_registrations.into_iter().map(
+                |(handler_prefix, registration)| {
+                    (
+                        Some(match handler_prefix {
+                            Some(handler_prefix) => format!("{prefix}.{handler_prefix}"),
+                            None => prefix.to_string(),
+                        }),
+                        registration,
+                    )
+                },
+            ));
+        self.ts_module.nest(prefix, router.ts_module);
 
         self
     }
 
     /// Consume this router, and produce an [`RpcModule`].
     pub fn into_module(self, ctx: Ctx) -> RpcModule<Ctx> {
-        let mut module = RpcModule::new(ctx);
-        self.add_to_module(&mut module, None);
-        module
-    }
-
-    /// Consume this router, adding it to the provided [`RpcModule`].
-    fn add_to_module(self, module: &mut RpcModule<Ctx>, prefix: Option<&str>) {
-        // Add the handlers for this router.
-        for register in self.handler_registrations {
-            register(module, prefix);
-        }
-
-        // Add all nested routers.
-        for (prefix, router) in self.nested_routers {
-            router.add_to_module(module, Some(&prefix));
-        }
+        self.handler_registrations.into_iter().fold(
+            RpcModule::new(ctx),
+            |mut module, (prefix, register)| {
+                register(&mut module, prefix.as_deref());
+                module
+            },
+        )
     }
 }
 

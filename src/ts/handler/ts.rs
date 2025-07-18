@@ -23,8 +23,8 @@ pub struct TsTypeUser {
     /// TypeScript type (with the exception of numbers like [`i32`] and [`u32`] which are both
     ///  `number`).
     pub id: std::any::TypeId,
-    /// Path that this user type will be exported to.
-    pub output_path: std::path::PathBuf,
+    /// Declaration of this type.
+    pub declaration: String,
 }
 
 /// Type information to represent a type in TypeScript.
@@ -53,10 +53,10 @@ impl TsType {
 
         // Determine whether the type is primitive or not based on whether the output path is defined.
         match T::output_path() {
-            Some(output_path) => Self::User(TsTypeUser {
+            Some(_) => Self::User(TsTypeUser {
                 common,
                 id: TypeId::of::<T>(),
-                output_path,
+                declaration: T::decl(),
             }),
             None => Self::Primitive(common),
         }
