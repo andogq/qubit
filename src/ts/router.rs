@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use jsonrpsee::RpcModule;
 
 use super::{
@@ -16,7 +18,7 @@ struct Router<Ctx> {
     /// Registration methods for all handlers present in this router.
     handler_registrations: Vec<(Option<String>, HandlerRegistration<Ctx>)>,
     /// Type information for generating TypeScript type for the router.
-    ts_module: TsRouter,
+    ts_router: TsRouter,
 }
 
 impl<Ctx> Router<Ctx> {
@@ -24,7 +26,7 @@ impl<Ctx> Router<Ctx> {
     pub fn new() -> Self {
         Router {
             handler_registrations: Vec::new(),
-            ts_module: TsRouter::new(),
+            ts_router: TsRouter::new(),
         }
     }
 }
@@ -41,7 +43,7 @@ where
     where
         F: RegisterableHandler<MSig, MValue, MReturn, Ctx = Ctx>,
     {
-        self.ts_module.add_handler(
+        self.ts_router.add_handler(
             handler.meta.name,
             handler.meta.param_names,
             &handler.handler,
@@ -86,9 +88,16 @@ where
                     )
                 },
             ));
-        self.ts_module.nest(prefix, router.ts_module);
+        self.ts_router.nest(prefix, router.ts_router);
 
         self
+    }
+
+    /// Generate the TypeScript for this router, and write it to the provided path.
+    pub fn generate_type(&self, output_path: impl AsRef<Path>) -> std::io::Result<()> {
+        let router_typescript = self.ts_router.generate_typescript();
+        std::fs::write(output_path.as_ref(), router_typescript)?;
+        Ok(())
     }
 
     /// Consume this router, and produce an [`RpcModule`].

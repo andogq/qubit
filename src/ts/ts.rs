@@ -100,6 +100,7 @@ impl TsRouter {
         Ok(())
     }
 
+    /// Generate an entire TypeScript file for this router, including all user type definitions.
     pub fn generate_typescript(&self) -> String {
         let user_types = {
             let mut user_types = BTreeMap::new();
@@ -120,6 +121,7 @@ impl TsRouter {
         typescript
     }
 
+    /// Copy user types into the provided [`BTreeMap`].
     fn copy_user_types(&self, user_types: &mut BTreeMap<TypeId, String>) {
         user_types.extend(self.user_types.clone());
 
