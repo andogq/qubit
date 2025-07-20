@@ -149,15 +149,15 @@ mod test {
 
         #[rstest]
         #[case::empty(&[], || {}, "() => null")]
-        #[case::ctx(&[], |ctx: &()| {}, "() => null")]
-        #[case::param(&["a"], |ctx: &(), a: usize| {}, "(a: number) => null")]
-        #[case::multi_param(&["a", "b"], |ctx: &(), a: usize, b: bool| {}, "(a: number, b: boolean) => null")]
+        #[case::ctx(&[], |ctx: ()| {}, "() => null")]
+        #[case::param(&["a"], |ctx: (), a: usize| {}, "(a: number) => null")]
+        #[case::multi_param(&["a", "b"], |ctx: (), a: usize, b: bool| {}, "(a: number, b: boolean) => null")]
         #[case::ret(&[], || -> usize { todo!() }, "() => number")]
-        #[case::ret_ctx(&[], |ctx: &()| -> usize { todo!() }, "() => number")]
-        #[case::custom_param(&["custom"], |ctx: &(), custom: CustomStruct| {}, "(custom: CustomStruct) => null")]
-        #[case::custom_ret(&[], |ctx: &()| -> CustomStruct { todo!() }, "() => CustomStruct")]
-        #[case::complex_response(&[], |ctx: &()| async { CustomStruct }, "() => CustomStruct")]
-        #[case::everything(&["a", "b", "custom"], |ctx: &(), a: usize, b: String, custom: CustomStruct| async { CustomStruct }, "(a: number, b: string, custom: CustomStruct) => CustomStruct")]
+        #[case::ret_ctx(&[], |ctx: ()| -> usize { todo!() }, "() => number")]
+        #[case::custom_param(&["custom"], |ctx: (), custom: CustomStruct| {}, "(custom: CustomStruct) => null")]
+        #[case::custom_ret(&[], |ctx: ()| -> CustomStruct { todo!() }, "() => CustomStruct")]
+        #[case::complex_response(&[], |ctx: ()| async { CustomStruct }, "() => CustomStruct")]
+        #[case::everything(&["a", "b", "custom"], |ctx: (), a: usize, b: String, custom: CustomStruct| async { CustomStruct }, "(a: number, b: string, custom: CustomStruct) => CustomStruct")]
         fn test<F, MSig, MValue: marker::ResponseMarker, MReturn: marker::HandlerReturnMarker>(
             #[case] param_names: &[&str],
             #[case] handler: F,
@@ -186,7 +186,7 @@ mod test {
     #[allow(unused)]
     fn user_types() {
         let mut module = TsRouter::new();
-        module.add_handler("handler", &["a"], &|ctx: &(), a: UserTypeA| -> UserTypeB {
+        module.add_handler("handler", &["a"], &|ctx: (), a: UserTypeA| -> UserTypeB {
             todo!()
         });
 
@@ -238,18 +238,10 @@ mod test {
         #![allow(unused)]
 
         let mut router = TsRouter::new();
-        router.add_handler(
-            "outer",
-            &["user_type"],
-            &|ctx: &(), user_type: UserTypeA| {},
-        );
+        router.add_handler("outer", &["user_type"], &|ctx: (), user_type: UserTypeA| {});
         router.nest("nested", {
             let mut router = TsRouter::new();
-            router.add_handler(
-                "inner",
-                &["user_type"],
-                &|ctx: &(), user_type: UserTypeB| {},
-            );
+            router.add_handler("inner", &["user_type"], &|ctx: (), user_type: UserTypeB| {});
             router
         });
 

@@ -18,7 +18,7 @@ use self::{response::ResponseValue, ts::TsTypeTuple};
 /// take generics as parameters.
 pub trait QubitHandler<MSig>: 'static + Send + Sync + Clone {
     /// Context type this handler expects.
-    type Ctx: 'static + Send + Sync;
+    type Ctx: 'static + Clone + Send + Sync;
     /// Parameters that the handler will accept (excluding [`Ctx`](QubitHandler::Ctx)).
     type Params: TsTypeTuple;
     /// Return type of the handler.
@@ -26,7 +26,7 @@ pub trait QubitHandler<MSig>: 'static + Send + Sync + Clone {
 
     /// Call the handler with the provided `Ctx` and [`Params`]. The handler implementation
     /// must deserialise the parameters as required.
-    fn call(&self, ctx: &Self::Ctx, params: Params) -> Self::Return;
+    fn call(&self, ctx: Self::Ctx, params: Params) -> Self::Return;
 }
 
 macro_rules! impl_handlers {
@@ -37,9 +37,9 @@ macro_rules! impl_handlers {
         )>
         for F
         where
-            F: 'static + Send + Sync + Clone + Fn($(&$ctx, $($params),*)?) -> R,
+            F: 'static + Send + Sync + Clone + Fn($($ctx, $($params),*)?) -> R,
             $(
-                $ctx: 'static + Send + Sync,
+                $ctx: 'static + Clone + Send + Sync,
                 $($params: 'static + TS + Send + for<'a> Deserialize<'a>),*
             )?
         {
@@ -50,7 +50,7 @@ macro_rules! impl_handlers {
 
             fn call(
                 &self,
-                #[allow(unused)] ctx: &Self::Ctx,
+                #[allow(unused)] ctx: Self::Ctx,
                 #[allow(unused)] params: Params
             ) -> Self::Return {
                 // If parameters are included, deserialise them.
@@ -134,7 +134,7 @@ where
             .register_blocking_method(
                 Box::leak(method_name.into_boxed_str()),
                 move |params, ctx, _extensions| {
-                    let result = self.call(&ctx, params);
+                    let result = self.call((*ctx).clone(), params);
                     Ok::<_, Infallible>(result.transform())
                 },
             )
@@ -164,7 +164,7 @@ where
                     let f = self.clone();
 
                     async move {
-                        let result = f.call(&ctx, params).await;
+                        let result = f.call((*ctx).clone(), params).await;
                         Ok::<_, Infallible>(result.transform())
                     }
                 },
@@ -203,7 +203,7 @@ where
                     async move {
                         let sink = pending.accept().await.unwrap();
 
-                        let mut stream = pin!(f.call(&ctx, params));
+                        let mut stream = pin!(f.call((*ctx).clone(), params));
 
                         while let Some(item) = stream.next().await {
                             let item = serde_json::value::to_raw_value(&item.transform()).unwrap();
@@ -248,7 +248,7 @@ where
                     async move {
                         let sink = pending.accept().await.unwrap();
 
-                        let mut stream = pin!(f.call(&ctx, params).await);
+                        let mut stream = pin!(f.call((*ctx).clone(), params).await);
 
                         while let Some(item) = stream.next().await {
                             let item = serde_json::value::to_raw_value(&item.transform()).unwrap();
@@ -383,16 +383,16 @@ mod test {
     /// Call some handlers, and assert the output.
     #[rstest]
     #[case(|| {}, json!(()), ())]
-    #[case(|_ctx: &()| {}, json!(()), ())]
-    #[case(|_ctx: &(), param: u32| param, json!([123]), 123)]
-    #[case(|_ctx: &(), param_1: u32, param_2: String| -> (u32, String) { (param_1, param_2) }, json!([123, "hello"]), (123, "hello".to_string()))]
+    #[case(|_ctx: ()| {}, json!(()), ())]
+    #[case(|_ctx: (), param: u32| param, json!([123]), 123)]
+    #[case(|_ctx: (), param_1: u32, param_2: String| -> (u32, String) { (param_1, param_2) }, json!([123, "hello"]), (123, "hello".to_string()))]
     fn call_handler<H, MSig>(#[case] handler: H, #[case] params: Value, #[case] expected: H::Return)
     where
         H: QubitHandler<MSig, Ctx = ()>,
         H::Return: Debug + PartialEq,
     {
         let output = handler.call(
-            &(),
+            (),
             Params::new(Some(&serde_json::to_string(&params).unwrap())).into_owned(),
         );
 
@@ -400,17 +400,18 @@ mod test {
     }
 
     /// Sample CTX for [`handler_ts_type`].
+    #[derive(Clone)]
     struct SampleCtx;
 
     /// Assert that a handler implements [`RegisterableHandler`], and the reflected TS types are correct.
     #[rstest]
     #[case::unit_handler(|| {}, (), [], "null")]
-    #[case::single_ctx_param(|_ctx: &SampleCtx| {}, SampleCtx, [], "null")]
+    #[case::single_ctx_param(|_ctx: SampleCtx| {}, SampleCtx, [], "null")]
     #[case::only_return_ty(|| -> bool { todo!() }, (), [], "boolean")]
-    #[case::ctx_and_param(|_ctx: &SampleCtx, _a: u32| {}, SampleCtx, ["number"], "null")]
-    #[case::ctx_and_param_and_return(|_ctx: &SampleCtx, _a: u32| -> bool { todo!() }, SampleCtx, ["number"], "boolean")]
-    #[case::ctx_and_multi_param(|_ctx: &SampleCtx, _a: u32, _b: String, _c: bool| {}, SampleCtx, ["number", "string", "boolean"], "null")]
-    #[case::ctx_and_multi_param_return(|_ctx: &SampleCtx, _a: u32, _b: String, _c: bool| -> bool { todo!() }, SampleCtx, ["number", "string", "boolean"], "boolean")]
+    #[case::ctx_and_param(|_ctx: SampleCtx, _a: u32| {}, SampleCtx, ["number"], "null")]
+    #[case::ctx_and_param_and_return(|_ctx: SampleCtx, _a: u32| -> bool { todo!() }, SampleCtx, ["number"], "boolean")]
+    #[case::ctx_and_multi_param(|_ctx: SampleCtx, _a: u32, _b: String, _c: bool| {}, SampleCtx, ["number", "string", "boolean"], "null")]
+    #[case::ctx_and_multi_param_return(|_ctx: SampleCtx, _a: u32, _b: String, _c: bool| -> bool { todo!() }, SampleCtx, ["number", "string", "boolean"], "boolean")]
     #[case::produce_iter(|| { [1, 2, 3].into_iter() }, (), [], "Array<number>")]
     #[case::produce_stream(|| { stream::iter([1, 2, 3]) }, (), [], "number")]
     fn handler_ts_type<H, MSig, MValue, MReturn>(
@@ -449,11 +450,11 @@ mod test {
         );
         // Handler with single Ctx param.
         assert_impl_all!(
-            fn (&u32) -> (): QubitHandler<((u32,), ()), Ctx = u32, Params = (), Return = ()>
+            fn (u32) -> (): QubitHandler<((u32,), ()), Ctx = u32, Params = (), Return = ()>
         );
         // Handler with Ctx param, and other parameters.
         assert_impl_all!(
-            fn (&u32, String, bool) -> (): QubitHandler<((u32, String, bool), ()), Ctx = u32, Params = (String, bool), Return = ()>
+            fn (u32, String, bool) -> (): QubitHandler<((u32, String, bool), ()), Ctx = u32, Params = (String, bool), Return = ()>
         );
         // Handler with primitive return type.
         assert_impl_all!(
