@@ -1,8 +1,10 @@
+pub mod ctx;
 pub mod marker;
 pub mod reflection;
 pub mod response;
 pub mod ts;
 
+use ctx::FromRequestExtensions;
 use futures::{Stream, StreamExt};
 use jsonrpsee::{RpcModule, types::Params};
 use serde::Deserialize;
@@ -18,7 +20,7 @@ use self::{response::ResponseValue, ts::TsTypeTuple};
 /// take generics as parameters.
 pub trait QubitHandler<MSig>: 'static + Send + Sync + Clone {
     /// Context type this handler expects.
-    type Ctx: 'static + Clone + Send + Sync;
+    type Ctx: 'static + Send + Sync;
     /// Parameters that the handler will accept (excluding [`Ctx`](QubitHandler::Ctx)).
     type Params: TsTypeTuple;
     /// Return type of the handler.
@@ -39,7 +41,7 @@ macro_rules! impl_handlers {
         where
             F: 'static + Send + Sync + Clone + Fn($($ctx, $($params),*)?) -> R,
             $(
-                $ctx: 'static + Clone + Send + Sync,
+                $ctx: 'static + Send + Sync,
                 $($params: 'static + TS + Send + for<'a> Deserialize<'a>),*
             )?
         {
@@ -112,7 +114,10 @@ pub trait RegisterableHandler<
     type Response: ResponseValue<MValue>;
 
     /// Register this handler against the provided RPC module.
-    fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String);
+    fn register<Ctx>(self, module: &mut RpcModule<Ctx>, method_name: String)
+    where
+        Ctx: 'static + Clone + Send + Sync,
+        Self::Ctx: FromRequestExtensions<Ctx>;
 }
 
 /// Register any handler that directly returns a [`ResponseValue`]. This will generally be the
@@ -129,13 +134,24 @@ where
 
     /// These handlers will be registered using [`RpcModule::register_blocking_method`], so that
     /// the handler can be run on a new thread without blocking the server.
-    fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String) {
+    fn register<Ctx>(self, module: &mut RpcModule<Ctx>, method_name: String)
+    where
+        Ctx: 'static + Clone + Send + Sync,
+        Self::Ctx: FromRequestExtensions<Ctx>,
+    {
         module
-            .register_blocking_method(
+            .register_async_method(
                 Box::leak(method_name.into_boxed_str()),
-                move |params, ctx, _extensions| {
-                    let result = self.call((*ctx).clone(), params);
-                    Ok::<_, Infallible>(result.transform())
+                move |params, ctx, extensions| {
+                    let handler = self.clone();
+
+                    async move {
+                        let ctx = Self::Ctx::from_request_extensions((*ctx).clone(), extensions)
+                            .await
+                            .unwrap();
+                        let result = handler.call(ctx, params);
+                        Ok::<_, Infallible>(result.transform())
+                    }
                 },
             )
             .unwrap();
@@ -156,15 +172,22 @@ where
     type Response = <T::Return as Future>::Output;
 
     /// These handlers will be registered using [`RpcModule::register_async_method`].
-    fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String) {
+    fn register<Ctx>(self, module: &mut RpcModule<Ctx>, method_name: String)
+    where
+        Ctx: 'static + Clone + Send + Sync,
+        Self::Ctx: FromRequestExtensions<Ctx>,
+    {
         module
             .register_async_method(
                 Box::leak(method_name.into_boxed_str()),
-                move |params, ctx, _extensions| {
+                move |params, ctx, extensions| {
                     let f = self.clone();
 
                     async move {
-                        let result = f.call((*ctx).clone(), params).await;
+                        let ctx = Self::Ctx::from_request_extensions((*ctx).clone(), extensions)
+                            .await
+                            .unwrap();
+                        let result = f.call(ctx, params).await;
                         Ok::<_, Infallible>(result.transform())
                     }
                 },
@@ -188,7 +211,11 @@ where
     type Response = <T::Return as Stream>::Item;
 
     /// These handlers will be registered usig [`RpcModule::register_subscription`].
-    fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String) {
+    fn register<Ctx>(self, module: &mut RpcModule<Ctx>, method_name: String)
+    where
+        Ctx: 'static + Clone + Send + Sync,
+        Self::Ctx: FromRequestExtensions<Ctx>,
+    {
         let notif_method_name = format!("{method_name}_notif");
         let unsub_method_name = format!("{method_name}_unsub");
 
@@ -197,13 +224,16 @@ where
                 Box::leak(method_name.into_boxed_str()),
                 Box::leak(notif_method_name.into_boxed_str()),
                 Box::leak(unsub_method_name.into_boxed_str()),
-                move |params, pending, ctx, _extensions| {
+                move |params, pending, ctx, extensions| {
                     let f = self.clone();
 
                     async move {
                         let sink = pending.accept().await.unwrap();
 
-                        let mut stream = pin!(f.call((*ctx).clone(), params));
+                        let ctx = Self::Ctx::from_request_extensions((*ctx).clone(), extensions)
+                            .await
+                            .unwrap();
+                        let mut stream = pin!(f.call(ctx, params));
 
                         while let Some(item) = stream.next().await {
                             let item = serde_json::value::to_raw_value(&item.transform()).unwrap();
@@ -233,7 +263,11 @@ where
 {
     type Response = <<T::Return as Future>::Output as Stream>::Item;
 
-    fn register(self, module: &mut RpcModule<Self::Ctx>, method_name: String) {
+    fn register<Ctx>(self, module: &mut RpcModule<Ctx>, method_name: String)
+    where
+        Ctx: 'static + Clone + Send + Sync,
+        Self::Ctx: FromRequestExtensions<Ctx>,
+    {
         let notif_method_name = format!("{method_name}_notif");
         let unsub_method_name = format!("{method_name}_unsub");
 
@@ -242,13 +276,16 @@ where
                 Box::leak(method_name.into_boxed_str()),
                 Box::leak(notif_method_name.into_boxed_str()),
                 Box::leak(unsub_method_name.into_boxed_str()),
-                move |params, pending, ctx, _extensions| {
+                move |params, pending, ctx, extensions| {
                     let f = self.clone();
 
                     async move {
                         let sink = pending.accept().await.unwrap();
 
-                        let mut stream = pin!(f.call((*ctx).clone(), params).await);
+                        let ctx = Self::Ctx::from_request_extensions((*ctx).clone(), extensions)
+                            .await
+                            .unwrap();
+                        let mut stream = pin!(f.call(ctx, params).await);
 
                         while let Some(item) = stream.next().await {
                             let item = serde_json::value::to_raw_value(&item.transform()).unwrap();
@@ -265,7 +302,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::{ts::TsType, *};
+    use super::{ctx::FromRequestExtensions, ts::TsType, *};
 
     use futures::stream;
     use rstest::rstest;
@@ -399,9 +436,28 @@ mod test {
         assert_eq!(output, expected);
     }
 
-    /// Sample CTX for [`handler_ts_type`].
+    /// Sample CTX.
     #[derive(Clone)]
     struct SampleCtx;
+
+    /// Sample CTX that derives from [`SampleCtx`].
+    #[derive(Clone)]
+    struct DerivedCtx;
+    impl FromRequestExtensions<SampleCtx> for DerivedCtx {
+        async fn from_request_extensions(
+            _ctx: SampleCtx,
+            _extensions: http::Extensions,
+        ) -> Result<Self, ()> {
+            Ok(DerivedCtx)
+        }
+    }
+
+    /// Ensure that a handler can be registered if the ctx can be derived from the module ctx.
+    #[test]
+    fn derived_ctx() {
+        fn handler(_ctx: DerivedCtx) {}
+        handler.register(&mut RpcModule::new(SampleCtx), "handler".to_string());
+    }
 
     /// Assert that a handler implements [`RegisterableHandler`], and the reflected TS types are correct.
     #[rstest]

@@ -33,7 +33,7 @@ impl<Ctx> Router<Ctx> {
 
 impl<Ctx> Router<Ctx>
 where
-    Ctx: 'static + Send + Sync,
+    Ctx: 'static + Clone + Send + Sync,
 {
     /// Register the provided handler to this router.
     pub fn handler<F, MSig, MValue: marker::ResponseMarker, MReturn: marker::HandlerReturnMarker>(
