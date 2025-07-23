@@ -1,4 +1,7 @@
-use crate::ts::handler::ts::TsTypeTuple;
+use crate::ts::handler::{
+    reflection::{HandlerKind, HandlerMeta},
+    ts::TsTypeTuple,
+};
 use std::{any::TypeId, collections::BTreeMap, fmt::Write};
 
 use super::handler::{RegisterableHandler, marker, response::ResponseValue, ts::TsType};
@@ -31,8 +34,7 @@ impl TsRouter {
         MReturn: marker::HandlerReturnMarker,
     >(
         &mut self,
-        name: impl ToString,
-        param_names: &[impl AsRef<str>],
+        meta: &HandlerMeta,
         _handler: &F,
     ) where
         F: RegisterableHandler<MSig, MValue, MReturn>,
@@ -42,7 +44,7 @@ impl TsRouter {
 
         assert_eq!(
             param_tys.len(),
-            param_names.len(),
+            meta.param_names.len(),
             "param types and provided names must be equal length"
         );
 
@@ -55,18 +57,26 @@ impl TsRouter {
         });
 
         // Generate the signature of this handler.
-        let params = param_names
+        let kind = match meta.kind {
+            HandlerKind::Query => "Query",
+            HandlerKind::Mutation => "Mutation",
+            HandlerKind::Subscription => "Subscription",
+        };
+        let params = meta
+            .param_names
             .iter()
             .zip(&param_tys)
-            .flat_map(|(name, ty)| [format!("{}: {}", name.as_ref(), ty.name), ", ".to_string()])
-            .take(if param_names.is_empty() {
+            .flat_map(|(name, ty)| [format!("{}: {}", name, ty.name), ", ".to_string()])
+            .take(if meta.param_names.is_empty() {
                 0
             } else {
-                param_names.len() * 2 - 1
+                meta.param_names.len() * 2 - 1
             })
             .collect::<String>();
-        self.handlers
-            .insert(name.to_string(), format!("({params}) => {}", ret_ty.name));
+        self.handlers.insert(
+            meta.name.to_string(),
+            format!("{kind}<[{params}], {}>", ret_ty.name),
+        );
     }
 
     /// Nest another router at a prefix.
@@ -148,25 +158,32 @@ mod test {
         struct CustomStruct;
 
         #[rstest]
-        #[case::empty(&[], || {}, "() => null")]
-        #[case::ctx(&[], |ctx: ()| {}, "() => null")]
-        #[case::param(&["a"], |ctx: (), a: usize| {}, "(a: number) => null")]
-        #[case::multi_param(&["a", "b"], |ctx: (), a: usize, b: bool| {}, "(a: number, b: boolean) => null")]
-        #[case::ret(&[], || -> usize { todo!() }, "() => number")]
-        #[case::ret_ctx(&[], |ctx: ()| -> usize { todo!() }, "() => number")]
-        #[case::custom_param(&["custom"], |ctx: (), custom: CustomStruct| {}, "(custom: CustomStruct) => null")]
-        #[case::custom_ret(&[], |ctx: ()| -> CustomStruct { todo!() }, "() => CustomStruct")]
-        #[case::complex_response(&[], |ctx: ()| async { CustomStruct }, "() => CustomStruct")]
-        #[case::everything(&["a", "b", "custom"], |ctx: (), a: usize, b: String, custom: CustomStruct| async { CustomStruct }, "(a: number, b: string, custom: CustomStruct) => CustomStruct")]
+        #[case::empty(&[], || {}, "Query<[], null>")]
+        #[case::ctx(&[], |ctx: ()| {}, "Query<[], null>")]
+        #[case::param(&["a"], |ctx: (), a: usize| {}, "Query<[a: number], null>")]
+        #[case::multi_param(&["a", "b"], |ctx: (), a: usize, b: bool| {}, "Query<[a: number, b: boolean], null>")]
+        #[case::ret(&[], || -> usize { todo!() }, "Query<[], number>")]
+        #[case::ret_ctx(&[], |ctx: ()| -> usize { todo!() }, "Query<[], number>")]
+        #[case::custom_param(&["custom"], |ctx: (), custom: CustomStruct| {}, "Query<[custom: CustomStruct], null>")]
+        #[case::custom_ret(&[], |ctx: ()| -> CustomStruct { todo!() }, "Query<[], CustomStruct>")]
+        #[case::complex_response(&[], |ctx: ()| async { CustomStruct }, "Query<[], CustomStruct>")]
+        #[case::everything(&["a", "b", "custom"], |ctx: (), a: usize, b: String, custom: CustomStruct| async { CustomStruct }, "Query<[a: number, b: string, custom: CustomStruct], CustomStruct>")]
         fn test<F, MSig, MValue: marker::ResponseMarker, MReturn: marker::HandlerReturnMarker>(
-            #[case] param_names: &[&str],
+            #[case] param_names: &'static [&'static str],
             #[case] handler: F,
             #[case] expected: String,
         ) where
             F: RegisterableHandler<MSig, MValue, MReturn>,
         {
             let mut module = TsRouter::new();
-            module.add_handler("handler", param_names, &handler);
+            module.add_handler(
+                &HandlerMeta {
+                    name: "handler",
+                    param_names,
+                    kind: HandlerKind::Query,
+                },
+                &handler,
+            );
 
             let signature = module.handlers.get("handler").unwrap();
             assert_eq!(signature, &expected);
@@ -186,12 +203,17 @@ mod test {
     #[allow(unused)]
     fn user_types() {
         let mut module = TsRouter::new();
-        module.add_handler("handler", &["a"], &|ctx: (), a: UserTypeA| -> UserTypeB {
-            todo!()
-        });
+        module.add_handler(
+            &HandlerMeta {
+                name: "handler",
+                param_names: &["a"],
+                kind: HandlerKind::Query,
+            },
+            &|ctx: (), a: UserTypeA| -> UserTypeB { todo!() },
+        );
 
         let signature = module.handlers.get("handler").unwrap();
-        assert_eq!(signature, "(a: UserTypeA) => UserTypeB");
+        assert_eq!(signature, "Query<[a: UserTypeA], UserTypeB>");
 
         assert_eq!(module.user_types.len(), 2);
         assert_eq!(
@@ -208,15 +230,22 @@ mod test {
     fn make_router(handlers: impl IntoIterator<Item = &'static str>) -> TsRouter {
         let mut router = TsRouter::new();
         for handler in handlers {
-            router.add_handler(handler, &[] as &[&str], &|| {});
+            router.add_handler(
+                &HandlerMeta {
+                    name: handler,
+                    param_names: &[],
+                    kind: HandlerKind::Query,
+                },
+                &|| {},
+            );
         }
         router
     }
 
     #[rstest]
     #[case::empty(make_router([]), "{ }")]
-    #[case::shallow(make_router(["handler"]), "{ handler: () => null, }")]
-    #[case::multi(make_router(["handler_a", "handler_b"]), "{ handler_a: () => null, handler_b: () => null, }")]
+    #[case::shallow(make_router(["handler"]), "{ handler: Query<[], null>, }")]
+    #[case::multi(make_router(["handler_a", "handler_b"]), "{ handler_a: Query<[], null>, handler_b: Query<[], null>, }")]
     #[case::deep(
         {
             let mut module = make_router(["top"]);
@@ -227,7 +256,7 @@ mod test {
             });
             module
         },
-        "{ layer_2: { layer_3: { inner: () => null, }, middle: () => null, }, top: () => null, }"
+        "{ layer_2: { layer_3: { inner: Query<[], null>, }, middle: Query<[], null>, }, top: Query<[], null>, }"
     )]
     fn nested(#[case] router: TsRouter, #[case] expected: &str) {
         assert_eq!(router.get_router_type(), expected);
@@ -238,10 +267,24 @@ mod test {
         #![allow(unused)]
 
         let mut router = TsRouter::new();
-        router.add_handler("outer", &["user_type"], &|ctx: (), user_type: UserTypeA| {});
+        router.add_handler(
+            &HandlerMeta {
+                name: "outer",
+                param_names: &["user_type"],
+                kind: HandlerKind::Query,
+            },
+            &|ctx: (), user_type: UserTypeA| {},
+        );
         router.nest("nested", {
             let mut router = TsRouter::new();
-            router.add_handler("inner", &["user_type"], &|ctx: (), user_type: UserTypeB| {});
+            router.add_handler(
+                &HandlerMeta {
+                    name: "inner",
+                    param_names: &["user_type"],
+                    kind: HandlerKind::Query,
+                },
+                &|ctx: (), user_type: UserTypeB| {},
+            );
             router
         });
 
@@ -249,7 +292,7 @@ mod test {
             router.generate_typescript(),
             r#"type UserTypeB = string;
 type UserTypeA = { a: number, b: boolean, };
-export type Router = { nested: { inner: (user_type: UserTypeB) => null, }, outer: (user_type: UserTypeA) => null, };
+export type Router = { nested: { inner: Query<[user_type: UserTypeB], null>, }, outer: Query<[user_type: UserTypeA], null>, };
 "#
         );
     }

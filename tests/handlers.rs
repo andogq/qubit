@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 
-use qubit::*;
+use qubit::{handler, ts::router::Router};
 
 macro_rules! test_handler {
     ($handler:ident = $kind:ident<[$($params:tt)*], $ret:tt>) => {
@@ -16,14 +16,18 @@ macro_rules! test_handler {
     };
 
     ($handler:ident <$ctx:ty> ($handler_name:ident) = $kind:ident<[$($params:tt)*], $ret:tt>) => {
-        let ty = <$handler as Handler<$ctx>>::get_type();
+        let ty = Router::new().handler($handler).generate_type_to_string();
 
-        assert_eq!(ty.name, stringify!($handler_name));
         assert_eq!(
-            ty.signature,
-            concat!(stringify!($kind), "<[", stringify!($($params)*), "], ", stringify!($ret), ">")
+            ty,
+            format!(
+                "export type Router = {{ {handler_name}: {kind}<[{params}], {ret}>, }};\n",
+                handler_name = stringify!($handler_name),
+                kind = stringify!($kind),
+                params = stringify!($($params)*),
+                ret = stringify!($ret),
+            )
         );
-        assert_eq!(ty.kind, stringify!($kind));
     };
 }
 

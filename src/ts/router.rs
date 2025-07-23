@@ -60,8 +60,7 @@ where
         F: RegisterableHandler<MSig, MValue, MReturn, Ctx = Ctx>,
     {
         let handler_meta = HANDLER_DEFINITIONS_MAP.get(&handler.type_id()).unwrap();
-        self.ts_router
-            .add_handler(handler_meta.name, handler_meta.param_names, &handler);
+        self.ts_router.add_handler(handler_meta, &handler);
 
         // Create the registration function for this handler.
         self.handler_registrations.push((
