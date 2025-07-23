@@ -36,6 +36,8 @@ trait-variant = "0.1.2"
 serde_qs = "0.13.0"
 urlencoding = "2.1.3"
 derive_more = { version = "2.0.1", features = ["deref"] }
+linkme = "0.3.33"
+lazy_static = "1.5.0"
 
 [features]
 ts-format = ["ts-rs/format"]

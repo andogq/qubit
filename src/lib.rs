@@ -1,6 +1,6 @@
 pub mod builder;
 pub mod server;
-mod ts;
+pub mod ts;
 
 pub use qubit_macros::*;
 
