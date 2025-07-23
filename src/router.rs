@@ -71,7 +71,7 @@ where
                     let handler_name = handler_meta.name.to_string();
 
                     if let Some(prefix) = prefix {
-                        format!("{prefix}.{}", handler_name)
+                        format!("{prefix}.{handler_name}")
                     } else {
                         handler_name
                     }

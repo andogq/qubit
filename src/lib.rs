@@ -1,11 +1,10 @@
-pub mod builder;
-pub mod server;
-pub mod ts;
+mod handler;
+mod router;
+mod ts;
 
 pub use qubit_macros::*;
 
-pub use builder::*;
-pub use server::*;
+pub use self::router::Router;
 
 #[doc(hidden)]
 #[path = "./private.rs"]

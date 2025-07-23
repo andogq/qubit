@@ -3,7 +3,7 @@
 pub use ::linkme;
 pub use ::ts_rs;
 
-pub use crate::ts::{
+pub use crate::{
     handler::reflection::{HandlerKind, HandlerMeta},
     router::HANDLER_DEFINITIONS,
 };

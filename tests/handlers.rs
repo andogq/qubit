@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 
-use qubit::{handler, ts::router::Router};
+use qubit::*;
 
 macro_rules! test_handler {
     ($handler:ident = $kind:ident<[$($params:tt)*], $ret:tt>) => {

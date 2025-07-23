@@ -1,4 +1,4 @@
-use qubit::ts::router::Router;
+use qubit::Router;
 
 #[qubit::handler(query)]
 fn cool_handler() -> u32 {

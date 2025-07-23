@@ -37,16 +37,6 @@ pub enum TsType {
 }
 
 impl TsType {
-    /// Determine if the type is primitive.
-    pub fn is_primitive(&self) -> bool {
-        matches!(self, Self::Primitive(_))
-    }
-
-    /// Determine if the type is user-defined.
-    pub fn is_user(&self) -> bool {
-        matches!(self, Self::User(_))
-    }
-
     /// Produce type information for the given Rust type.
     pub fn from_type<T: 'static + TS + ?Sized>() -> Self {
         let common = TsTypeCommon { name: T::name() };
@@ -113,7 +103,7 @@ mod test {
     fn valid_primitive() {
         let ts_type = TsType::from_type::<u32>();
         assert_eq!(ts_type.name, "number");
-        assert!(ts_type.is_primitive());
+        assert!(matches!(ts_type, TsType::Primitive(_)));
     }
 
     #[test]
@@ -123,7 +113,7 @@ mod test {
 
         let ts_type = TsType::from_type::<MyType>();
         assert_eq!(ts_type.name, "MyType");
-        assert!(ts_type.is_user());
+        assert!(matches!(ts_type, TsType::User(_)));
     }
 
     mod ts_tupe_tuple {

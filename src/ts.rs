@@ -1,10 +1,11 @@
-use crate::ts::handler::{
+use crate::handler::{
+    RegisterableHandler, marker,
     reflection::{HandlerKind, HandlerMeta},
+    response::ResponseValue,
+    ts::TsType,
     ts::TsTypeTuple,
 };
 use std::{any::TypeId, collections::BTreeMap, fmt::Write};
-
-use super::handler::{RegisterableHandler, marker, response::ResponseValue, ts::TsType};
 
 /// TypeScript representation of a [`Router`], containing all required information to generate
 /// TypeScript types at runtime.
@@ -285,8 +286,8 @@ mod test {
 
         assert_eq!(
             router.generate_typescript(),
-            r#"type UserTypeB = string;
-type UserTypeA = { a: number, b: boolean, };
+            r#"type UserTypeA = { a: number, b: boolean, };
+type UserTypeB = string;
 export type Router = { nested: { inner: Query<[user_type: UserTypeB], null>, }, outer: Query<[user_type: UserTypeA], null>, };
 "#
         );
