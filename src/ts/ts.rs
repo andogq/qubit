@@ -84,13 +84,6 @@ impl TsRouter {
         self.nested.insert(prefix.to_string(), other);
     }
 
-    /// Generate the router's TypeScript type, and return it in a [`String`].
-    pub fn get_router_type(&self) -> String {
-        let mut ty = String::new();
-        self.write_router_type(&mut ty).unwrap();
-        ty
-    }
-
     /// Write the router type to the provided writer.
     fn write_router_type(&self, fmt: &mut impl Write) -> std::fmt::Result {
         write!(fmt, "{{ ")?;
@@ -259,7 +252,9 @@ mod test {
         "{ layer_2: { layer_3: { inner: Query<[], null>, }, middle: Query<[], null>, }, top: Query<[], null>, }"
     )]
     fn nested(#[case] router: TsRouter, #[case] expected: &str) {
-        assert_eq!(router.get_router_type(), expected);
+        let mut ty = String::new();
+        router.write_router_type(&mut ty).unwrap();
+        assert_eq!(ty, expected);
     }
 
     #[test]
