@@ -131,7 +131,6 @@ mod test {
             rpc_name: model.rpc_name,
             kind: model.kind,
             param_names: model.param_names,
-            visibility: model.visibility,
             handler: parse_quote!(fn #name() {}),
             name,
         });

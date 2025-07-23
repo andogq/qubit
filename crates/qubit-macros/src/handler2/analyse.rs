@@ -1,4 +1,4 @@
-use syn::{Error, FnArg, Ident, ItemFn, Pat, PatIdent, Receiver, Visibility};
+use syn::{Error, FnArg, Ident, ItemFn, Pat, PatIdent, Receiver};
 
 use super::parse::{Ast, HandlerKind};
 
@@ -11,7 +11,6 @@ pub fn analyse(ast: Ast) -> Result<Model, AnalyseError> {
             .unwrap_or_else(|| ast.handler.sig.ident.to_string()),
         kind: ast.attrs.kind,
         param_names: process_inputs(ast.handler.sig.inputs.iter())?,
-        visibility: ast.handler.vis.clone(),
         handler: ast.handler,
     })
 }
@@ -29,9 +28,6 @@ pub struct Model {
 
     /// Name of all the parameters (excluding the `ctx`).
     pub param_names: Vec<Ident>,
-
-    /// Visiblity of the handler.
-    pub visibility: Visibility,
 
     /// The actual handler implementation.
     pub handler: ItemFn,
@@ -111,7 +107,6 @@ mod test {
         pub rpc_name: String,
         pub kind: HandlerKind,
         pub param_names: Vec<Ident>,
-        pub visibility: Visibility,
     }
 
     impl ModelAssertion {
@@ -121,7 +116,6 @@ mod test {
                 name,
                 kind,
                 param_names: Vec::new(),
-                visibility: Visibility::Inherited,
             }
         }
 
@@ -146,128 +140,99 @@ mod test {
             self.param_names = param_names.into_iter().collect();
             self
         }
-
-        pub fn with_visibility(mut self, visibility: Visibility) -> Self {
-            self.visibility = visibility;
-            self
-        }
     }
 
     mod analyse {
-        use syn::{Signature, Visibility};
+        use syn::Signature;
 
         use super::*;
 
         #[rstest]
         #[case::simple_query(
             Attributes::query(),
-            parse_quote!(),
             parse_quote!(async fn my_handler()),
             ModelAssertion::query(parse_quote!(my_handler))
         )]
         #[case::simple_mutation(
             Attributes::mutation(),
-            parse_quote!(),
             parse_quote!(async fn my_handler()),
             ModelAssertion::mutation(parse_quote!(my_handler))
         )]
         #[case::simple_subscription(
             Attributes::subscription(),
-            parse_quote!(),
             parse_quote!(async fn my_handler()),
             ModelAssertion::subscription(parse_quote!(my_handler))
         )]
         #[case::rename(
             Attributes::query().with_name("other_name"),
-            parse_quote!(),
             parse_quote!(async fn my_handler()),
             ModelAssertion::query(parse_quote!(my_handler))
                 .with_rpc_name("other_name")
         )]
         #[case::visibility_pub(
             Attributes::query(),
-            parse_quote!(pub),
             parse_quote!(async fn my_handler()),
             ModelAssertion::query(parse_quote!(my_handler))
-                .with_visibility(parse_quote!(pub))
         )]
         #[case::visibility_complex(
             Attributes::query(),
-            parse_quote!(pub(in crate::some::path)),
             parse_quote!(async fn my_handler()),
             ModelAssertion::query(parse_quote!(my_handler))
-                .with_visibility(parse_quote!(pub(in crate::some::path)))
         )]
         #[case::ctx_only(
             Attributes::query(),
-            parse_quote!(),
             parse_quote!(async fn my_handler(ctx: Ctx)),
             ModelAssertion::query(parse_quote!(my_handler))
         )]
         #[case::single_param(
             Attributes::query(),
-            parse_quote!(),
             parse_quote!(async fn my_handler(ctx: Ctx, param_a: String)),
             ModelAssertion::query(parse_quote!(my_handler))
                 .with_param_names([parse_quote!(param_a)])
         )]
         #[case::multi_param(
             Attributes::query(),
-            parse_quote!(),
             parse_quote!(async fn my_handler(ctx: Ctx, param_a: String, param_b: bool, param_c: usize)),
             ModelAssertion::query(parse_quote!(my_handler))
                 .with_param_names([parse_quote!(param_a), parse_quote!(param_b), parse_quote!(param_c)])
         )]
         #[case::return_value(
             Attributes::query(),
-            parse_quote!(),
             parse_quote!(async fn my_handler() -> usize),
             ModelAssertion::query(parse_quote!(my_handler))
         )]
         #[case::query_everything(
             Attributes::query().with_name("other_name"),
-            parse_quote!(pub(in crate::some::path)),
             parse_quote!(async fn my_handler(ctx: Ctx, param_a: String, param_b: bool, param_c: usize) -> usize),
             ModelAssertion::query(parse_quote!(my_handler))
                 .with_rpc_name("other_name")
-                .with_visibility(parse_quote!(pub(in crate::some::path)))
                 .with_param_names([parse_quote!(param_a), parse_quote!(param_b), parse_quote!(param_c)])
         )]
         #[case::mutation_everything(
             Attributes::mutation().with_name("other_name"),
-            parse_quote!(pub(in crate::some::path)),
             parse_quote!(async fn my_handler(ctx: Ctx, param_a: String, param_b: bool, param_c: usize) -> usize),
             ModelAssertion::mutation(parse_quote!(my_handler))
                 .with_rpc_name("other_name")
-                .with_visibility(parse_quote!(pub(in crate::some::path)))
                 .with_param_names([parse_quote!(param_a), parse_quote!(param_b), parse_quote!(param_c)])
         )]
         #[case::subscription_everything(
             Attributes::subscription().with_name("other_name"),
-            parse_quote!(pub(in crate::some::path)),
             parse_quote!(async fn my_handler(ctx: Ctx, param_a: String, param_b: bool, param_c: usize) -> usize),
             ModelAssertion::subscription(parse_quote!(my_handler))
                 .with_rpc_name("other_name")
-                .with_visibility(parse_quote!(pub(in crate::some::path)))
                 .with_param_names([parse_quote!(param_a), parse_quote!(param_b), parse_quote!(param_c)])
         )]
         fn valid(
             #[case] attrs: Attributes,
-            #[case] visibility: Visibility,
             #[case] signature: Signature,
             #[case] expected: ModelAssertion,
         ) {
-            let model = analyse(Ast::new(
-                attrs,
-                parse_quote!(#visibility #signature { todo!() }),
-            ))
-            .unwrap();
+            let model = analyse(Ast::new(attrs, parse_quote!(#signature { todo!() }))).unwrap();
 
             assert_eq!(model.name, expected.name);
             assert_eq!(model.rpc_name, expected.rpc_name);
             assert_eq!(model.kind, expected.kind);
             assert_eq!(model.param_names, expected.param_names);
-            assert_eq!(model.visibility, expected.visibility);
         }
 
         #[rstest]
