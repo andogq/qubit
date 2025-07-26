@@ -35,23 +35,23 @@ pub trait QubitHandler<Ctx, MSig>: 'static + Send + Sync + Clone {
 }
 
 macro_rules! impl_handlers {
-    (impl [$ctx:ident, $($params:ident,)*]) => {
-        impl<Ctx, F, R, $ctx, $($params),*> QubitHandler<
+    (impl [$($ctx:ident, $($params:ident,)*)?]) => {
+        impl<Ctx, F, R, $($ctx, $($params),*)?> QubitHandler<
             Ctx,
             (
-                ($ctx, $($params,)*),
+                ($($ctx, $($params,)*)?),
                 R
             )
         >
         for F
         where
-            F: 'static + Send + Sync + Clone + Fn($ctx, $($params),*) -> R,
-            $ctx: 'static + Send + Sync + FromRequestExtensions<Ctx>,
-            $($params: 'static + TS + Send + for<'a> Deserialize<'a>),*
+            F: 'static + Send + Sync + Clone + Fn($($ctx, $($params),*)?) -> R,
+            impl_handlers!(ctx_ty [$($ctx)?]): 'static + Send + Sync + FromRequestExtensions<Ctx>,
+            $($($params: 'static + TS + Send + for<'a> Deserialize<'a>),*)?
         {
-            type Ctx = $ctx;
+            type Ctx = impl_handlers!(ctx_ty [$($ctx)?]);
 
-            type Params = ($($params,)*);
+            type Params = ($($($params,)*)?);
             type Return = R;
 
             fn call(
@@ -60,7 +60,7 @@ macro_rules! impl_handlers {
                 #[allow(unused)] params: Params
             ) -> Self::Return {
                 #[allow(non_snake_case)]
-                let ($($params,)*) = match impl_handlers!(parse_impl params -> [$($params,)*]) {
+                let ($($($params,)*)?) = match impl_handlers!(parse_impl params -> [$($($params,)*)?]) {
                     Ok(params) => params,
                     Err(e) => {
                         // TODO: Something
@@ -70,9 +70,16 @@ macro_rules! impl_handlers {
                 };
 
                 // Call the handler, optionally with the context and any parameters.
-                self(ctx, $($params,)*)
+                self($(ctx, $($params,)*)?)
             }
         }
+    };
+
+    (ctx_ty [$ctx:ty]) => {
+        $ctx
+    };
+    (ctx_ty []) => {
+        Ctx
     };
 
     // HACK: This is to work around `serde_json` not allowing parsing `()` from `[]`:
@@ -99,50 +106,20 @@ macro_rules! impl_handlers {
         1 + impl_handlers!(count [$($params,)*])
     };
 
-    (recurse [$param:ident,]) => {};
-    (recurse [$param:ident, $($params:ident,)+]) => {
-        impl_handlers!($($params),+);
+    (recurse []) => {};
+    (recurse [$param:ident, $($params:ident,)*]) => {
+        impl_handlers!($($params),*);
     };
 
-    ($($params:ident),+ $(,)?) => {
-        impl_handlers!(impl [$($params,)+]);
-        impl_handlers!(recurse [$($params,)+]);
+    ($($params:ident),* $(,)?) => {
+        impl_handlers!(impl [$($params,)*]);
+        impl_handlers!(recurse [$($params,)*]);
     };
 }
 
 impl_handlers!(
     P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15
 );
-
-impl<F, R, Ctx> QubitHandler<Ctx, ((), R)> for F
-where
-    F: 'static + Send + Sync + Clone + Fn() -> R,
-    Ctx: 'static + Send + Sync,
-{
-    type Ctx = Ctx;
-
-    type Params = ();
-    type Return = R;
-
-    fn call(
-        &self,
-        #[allow(unused)] ctx: Self::Ctx,
-        #[allow(unused)] params: Params,
-    ) -> Self::Return {
-        #[allow(non_snake_case)]
-        match impl_handlers!(parse_impl params -> []) {
-            Ok(params) => params,
-            Err(e) => {
-                // TODO: Something
-                dbg!(e);
-                panic!("fukc");
-            }
-        };
-
-        // Call the handler, optionally with the context and any parameters.
-        self()
-    }
-}
 
 /// Registration implementation differs depending on the return type of the handler. This
 /// is to account for handlers which may return futures, streams, or values directly.
