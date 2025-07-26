@@ -1,12 +1,22 @@
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
+    convert::Infallible,
+    fs::OpenOptions,
+    io::Write,
     path::Path,
 };
 
-use jsonrpsee::RpcModule;
+use axum::response::IntoResponse;
+use futures::FutureExt;
+use http::{HeaderValue, Method, Request, header};
+use jsonrpsee::{
+    RpcModule,
+    server::{Server, ServerHandle, stop_channel, ws::is_upgrade_request},
+};
 use lazy_static::lazy_static;
 use linkme::distributed_slice;
+use tower::{Service, ServiceBuilder, service_fn};
 
 use super::{
     handler::{RegisterableHandler, marker, reflection::*},
@@ -126,6 +136,75 @@ where
                 module
             },
         )
+    }
+
+    pub fn into_service(
+        self,
+        ctx: Ctx,
+    ) -> (
+        impl Service<
+            Request<axum::body::Body>,
+            Error = Infallible,
+            Future = impl Send,
+            Response = impl IntoResponse,
+        > + Clone,
+        ServerHandle,
+    ) {
+        let module = self.into_module(ctx);
+        let (stop_handle, server_handle) = stop_channel();
+
+        let mut tower_service = Server::builder()
+            .set_http_middleware(ServiceBuilder::new().map_request(|mut req: Request<_>| {
+                // Check if this is a GET request, and if it is convert it to a regular POST.
+                if matches!(req.method(), &Method::GET) && !is_upgrade_request(&req) {
+                    // Change this request into a regular POST request, and indicate that it should
+                    // be a query.
+                    *req.method_mut() = Method::POST;
+
+                    // Update the headers.
+                    let headers = req.headers_mut();
+                    headers.insert(
+                        header::CONTENT_TYPE,
+                        HeaderValue::from_static("application/json"),
+                    );
+                    headers.insert(header::ACCEPT, HeaderValue::from_static("application/json"));
+
+                    // Convert the `input` field of the query string into the request body.
+                    if let Some(body) = req
+                        // Extract the query string.
+                        .uri()
+                        .query()
+                        // Parse the query string.
+                        .and_then(|query| serde_qs::from_str::<HashMap<String, String>>(query).ok())
+                        // Take out the input.
+                        .and_then(|mut query| query.remove("input"))
+                        // URL decode the input.
+                        .map(|input| urlencoding::decode(&input).unwrap_or_default().to_string())
+                    {
+                        // TODO: Replace `axum` with something else.
+                        *req.body_mut() = axum::body::Body::from(body);
+                    }
+                };
+
+                req
+            }))
+            .to_service_builder()
+            .build(module, stop_handle);
+
+        let service = service_fn(move |req| {
+            let call = tower_service.call(req);
+
+            async move {
+                match call.await {
+                    Ok(response) => Ok::<_, Infallible>(response),
+                    // TODO: This should probably be an internal error
+                    Err(_) => unreachable!(),
+                }
+            }
+            .boxed()
+        });
+
+        (service, server_handle)
     }
 }
 
