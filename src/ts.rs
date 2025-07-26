@@ -30,6 +30,7 @@ impl TsRouter {
     /// Add a new handler to the router, generating the required TypeScript types in the process.
     pub fn add_handler<
         F,
+        Ctx,
         MSig,
         MValue: marker::ResponseMarker,
         MReturn: marker::HandlerReturnMarker,
@@ -38,7 +39,7 @@ impl TsRouter {
         meta: &HandlerMeta,
         _handler: &F,
     ) where
-        F: RegisterableHandler<MSig, MValue, MReturn>,
+        F: RegisterableHandler<Ctx, MSig, MValue, MReturn>,
     {
         let param_tys = F::Params::get_ts_types();
         let ret_ty = TsType::from_type::<<F::Response as ResponseValue<_>>::Value>();
@@ -162,12 +163,18 @@ mod test {
         #[case::custom_ret(&[], |ctx: ()| -> CustomStruct { todo!() }, "Query<[], CustomStruct>")]
         #[case::complex_response(&[], |ctx: ()| async { CustomStruct }, "Query<[], CustomStruct>")]
         #[case::everything(&["a", "b", "custom"], |ctx: (), a: usize, b: String, custom: CustomStruct| async { CustomStruct }, "Query<[a: number, b: string, custom: CustomStruct], CustomStruct>")]
-        fn test<F, MSig, MValue: marker::ResponseMarker, MReturn: marker::HandlerReturnMarker>(
+        fn test<
+            F,
+            Ctx,
+            MSig,
+            MValue: marker::ResponseMarker,
+            MReturn: marker::HandlerReturnMarker,
+        >(
             #[case] param_names: &'static [&'static str],
             #[case] handler: F,
             #[case] expected: String,
         ) where
-            F: RegisterableHandler<MSig, MValue, MReturn>,
+            F: RegisterableHandler<Ctx, MSig, MValue, MReturn, Ctx = ()>,
         {
             let mut module = TsRouter::new();
             module.add_handler(
@@ -224,7 +231,7 @@ mod test {
     fn make_router(handlers: impl IntoIterator<Item = &'static str>) -> TsRouter {
         let mut router = TsRouter::new();
         for handler in handlers {
-            router.add_handler(
+            router.add_handler::<_, (), _, _, _>(
                 &HandlerMeta {
                     name: handler,
                     param_names: &[],

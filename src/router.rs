@@ -69,7 +69,7 @@ where
         handler: F,
     ) -> Self
     where
-        F: RegisterableHandler<MSig, MValue, MReturn>,
+        F: RegisterableHandler<Ctx, MSig, MValue, MReturn>,
         F::Ctx: FromRequestExtensions<Ctx>,
     {
         let handler_meta = HANDLER_DEFINITIONS_MAP.get(&handler.type_id()).unwrap();

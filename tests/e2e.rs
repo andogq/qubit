@@ -12,7 +12,7 @@ fn even_cool_handler() -> u32 {
 
 #[test]
 fn main() {
-    let router = Router::new()
+    let router = Router::<()>::new()
         .handler(cool_handler)
         .handler(even_cool_handler);
 

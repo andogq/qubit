@@ -16,7 +16,7 @@ macro_rules! test_handler {
     };
 
     ($handler:ident <$ctx:ty> ($handler_name:ident) = $kind:ident<[$($params:tt)*], $ret:tt>) => {
-        let ty = Router::new().handler($handler).generate_type_to_string();
+        let ty = Router::<$ctx>::new().handler($handler).generate_type_to_string();
 
         assert_eq!(
             ty,
