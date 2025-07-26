@@ -4,7 +4,6 @@ pub mod reflection;
 pub mod response;
 pub mod ts;
 
-use ctx::FromRequestExtensions;
 use futures::{Stream, StreamExt};
 use jsonrpsee::{RpcModule, types::Params};
 use serde::Deserialize;
@@ -12,7 +11,7 @@ use ts_rs::TS;
 
 use std::{convert::Infallible, pin::pin};
 
-use self::{response::ResponseValue, ts::TsTypeTuple};
+use self::{ctx::FromRequestExtensions, response::ResponseValue, ts::TsTypeTuple};
 
 /// A handler suitable for use with Qubit.
 ///

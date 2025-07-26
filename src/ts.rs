@@ -118,7 +118,7 @@ impl TsRouter {
             writeln!(typescript, "{user_type}").unwrap();
         }
 
-        write!(typescript, "export type Router = ").unwrap();
+        write!(typescript, "export type QubitServer = ").unwrap();
         self.write_router_type(&mut typescript).unwrap();
         writeln!(typescript, ";").unwrap();
 

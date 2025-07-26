@@ -118,8 +118,26 @@ where
 
     /// Generate the TypeScript for this router, and write it to the provided path.
     pub fn generate_type(&self, output_path: impl AsRef<Path>) -> std::io::Result<()> {
+        const QUBIT_HEADER: &str = include_str!("./header.txt");
+
         let router_typescript = self.generate_type_to_string();
-        std::fs::write(output_path.as_ref(), router_typescript)?;
+
+        let mut file = OpenOptions::new()
+            .write(true)
+            .open(output_path.as_ref())
+            .unwrap();
+
+        writeln!(file, "{QUBIT_HEADER}").unwrap();
+
+        // TODO: Do this else where.
+        writeln!(
+            file,
+            r#"import type {{ Query, Mutation, Subscription }} from "@qubit-rs/client";"#
+        )
+        .unwrap();
+
+        writeln!(file, "{router_typescript}").unwrap();
+
         Ok(())
     }
 
