@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, time::Duration};
 
-use futures::{stream, Stream, StreamExt};
-use qubit::{handler, Router};
+use futures::{Stream, StreamExt, stream};
+use qubit::{Router, handler};
 use tokio::net::TcpListener;
 
 use crate::ctx::Ctx;
@@ -52,11 +52,11 @@ async fn main() {
         .handler(countdown);
 
     // Save the type
-    router.write_bindings_to_dir("./bindings");
-    println!("Successfully write bindings to `./bindings`");
+    router.generate_type("./bindings.ts").unwrap();
+    println!("Successfully write bindings to `./bindings.ts`");
 
     // Create service and handle
-    let (qubit_service, qubit_handle) = router.to_service(Ctx::default());
+    let (qubit_service, qubit_handle) = router.into_service(Ctx::default());
 
     // Nest into an Axum rouer
     let axum_router = axum::Router::<()>::new().nest_service("/rpc", qubit_service);
