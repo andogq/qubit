@@ -5,11 +5,15 @@ pub mod response;
 pub mod ts;
 
 use futures::{Stream, StreamExt};
-use jsonrpsee::{RpcModule, types::Params};
+use jsonrpsee::{
+    RpcModule, SubscriptionCloseResponse, SubscriptionMessage,
+    types::{Params, ResponsePayload},
+};
 use serde::Deserialize;
+use serde_json::json;
 use ts_rs::TS;
 
-use std::{convert::Infallible, pin::pin};
+use std::pin::pin;
 
 use self::{ctx::FromRequestExtensions, response::ResponseValue, ts::TsTypeTuple};
 
@@ -57,10 +61,11 @@ macro_rules! impl_handlers {
                 // If parameters are included, deserialise them.
                 $(
                     #[allow(non_snake_case)]
-                    let ($($params,)*) = match params.parse::<Self::Params>() {
+                    let ($($params,)*) = match impl_handlers!(parse_impl params -> [$($params,)*]) {
                         Ok(params) => params,
-                        Err(_e) => {
+                        Err(e) => {
                             // TODO: Something
+                            dbg!(e);
                             panic!("fukc");
                         }
                     };
@@ -70,6 +75,25 @@ macro_rules! impl_handlers {
                 self($(ctx, $($params,)*)?)
             }
         }
+    };
+
+    // HACK: This is to work around `serde_json` not allowing parsing `()` from `[]`:
+    //
+    // ```rs
+    // serde_json::from_str::<()>("[]")
+    // ```
+    //
+    // Instead, this swaps between two implementations. If the handler takes no parameters, it will
+    // try parse `[(); 0]` (to ensure that no unnecessary parameters were passed to the handler).
+    // Otherwise if the parameter does require parameters, they will be parsed as normal.
+    //
+    // This can be reverted once the following PR lands: https://github.com/serde-rs/json/pull/869
+    (parse_impl $params:ident -> []) => {
+        $params.parse::<[(); 0]>()
+            .map(|_| ())
+    };
+    (parse_impl $params:ident -> [$($param_tys:ident,)*]) => {
+        $params.parse::<Self::Params>()
     };
 
     (ctx_ty [$ctx:ty]) => {
@@ -145,11 +169,17 @@ where
                     let handler = self.clone();
 
                     async move {
-                        let ctx = Self::Ctx::from_request_extensions((*ctx).clone(), extensions)
-                            .await
-                            .unwrap();
+                        let ctx =
+                            match Self::Ctx::from_request_extensions((*ctx).clone(), extensions)
+                                .await
+                            {
+                                Ok(ctx) => ctx,
+                                Err(e) => {
+                                    return ResponsePayload::error(e);
+                                }
+                            };
                         let result = handler.call(ctx, params);
-                        Ok::<_, Infallible>(result.transform())
+                        ResponsePayload::success(result.transform())
                     }
                 },
             )
@@ -183,11 +213,17 @@ where
                     let f = self.clone();
 
                     async move {
-                        let ctx = Self::Ctx::from_request_extensions((*ctx).clone(), extensions)
-                            .await
-                            .unwrap();
+                        let ctx =
+                            match Self::Ctx::from_request_extensions((*ctx).clone(), extensions)
+                                .await
+                            {
+                                Ok(ctx) => ctx,
+                                Err(e) => {
+                                    return ResponsePayload::error(e);
+                                }
+                            };
                         let result = f.call(ctx, params).await;
-                        Ok::<_, Infallible>(result.transform())
+                        ResponsePayload::success(result.transform())
                     }
                 },
             )
@@ -227,19 +263,38 @@ where
                     let f = self.clone();
 
                     async move {
+                        let ctx =
+                            match Self::Ctx::from_request_extensions((*ctx).clone(), extensions)
+                                .await
+                            {
+                                Ok(ctx) => ctx,
+                                Err(e) => {
+                                    pending.reject(e).await;
+                                    return SubscriptionCloseResponse::None;
+                                }
+                            };
+
                         let sink = pending.accept().await.unwrap();
 
-                        let ctx = Self::Ctx::from_request_extensions((*ctx).clone(), extensions)
-                            .await
-                            .unwrap();
+                        // Track the number of items emitted through the subscription
+                        let mut count = 0;
+                        let subscription_id = sink.subscription_id();
+
                         let mut stream = pin!(f.call(ctx, params));
 
                         while let Some(item) = stream.next().await {
                             let item = serde_json::value::to_raw_value(&item.transform()).unwrap();
                             sink.send(item).await.unwrap();
+                            count += 1;
                         }
 
-                        Ok(())
+                        // Notify that stream is closing
+                        SubscriptionCloseResponse::Notif(SubscriptionMessage::from(
+                            serde_json::value::to_raw_value(
+                                &json!({ "close_stream": subscription_id, "count": count }),
+                            )
+                            .unwrap(),
+                        ))
                     }
                 },
             )
@@ -279,19 +334,38 @@ where
                     let f = self.clone();
 
                     async move {
+                        let ctx =
+                            match Self::Ctx::from_request_extensions((*ctx).clone(), extensions)
+                                .await
+                            {
+                                Ok(ctx) => ctx,
+                                Err(e) => {
+                                    pending.reject(e).await;
+                                    return SubscriptionCloseResponse::None;
+                                }
+                            };
+
                         let sink = pending.accept().await.unwrap();
 
-                        let ctx = Self::Ctx::from_request_extensions((*ctx).clone(), extensions)
-                            .await
-                            .unwrap();
+                        // Track the number of items emitted through the subscription
+                        let mut count = 0;
+                        let subscription_id = sink.subscription_id();
+
                         let mut stream = pin!(f.call(ctx, params).await);
 
                         while let Some(item) = stream.next().await {
                             let item = serde_json::value::to_raw_value(&item.transform()).unwrap();
                             sink.send(item).await.unwrap();
+                            count += 1;
                         }
 
-                        Ok(())
+                        // Notify that stream is closing
+                        SubscriptionCloseResponse::Notif(SubscriptionMessage::from(
+                            serde_json::value::to_raw_value(
+                                &json!({ "close_stream": subscription_id, "count": count }),
+                            )
+                            .unwrap(),
+                        ))
                     }
                 },
             )
@@ -301,6 +375,8 @@ where
 
 #[cfg(test)]
 mod test {
+    use crate::RpcError;
+
     use super::{ctx::FromRequestExtensions, ts::TsType, *};
 
     use futures::stream;
@@ -418,8 +494,8 @@ mod test {
 
     /// Call some handlers, and assert the output.
     #[rstest]
-    #[case(|| {}, json!(()), ())]
-    #[case(|_ctx: ()| {}, json!(()), ())]
+    #[case(|| {}, json!([]), ())]
+    #[case(|_ctx: ()| {}, json!([]), ())]
     #[case(|_ctx: (), param: u32| param, json!([123]), 123)]
     #[case(|_ctx: (), param_1: u32, param_2: String| -> (u32, String) { (param_1, param_2) }, json!([123, "hello"]), (123, "hello".to_string()))]
     fn call_handler<H, MSig>(#[case] handler: H, #[case] params: Value, #[case] expected: H::Return)
@@ -446,7 +522,7 @@ mod test {
         async fn from_request_extensions(
             _ctx: SampleCtx,
             _extensions: http::Extensions,
-        ) -> Result<Self, ()> {
+        ) -> Result<Self, RpcError> {
             Ok(DerivedCtx)
         }
     }

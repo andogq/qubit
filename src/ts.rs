@@ -286,9 +286,9 @@ mod test {
 
         assert_eq!(
             router.generate_typescript(),
-            r#"type UserTypeA = { a: number, b: boolean, };
-type UserTypeB = string;
-export type Router = { nested: { inner: Query<[user_type: UserTypeB], null>, }, outer: Query<[user_type: UserTypeA], null>, };
+            r#"type UserTypeB = string;
+type UserTypeA = { a: number, b: boolean, };
+export type QubitServer = { nested: { inner: Query<[user_type: UserTypeB], null>, }, outer: Query<[user_type: UserTypeA], null>, };
 "#
         );
     }

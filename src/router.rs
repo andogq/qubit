@@ -18,6 +18,8 @@ use lazy_static::lazy_static;
 use linkme::distributed_slice;
 use tower::{Service, ServiceBuilder, service_fn};
 
+use crate::FromRequestExtensions;
+
 use super::{
     handler::{RegisterableHandler, marker, reflection::*},
     ts::TsRouter,
@@ -67,7 +69,8 @@ where
         handler: F,
     ) -> Self
     where
-        F: RegisterableHandler<MSig, MValue, MReturn, Ctx = Ctx>,
+        F: RegisterableHandler<MSig, MValue, MReturn>,
+        F::Ctx: FromRequestExtensions<Ctx>,
     {
         let handler_meta = HANDLER_DEFINITIONS_MAP.get(&handler.type_id()).unwrap();
         self.ts_router.add_handler(handler_meta, &handler);
@@ -124,6 +127,8 @@ where
 
         let mut file = OpenOptions::new()
             .write(true)
+            .create(true)
+            .truncate(true)
             .open(output_path.as_ref())
             .unwrap();
 

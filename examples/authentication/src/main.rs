@@ -1,13 +1,13 @@
 use std::net::SocketAddr;
 
 use axum::{
+    Form,
     response::{IntoResponse, Response},
     routing::post,
-    Form,
 };
 use cookie::Cookie;
-use hyper::{header::SET_COOKIE, StatusCode};
-use qubit::{handler, ErrorCode, Extensions, FromRequestExtensions, Router, RpcError};
+use hyper::{StatusCode, header::SET_COOKIE};
+use qubit::{ErrorCode, Extensions, FromRequestExtensions, Router, RpcError, handler};
 use serde::Deserialize;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
@@ -111,10 +111,12 @@ async fn secret_endpoint(ctx: AuthCtx) -> String {
 #[tokio::main]
 async fn main() {
     // Create the qubit router
-    let router = Router::new().handler(echo_cookie).handler(secret_endpoint);
-    router.write_bindings_to_dir("./auth-demo/src/bindings");
+    let router = Router::<()>::new()
+        .handler(echo_cookie)
+        .handler(secret_endpoint);
+    router.generate_type("./auth-demo/src/bindings.ts").unwrap();
 
-    let (qubit_service, handle) = router.to_service(());
+    let (qubit_service, handle) = router.into_service(());
 
     let qubit_service = ServiceBuilder::new()
         .map_request(|mut req: hyper::Request<_>| {

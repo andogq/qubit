@@ -21,7 +21,7 @@ macro_rules! test_handler {
         assert_eq!(
             ty,
             format!(
-                "export type Router = {{ {handler_name}: {kind}<[{params}], {ret}>, }};\n",
+                "export type QubitServer = {{ {handler_name}: {kind}<[{params}], {ret}>, }};\n",
                 handler_name = stringify!($handler_name),
                 kind = stringify!($kind),
                 params = stringify!($($params)*),
