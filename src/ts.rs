@@ -162,8 +162,16 @@ impl TsRouter {
 
         let mut typescript = String::new();
 
-        user_types.values() 
-        for user_type in {
+        // Super hacky way to ensure that the generated types are ordered in a stable manner.
+        // Otherwise, they'd be ordered based on the `TypeId`, which isn't stable across different
+        // compilers/compilations.
+        let user_types = {
+            let mut user_types = user_types.values().collect::<Vec<_>>();
+            user_types.sort();
+            user_types
+        };
+
+        for user_type in user_types {
             writeln!(typescript, "export {user_type}").unwrap();
         }
 
@@ -356,8 +364,8 @@ mod test {
 
         assert_eq!(
             router.generate_typescript(),
-            r#"type UserTypeB = string;
-type UserTypeA = { a: number, b: boolean, };
+            r#"export type UserTypeA = { a: number, b: boolean, };
+export type UserTypeB = string;
 export type QubitServer = { nested: { inner: Query<[], Array<UserTypeB>>, }, outer: Query<[user_type: UserTypeA], null>, };
 "#
         );
