@@ -115,7 +115,7 @@ impl TsRouter {
             .param_names
             .iter()
             .zip(&params)
-            .flat_map(|(name, ty)| [format!("{}: {}", name, ty), ", ".to_string()])
+            .flat_map(|(name, ty)| [format!("{name}: {ty}"), ", ".to_string()])
             .take(if meta.param_names.is_empty() {
                 0
             } else {
@@ -124,7 +124,7 @@ impl TsRouter {
             .collect::<String>();
         self.handlers.insert(
             meta.name.to_string(),
-            format!("{kind}<[{params}], {}>", ret_ty),
+            format!("{kind}<[{params}], {ret_ty}>"),
         );
     }
 
@@ -162,7 +162,8 @@ impl TsRouter {
 
         let mut typescript = String::new();
 
-        for user_type in user_types.values() {
+        user_types.values() 
+        for user_type in {
             writeln!(typescript, "export {user_type}").unwrap();
         }
 
