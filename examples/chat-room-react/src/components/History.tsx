@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import type { ChatMessage } from "../bindings/ChatMessage";
+import type { ChatMessage } from "../bindings";
 import { Message } from "./Message";
 
 export const History = () => {

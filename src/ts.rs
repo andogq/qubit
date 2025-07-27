@@ -1,11 +1,16 @@
+use ts_rs::{TS, TypeVisitor};
+
 use crate::handler::{
     RegisterableHandler, marker,
     reflection::{HandlerKind, HandlerMeta},
     response::ResponseValue,
-    ts::TsType,
     ts::TsTypeTuple,
 };
-use std::{any::TypeId, collections::BTreeMap, fmt::Write};
+use std::{
+    any::TypeId,
+    collections::{BTreeMap, HashSet},
+    fmt::Write,
+};
 
 /// TypeScript representation of a [`Router`], containing all required information to generate
 /// TypeScript types at runtime.
@@ -41,22 +46,64 @@ impl TsRouter {
     ) where
         F: RegisterableHandler<Ctx, MSig, MValue, MReturn>,
     {
-        let param_tys = F::Params::get_ts_types();
-        let ret_ty = TsType::from_type::<<F::Response as ResponseValue<_>>::Value>();
+        struct TypeCapturer<'a> {
+            types: &'a mut BTreeMap<TypeId, String>,
+            visited: HashSet<TypeId>,
+        }
+        impl<'a> TypeCapturer<'a> {
+            pub fn new(types: &'a mut BTreeMap<TypeId, String>) -> Self {
+                Self {
+                    types,
+                    visited: HashSet::new(),
+                }
+            }
+        }
+        impl<'a> TypeVisitor for TypeCapturer<'a> {
+            fn visit<T: TS + 'static + ?Sized>(&mut self) {
+                let type_id = TypeId::of::<T>();
+                if self.visited.contains(&type_id) {
+                    // Don't recurse if this type has already been visited.
+                    return;
+                }
+                self.visited.insert(type_id);
+
+                if T::output_path().is_some() {
+                    // If there's an output path, then it's a user-generated type, so its
+                    // declaration should be added.
+                    self.types.insert(type_id, T::decl());
+                }
+
+                T::visit_dependencies(self);
+                T::visit_generics(self);
+            }
+        }
+
+        let mut visitor = TypeCapturer::new(&mut self.user_types);
+
+        // Visit all parameters, and register them.
+        F::Params::visit_tys(&mut visitor);
+        // Register the return type.
+        visitor.visit::<<F::Response as ResponseValue<_>>::Value>();
+
+        // Generate the signature.
+        struct ParamCollector(Vec<String>);
+        impl TypeVisitor for ParamCollector {
+            fn visit<T: TS + 'static + ?Sized>(&mut self) {
+                self.0.push(T::name());
+            }
+        }
+
+        let mut params = ParamCollector(Vec::new());
+        F::Params::visit_tys(&mut params);
+        let params = params.0;
 
         assert_eq!(
-            param_tys.len(),
+            params.len(),
             meta.param_names.len(),
             "param types and provided names must be equal length"
         );
 
-        // Register all dependent types of this handler.
-        param_tys.iter().chain([&ret_ty]).for_each(|param| {
-            let TsType::User(ty) = param else {
-                return;
-            };
-            self.user_types.insert(ty.id, ty.declaration.clone());
-        });
+        let ret_ty = <<F::Response as ResponseValue<_>>::Value as TS>::name();
 
         // Generate the signature of this handler.
         let kind = match meta.kind {
@@ -67,8 +114,8 @@ impl TsRouter {
         let params = meta
             .param_names
             .iter()
-            .zip(&param_tys)
-            .flat_map(|(name, ty)| [format!("{}: {}", name, ty.name), ", ".to_string()])
+            .zip(&params)
+            .flat_map(|(name, ty)| [format!("{}: {}", name, ty), ", ".to_string()])
             .take(if meta.param_names.is_empty() {
                 0
             } else {
@@ -77,7 +124,7 @@ impl TsRouter {
             .collect::<String>();
         self.handlers.insert(
             meta.name.to_string(),
-            format!("{kind}<[{params}], {}>", ret_ty.name),
+            format!("{kind}<[{params}], {}>", ret_ty),
         );
     }
 
@@ -116,7 +163,7 @@ impl TsRouter {
         let mut typescript = String::new();
 
         for user_type in user_types.values() {
-            writeln!(typescript, "{user_type}").unwrap();
+            writeln!(typescript, "export {user_type}").unwrap();
         }
 
         write!(typescript, "export type QubitServer = ").unwrap();
@@ -227,6 +274,21 @@ mod test {
         );
     }
 
+    #[test]
+    fn capture_return_types() {
+        let mut module = TsRouter::new();
+        module.add_handler(
+            &HandlerMeta {
+                name: "handler",
+                param_names: &[],
+                kind: HandlerKind::Query,
+            },
+            &|_ctx: ()| -> Vec<UserTypeA> { todo!() },
+        );
+
+        assert!(module.user_types.contains_key(&TypeId::of::<UserTypeA>()));
+    }
+
     /// Helper to make a router with the named handlers inside.
     fn make_router(handlers: impl IntoIterator<Item = &'static str>) -> TsRouter {
         let mut router = TsRouter::new();
@@ -283,10 +345,10 @@ mod test {
             router.add_handler(
                 &HandlerMeta {
                     name: "inner",
-                    param_names: &["user_type"],
+                    param_names: &[],
                     kind: HandlerKind::Query,
                 },
-                &|ctx: (), user_type: UserTypeB| {},
+                &|ctx: ()| async { vec![UserTypeB(todo!())] },
             );
             router
         });
@@ -295,7 +357,7 @@ mod test {
             router.generate_typescript(),
             r#"type UserTypeB = string;
 type UserTypeA = { a: number, b: boolean, };
-export type QubitServer = { nested: { inner: Query<[user_type: UserTypeB], null>, }, outer: Query<[user_type: UserTypeA], null>, };
+export type QubitServer = { nested: { inner: Query<[], Array<UserTypeB>>, }, outer: Query<[user_type: UserTypeA], null>, };
 "#
         );
     }

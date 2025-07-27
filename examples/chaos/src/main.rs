@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-#[ts(optional_fields)]
+#[ts]
 pub struct Metadata {
     param_a: String,
     param_b: u32,

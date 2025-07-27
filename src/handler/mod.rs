@@ -359,9 +359,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::RpcError;
+    use crate::{RpcError, handler::ts::TypeCollector};
 
-    use super::{ctx::FromRequestExtensions, ts::TsType, *};
+    use super::{ctx::FromRequestExtensions, *};
 
     use futures::stream;
     use rstest::rstest;
@@ -549,14 +549,11 @@ mod test {
         H::Ctx: 'static + Send + Sync + FromRequestExtensions<Ctx>,
     {
         assert_eq!(
-            H::Params::get_ts_types()
-                .into_iter()
-                .map(|ty| ty.name.clone())
-                .collect::<Vec<_>>(),
+            TypeCollector::collect_names::<H::Params>(),
             expected_params.into_iter().collect::<Vec<_>>()
         );
         assert_eq!(
-            TsType::from_type::<<H::Response as ResponseValue<_>>::Value>().name,
+            <<H::Response as ResponseValue<_>>::Value as TS>::name(),
             expected_return
         );
     }

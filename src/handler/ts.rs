@@ -1,80 +1,17 @@
 //! Utilities for representing TypeScript types at runtime.
 
-use std::{any::TypeId, ops::Deref};
-
-use derive_more::Deref;
-use ts_rs::TS;
-
-/// Common components of [`TsType`].
-#[derive(Clone, Debug)]
-pub struct TsTypeCommon {
-    /// TypeScript name of the type. Could be the primitive (`number`, `string`), or a
-    /// user-defined type.
-    pub name: String,
-}
-
-/// User-defined type.
-#[derive(Clone, Debug, Deref)]
-pub struct TsTypeUser {
-    #[deref]
-    common: TsTypeCommon,
-
-    /// Rust type that this refers to. The same Rust type will correspond to the same
-    /// TypeScript type (with the exception of numbers like [`i32`] and [`u32`] which are both
-    ///  `number`).
-    pub id: std::any::TypeId,
-    /// Declaration of this type.
-    pub declaration: String,
-}
-
-/// Type information to represent a type in TypeScript.
-#[derive(Clone, Debug)]
-pub enum TsType {
-    /// Built-in TypeScript type.
-    Primitive(TsTypeCommon),
-    /// User-defined TypeScript type.
-    User(TsTypeUser),
-}
-
-impl TsType {
-    /// Produce type information for the given Rust type.
-    pub fn from_type<T: 'static + TS + ?Sized>() -> Self {
-        let common = TsTypeCommon { name: T::name() };
-
-        // Determine whether the type is primitive or not based on whether the output path is defined.
-        match T::output_path() {
-            Some(_) => Self::User(TsTypeUser {
-                common,
-                id: TypeId::of::<T>(),
-                declaration: T::decl(),
-            }),
-            None => Self::Primitive(common),
-        }
-    }
-}
-
-impl Deref for TsType {
-    type Target = TsTypeCommon;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            TsType::Primitive(ts_type_common) => ts_type_common,
-            TsType::User(ts_type_user) => ts_type_user,
-        }
-    }
-}
+use ts_rs::{TS, TypeVisitor};
 
 /// Tuple of [`TsType`] types.
 pub trait TsTypeTuple {
-    /// Produce all of the [`TsType`] for each of the types in the tuple, in order.
-    fn get_ts_types() -> Vec<TsType>;
+    fn visit_tys(visitor: &mut impl TypeVisitor);
 }
 
 macro_rules! impl_ts_type_tuple {
     (impl [$($params:ident,)*]) => {
         impl<$($params: 'static + TS,)*> TsTypeTuple for ($($params,)*) {
-            fn get_ts_types() -> Vec<TsType> {
-                vec![$(TsType::from_type::<$params>(),)*]
+            fn visit_tys(#[allow(unused)] visitor: &mut impl TypeVisitor) {
+                $(visitor.visit::<$params>();)*
             }
         }
     };
@@ -96,49 +33,51 @@ impl_ts_type_tuple!(
 );
 
 #[cfg(test)]
+pub use self::test::TypeCollector;
+
+#[cfg(test)]
 mod test {
     use super::*;
 
-    #[test]
-    fn valid_primitive() {
-        let ts_type = TsType::from_type::<u32>();
-        assert_eq!(ts_type.name, "number");
-        assert!(matches!(ts_type, TsType::Primitive(_)));
+    pub struct TypeCollector(Vec<(String, Option<String>)>);
+
+    impl TypeCollector {
+        pub fn collect_names<T: TsTypeTuple>() -> Vec<String> {
+            TypeCollector::collect::<T>()
+                .into_iter()
+                .map(|(name, _)| name)
+                .collect()
+        }
+
+        pub fn collect<T: TsTypeTuple>() -> Vec<(String, Option<String>)> {
+            let mut types = Self(Vec::new());
+            T::visit_tys(&mut types);
+            types.0
+        }
+    }
+
+    impl TypeVisitor for TypeCollector {
+        fn visit<T: TS + 'static + ?Sized>(&mut self) {
+            self.0
+                .push((T::name(), T::output_path().map(|_| T::decl())));
+        }
     }
 
     #[test]
-    fn valid_user_defined() {
-        #[derive(TS)]
-        struct MyType;
-
-        let ts_type = TsType::from_type::<MyType>();
-        assert_eq!(ts_type.name, "MyType");
-        assert!(matches!(ts_type, TsType::User(_)));
+    fn empty() {
+        assert_eq!(TypeCollector::collect_names::<()>(), &[] as &[&str]);
     }
 
-    mod ts_tupe_tuple {
-        use super::*;
+    #[test]
+    fn single() {
+        assert_eq!(TypeCollector::collect_names::<(u32,)>(), &["number"]);
+    }
 
-        #[test]
-        fn empty() {
-            let types = <()>::get_ts_types();
-            assert!(types.is_empty());
-        }
-
-        #[test]
-        fn single() {
-            let types = <(u32,)>::get_ts_types();
-            assert_eq!(types.len(), 1);
-            assert_eq!(types[0].name, "number");
-        }
-
-        #[test]
-        fn multiple() {
-            let types = <(u32, bool, String)>::get_ts_types();
-            assert_eq!(types.len(), 3);
-            assert_eq!(types[0].name, "number");
-            assert_eq!(types[1].name, "boolean");
-            assert_eq!(types[2].name, "string");
-        }
+    #[test]
+    fn multiple() {
+        assert_eq!(
+            TypeCollector::collect_names::<(u32, bool, String)>(),
+            ["number", "boolean", "string"]
+        );
     }
 }
