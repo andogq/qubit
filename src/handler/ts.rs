@@ -2,7 +2,7 @@
 
 use ts_rs::{TS, TypeVisitor};
 
-/// Tuple of [`TsType`] types.
+/// Tuple of [`TS`] types.
 pub trait TsTypeTuple {
     fn visit_tys(visitor: &mut impl TypeVisitor);
 }
