@@ -1,7 +1,8 @@
-pub use jsonrpsee::types::error::ErrorCode;
-use jsonrpsee::{types::ErrorObjectOwned, IntoResponse};
+use jsonrpsee::{IntoResponse, types::ErrorObjectOwned};
 use serde::Serialize;
 use serde_json::Value;
+
+pub use jsonrpsee::types::error::ErrorCode;
 
 /// An RPC error response. [See documentation](https://www.jsonrpc.org/specification#response_object).
 /// for addtional information.

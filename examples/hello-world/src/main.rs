@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use qubit::{handler, Router};
+use qubit::{Router, handler};
 use tokio::net::TcpListener;
 
 #[handler(query)]
@@ -14,11 +14,11 @@ async fn main() {
     let router = Router::new().handler(hello_world);
 
     // Save the type
-    router.write_bindings_to_dir("./bindings");
+    router.generate_type("./bindings.ts").unwrap();
     println!("Successfully write server type to `./bindings`");
 
     // Create service and handle
-    let (qubit_service, qubit_handle) = router.to_service(());
+    let (qubit_service, qubit_handle) = router.into_service(());
 
     // Nest into an Axum rouer
     let axum_router = axum::Router::<()>::new().nest_service("/rpc", qubit_service);

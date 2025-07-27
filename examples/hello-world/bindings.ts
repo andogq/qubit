@@ -10,8 +10,6 @@
 ############### && @@@@@@@@@@@@@@
 ############### & @@@@@@@@@@@@@    */
 
-import type { Query } from "@qubit-rs/client";
+import type { Query, Mutation, Subscription } from "@qubit-rs/client";
+export type QubitServer = { hello_world: Query<[], string>, };
 
-export type { Query } from "@qubit-rs/client";
-
-export type QubitServer = { hello_world: Query<[], string> };

@@ -2,8 +2,8 @@ use std::net::SocketAddr;
 
 use futures::Stream;
 use manager::{ChatMessage, Client, Manager};
-use qubit::{handler, Router};
-use rand::{thread_rng, Rng};
+use qubit::{Router, handler};
+use rand::{Rng, thread_rng};
 use tokio::net::TcpListener;
 
 mod manager;
@@ -44,12 +44,12 @@ async fn main() {
         .handler(list_messages);
 
     // Save the type
-    router.write_bindings_to_dir("../src/bindings");
-    println!("Successfully wrote server bindings to `./bindings`");
+    router.generate_type("../src/bindings.ts").unwrap();
+    println!("Successfully wrote server bindings to `./bindings.ts`");
 
     // Create service and handle
     let client = Manager::start();
-    let (qubit_service, qubit_handle) = router.to_service(
+    let (qubit_service, qubit_handle) = router.into_service(
         Ctx {
             client, name: '🦀'
         }, //     move |_| {

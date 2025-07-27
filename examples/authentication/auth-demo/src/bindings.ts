@@ -10,8 +10,6 @@
 ############### && @@@@@@@@@@@@@@
 ############### & @@@@@@@@@@@@@    */
 
-import type { Query } from "@qubit-rs/client";
+import type { Query, Mutation, Subscription } from "@qubit-rs/client";
+export type QubitServer = { echo_cookie: Query<[], string>, secret_endpoint: Query<[], string>, };
 
-export type { Query } from "@qubit-rs/client";
-
-export type QubitServer = { echo_cookie: Query<[], string>, secret_endpoint: Query<[], string> };

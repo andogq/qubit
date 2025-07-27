@@ -1,13 +1,13 @@
 use std::{
     net::SocketAddr,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
     time::Duration,
 };
 
-use futures::{stream, Stream, StreamExt};
+use futures::{Stream, StreamExt, stream};
 use qubit::*;
 
 use axum::routing::get;
@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-#[ts(optional_fields)]
+#[ts]
 pub struct Metadata {
     param_a: String,
     param_b: u32,
@@ -203,7 +203,7 @@ async fn enum_test() -> MyEnum {
 #[tokio::main]
 async fn main() {
     // Build up the router
-    let app = Router::new()
+    let app = Router::<AppCtx>::new()
         .handler(version)
         .handler(count)
         .handler(countdown)
@@ -213,10 +213,10 @@ async fn main() {
         .nest("user", user::create_router());
 
     // Save the router's bindings
-    app.write_bindings_to_dir("./bindings");
+    app.generate_type("./bindings.ts").unwrap();
 
     // Create a service and handle for the app
-    let (app_service, app_handle) = app.to_service(AppCtx::default());
+    let (app_service, app_handle) = app.into_service(AppCtx::default());
 
     // Set up the axum router
     let router = axum::Router::<()>::new()
