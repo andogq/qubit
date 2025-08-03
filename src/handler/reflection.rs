@@ -2,7 +2,7 @@
 
 /// Kind of the handler. This will correspond with the method the user must call from
 /// TypeScript.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HandlerKind {
     Query,
     Mutation,

@@ -1,3 +1,4 @@
+mod codegen;
 mod error;
 mod handler;
 mod router;
