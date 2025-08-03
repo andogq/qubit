@@ -71,43 +71,43 @@ impl TsBackend {
     }
 }
 
-impl Backend for TsBackend {
-    type HandlerBuilder = TsHandlerBuilder;
+// impl Backend for TsBackend {
+//     type HandlerBuilder = TsHandlerBuilder;
 
-    const FILE_EXTENSION: &'static str = "ts";
+//     const FILE_EXTENSION: &'static str = "ts";
 
-    fn register_user_type<T: TS + 'static + ?Sized>(&mut self) {
-        self.types.push(TsType::from::<T>());
-    }
+//     fn register_user_type<T: TS + 'static + ?Sized>(&mut self) {
+//         self.types.push(TsType::from::<T>());
+//     }
 
-    fn register_handler(&mut self, handler: <Self::HandlerBuilder as HandlerBuilder>::Output) {
-        self.handlers.push(handler);
-    }
+//     fn register_handler(&mut self, handler: <Self::HandlerBuilder as HandlerBuilder>::Output) {
+//         self.handlers.push(handler);
+//     }
 
-    fn codegen(
-        &self,
-        header: &'static str,
-        mut writer: impl std::fmt::Write,
-    ) -> Result<(), std::fmt::Error> {
-        // Add comments to disable common linting tools.
-        HEADER_LINES
-            .iter()
-            .try_for_each(|line| writeln!(writer, "{line}"))?;
+//     fn codegen(
+//         &self,
+//         header: &'static str,
+//         mut writer: impl std::fmt::Write,
+//     ) -> Result<(), std::fmt::Error> {
+//         // Add comments to disable common linting tools.
+//         HEADER_LINES
+//             .iter()
+//             .try_for_each(|line| writeln!(writer, "{line}"))?;
 
-        // Write the header in a multi-line comment block.
-        write_comment_block(&mut writer, header)?;
+//         // Write the header in a multi-line comment block.
+//         write_comment_block(&mut writer, header)?;
 
-        // Write generated user types
-        writeln!(writer)?;
-        self.write_types(&mut writer)?;
+//         // Write generated user types
+//         writeln!(writer)?;
+//         self.write_types(&mut writer)?;
 
-        // Write router type.
-        writeln!(writer)?;
-        self.write_router_type(&mut writer)?;
+//         // Write router type.
+//         writeln!(writer)?;
+//         self.write_router_type(&mut writer)?;
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }
 
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -184,104 +184,104 @@ fn write_comment_block(mut writer: impl Write, content: &str) -> Result<(), std:
     Ok(())
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
+// #[cfg(test)]
+// mod test {
+//     use super::*;
 
-    use crate::{__private::HandlerMeta, codegen::Codegen};
+//     use crate::{__private::HandlerMeta, codegen::Codegen};
 
-    mod with_codegen {
-        use serde::{Deserialize, Serialize};
+//     mod with_codegen {
+//         use serde::{Deserialize, Serialize};
 
-        use super::*;
+//         use super::*;
 
-        #[test]
-        fn only_inbuilt_types() {
-            let mut codegen = Codegen::new(TsBackend::new());
+//         #[test]
+//         fn only_inbuilt_types() {
+//             let mut codegen = Codegen::new(TsBackend::new());
 
-            codegen.register_handler(
-                &HandlerMeta {
-                    kind: HandlerKind::Query,
-                    name: "handler_a",
-                    param_names: &["param_a", "param_b", "param_c"],
-                },
-                #[allow(unused)]
-                &|ctx: (), param_a: u32, param_b: String, param_c: bool| -> Vec<i32> { todo!() },
-            );
+//             codegen.register_handler(
+//                 &HandlerMeta {
+//                     kind: HandlerKind::Query,
+//                     name: "handler_a",
+//                     param_names: &["param_a", "param_b", "param_c"],
+//                 },
+//                 #[allow(unused)]
+//                 &|ctx: (), param_a: u32, param_b: String, param_c: bool| -> Vec<i32> { todo!() },
+//             );
 
-            assert!(codegen.backend.types.is_empty());
+//             assert!(codegen.backend.types.is_empty());
 
-            assert_eq!(
-                codegen.backend.handlers,
-                vec![TsHandler {
-                    kind: HandlerKind::Query,
-                    name: "handler_a",
-                    params: vec![
-                        ("param_a", "number".to_string()),
-                        ("param_b", "string".to_string()),
-                        ("param_c", "boolean".to_string())
-                    ],
-                    return_ty: "Array<number>".to_string()
-                }]
-            )
-        }
+//             assert_eq!(
+//                 codegen.backend.handlers,
+//                 vec![TsHandler {
+//                     kind: HandlerKind::Query,
+//                     name: "handler_a",
+//                     params: vec![
+//                         ("param_a", "number".to_string()),
+//                         ("param_b", "string".to_string()),
+//                         ("param_c", "boolean".to_string())
+//                     ],
+//                     return_ty: "Array<number>".to_string()
+//                 }]
+//             )
+//         }
 
-        #[test]
-        fn with_user_types() {
-            #[derive(TS, Deserialize)]
-            struct TypeA;
-            #[derive(TS, Clone, Deserialize, Serialize)]
-            struct TypeB<T>(T);
-            #[derive(TS, Deserialize)]
-            struct TypeC;
+//         #[test]
+//         fn with_user_types() {
+//             #[derive(TS, Deserialize)]
+//             struct TypeA;
+//             #[derive(TS, Clone, Deserialize, Serialize)]
+//             struct TypeB<T>(T);
+//             #[derive(TS, Deserialize)]
+//             struct TypeC;
 
-            let mut codegen = Codegen::new(TsBackend::new());
+//             let mut codegen = Codegen::new(TsBackend::new());
 
-            codegen.register_handler(
-                &HandlerMeta {
-                    kind: HandlerKind::Query,
-                    name: "handler_a",
-                    param_names: &["param_a", "param_b", "param_c"],
-                },
-                #[allow(unused)]
-                &|ctx: (),
-                  param_a: TypeA,
-                  param_b: TypeB<u32>,
-                  param_c: Vec<TypeC>|
-                 -> TypeB<bool> { todo!() },
-            );
+//             codegen.register_handler(
+//                 &HandlerMeta {
+//                     kind: HandlerKind::Query,
+//                     name: "handler_a",
+//                     param_names: &["param_a", "param_b", "param_c"],
+//                 },
+//                 #[allow(unused)]
+//                 &|ctx: (),
+//                   param_a: TypeA,
+//                   param_b: TypeB<u32>,
+//                   param_c: Vec<TypeC>|
+//                  -> TypeB<bool> { todo!() },
+//             );
 
-            assert_eq!(
-                codegen.backend.types,
-                vec![
-                    TsType {
-                        name: "TypeA".to_string(),
-                        definition: "null".to_string()
-                    },
-                    TsType {
-                        name: "TypeB<T>".to_string(),
-                        definition: "T".to_string()
-                    },
-                    TsType {
-                        name: "TypeC".to_string(),
-                        definition: "null".to_string()
-                    },
-                ]
-            );
+//             assert_eq!(
+//                 codegen.backend.types,
+//                 vec![
+//                     TsType {
+//                         name: "TypeA".to_string(),
+//                         definition: "null".to_string()
+//                     },
+//                     TsType {
+//                         name: "TypeB<T>".to_string(),
+//                         definition: "T".to_string()
+//                     },
+//                     TsType {
+//                         name: "TypeC".to_string(),
+//                         definition: "null".to_string()
+//                     },
+//                 ]
+//             );
 
-            assert_eq!(
-                codegen.backend.handlers,
-                vec![TsHandler {
-                    kind: HandlerKind::Query,
-                    name: "handler_a",
-                    params: vec![
-                        ("param_a", "TypeA".to_string()),
-                        ("param_b", "TypeB<number>".to_string()),
-                        ("param_c", "Array<TypeC>".to_string())
-                    ],
-                    return_ty: "TypeB<boolean>".to_string()
-                }]
-            );
-        }
-    }
-}
+//             assert_eq!(
+//                 codegen.backend.handlers,
+//                 vec![TsHandler {
+//                     kind: HandlerKind::Query,
+//                     name: "handler_a",
+//                     params: vec![
+//                         ("param_a", "TypeA".to_string()),
+//                         ("param_b", "TypeB<number>".to_string()),
+//                         ("param_c", "Array<TypeC>".to_string())
+//                     ],
+//                     return_ty: "TypeB<boolean>".to_string()
+//                 }]
+//             );
+//         }
+//     }
+// }
