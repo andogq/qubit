@@ -17,7 +17,7 @@ use crate::{
 /// Collects handler and type definitions, and dispatches them to a [`Backend`] to generate the
 /// final code. This will handle all book-keeping and tracking to prevent recursion and detect user
 /// types, so the backend is safe to trust types that are dispatched to it.
-struct Codegen<B: Backend> {
+pub struct Codegen<B: Backend> {
     /// Types that have been visited, tracked to prevent recursing on types.
     visited_types: HashSet<TypeId>,
     /// Backend that will output the generated code.
@@ -31,6 +31,8 @@ struct Codegen<B: Backend> {
 
 #[derive(Clone)]
 enum GraphNode<H> {
+    // TODO: Make this `Vec<H>`, and update everything. This way, the handler names aren't used in
+    // the edges between nodes.
     Handler(H),
     Parent,
 }
@@ -107,6 +109,25 @@ where
         }
     }
 
+    pub fn write(&self, writer: &mut impl Write) -> Result<(), std::fmt::Error> {
+        let mut handler_writer = self.backend.write(writer)?;
+
+        let mut stack = vec![self.handler_root];
+
+        while let Some(idx) = stack.pop() {
+            match &self.handlers[idx] {
+                GraphNode::Handler(handler) => handler_writer.write_handler(handler)?,
+                GraphNode::Parent => {
+                    handler_writer.begin_nested()?;
+
+                    handler_writer.end_nested()?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Generate a [`UserTypeVisitor`] with this codegen instance.
     fn user_type_visitor(&mut self) -> UserTypeVisitor<'_, B> {
         UserTypeVisitor(self)
@@ -153,7 +174,137 @@ where
     }
 }
 
-trait Backend {
+/*
+* { "asdf": () => {}, }
+
+export type EntityTick = {};
+
+{ "nested": { "asdf": (tick: EntityTick) => {}, } }
+
+let handlers = vec![
+    ("some.path.for.something", "(EntityTick) => void"),
+    ("some.path.for.otherthing", "(EntityTick) => void"),
+];
+
+{
+    "some": {
+        "path": {
+            "for": {
+                "something": (EntityTick) => void,
+                "otherthing": (EntityTick) => void,
+            }
+        }
+    }
+}
+
+*/
+
+struct TypeScript;
+impl<W: Write> Backend3<W> for TypeScript {
+    type HandlerBackend = ();
+    type TypeBackend = ();
+
+    fn stages(&self) -> &[BackendStage] {
+        &[BackendStage::Type, BackendStage::Handler]
+    }
+
+    fn begin_backend(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+        Ok(())
+    }
+
+    fn end_backend(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+        Ok(())
+    }
+
+    fn begin_stage(&self, writer: &mut W, stage: BackendStage) -> Result<(), std::fmt::Error> {
+        match stage {
+            BackendStage::Handler => {
+                write!(writer, "export type Router = ")?;
+            }
+            BackendStage::Type => {
+                writeln!(writer, "// User types")?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl HandlerBackend for TypeScript {
+    fn write_key(&mut self, key: &str) -> Result<(), std::fmt::Error> {
+        format!(r#""{key}: ""#);
+        Ok(())
+    }
+
+    fn write_handler(&mut self, handler: &H) -> Result<(), std::fmt::Error> {
+        todo!()
+    }
+
+    fn begin_nested(&mut self) -> Result<(), std::fmt::Error> {
+        format!("{{");
+        Ok(())
+    }
+
+    fn end_nested(&mut self) -> Result<(), std::fmt::Error> {
+        format!("}}");
+        Ok(())
+    }
+}
+
+trait Backend3<W: Write> {
+    type HandlerBackend;
+    type TypeBackend;
+
+    fn stages(&self) -> &[BackendStage];
+
+    #[allow(unused)]
+    fn begin_backend(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+        Ok(())
+    }
+
+    #[allow(unused)]
+    fn end_backend(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+        Ok(())
+    }
+
+    #[allow(unused)]
+    fn begin_stage(&self, writer: &mut W, stage: BackendStage) -> Result<(), std::fmt::Error> {
+        Ok(())
+    }
+
+    #[allow(unused)]
+    fn end_stage(&self, writer: &mut W, stage: BackendStage) -> Result<(), std::fmt::Error> {
+        Ok(())
+    }
+}
+
+trait HandlerBackend {
+    fn write_key(&mut self, key: &str) -> Result<(), std::fmt::Error>;
+    fn write_handler(&mut self, handler: H) -> Result<(), std::fmt::Error>;
+    fn begin_nested(&mut self) -> Result<(), std::fmt::Error>;
+    fn end_nested(&mut self) -> Result<(), std::fmt::Error>;
+}
+
+trait TypeBackend {
+    fn write_type<T: TS + 'static + ?Sized>(writer: &mut impl Write)
+    -> Result<(), std::fmt::Error>;
+}
+
+enum BackendStage {
+    Handler,
+    Type,
+}
+
+trait Backend2 {
+    fn write_component(&mut self, key: &str) -> Result<(), std::fmt::Error>;
+
+    fn write_key(&mut self, key: &str) -> Result<(), std::fmt::Error>;
+    fn write_handler(&mut self, handler: &H) -> Result<(), std::fmt::Error>;
+    fn begin_nested(&mut self) -> Result<(), std::fmt::Error>;
+    fn end_nested(&mut self) -> Result<(), std::fmt::Error>;
+}
+
+pub trait Backend {
     type UserType: FromType;
     type HandlerBuilder: HandlerBuilder;
     type HandlerWriter: HandlerWriter<<Self::HandlerBuilder as HandlerBuilder>::Output>;
@@ -168,7 +319,7 @@ trait Backend {
 
 trait HandlerWriter<H> {
     fn write_key(&mut self, key: &str) -> Result<(), std::fmt::Error>;
-    fn write_handler(&mut self, handler: H) -> Result<(), std::fmt::Error>;
+    fn write_handler(&mut self, handler: &H) -> Result<(), std::fmt::Error>;
     fn begin_nested(&mut self) -> Result<(), std::fmt::Error>;
     fn end_nested(&mut self) -> Result<(), std::fmt::Error>;
 }
@@ -226,7 +377,7 @@ mod test {
             todo!()
         }
 
-        fn write_handler(&mut self, _handler: AssertHandler) -> Result<(), std::fmt::Error> {
+        fn write_handler(&mut self, _handler: &AssertHandler) -> Result<(), std::fmt::Error> {
             todo!()
         }
 

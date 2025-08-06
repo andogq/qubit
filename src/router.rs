@@ -18,7 +18,10 @@ use lazy_static::lazy_static;
 use linkme::distributed_slice;
 use tower::{Service, ServiceBuilder, service_fn};
 
-use crate::FromRequestExtensions;
+use crate::{
+    FromRequestExtensions,
+    codegen::{Backend, Codegen},
+};
 
 use super::{
     handler::{RegisterableHandler, marker, reflection::*},
