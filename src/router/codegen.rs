@@ -1,4 +1,7 @@
-use std::path::Path;
+use std::{
+    fs::{File, OpenOptions},
+    path::Path,
+};
 
 use ts_rs::TypeVisitor;
 
@@ -16,21 +19,30 @@ impl CodegenModule {
         Self(Codegen::new())
     }
 
-    pub fn generate_type<B: Backend<String>>(&self, backend: B) -> Result<String, std::fmt::Error> {
-        let mut generated_type = String::new();
-        self.0.generate(&mut generated_type, backend).unwrap();
-        Ok(generated_type)
+    pub fn generate_type(&self, backend: impl Backend<Vec<u8>>) -> std::io::Result<String> {
+        let mut generated_type = Vec::new();
+        self.0.generate(&mut generated_type, backend)?;
+        Ok(String::from_utf8(generated_type).unwrap())
     }
 
     /// Generate the TypeScript for this router, and write it to the provided path.
-    pub fn write_type<B: Backend<String>>(
+    pub fn write_type(
         &self,
         output_path: impl AsRef<Path>,
-        backend: B,
-    ) -> Result<(), std::fmt::Error> {
-        let generated_type = self.generate_type(backend)?;
-        std::fs::write(output_path, generated_type).unwrap();
-        Ok(())
+        backend: impl Backend<File>,
+    ) -> std::io::Result<()> {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(output_path)?;
+        self.0.generate(&mut file, backend)
+    }
+}
+
+impl Default for CodegenModule {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -4,7 +4,8 @@ mod handler;
 use std::{
     any::TypeId,
     collections::{BTreeMap, BTreeSet},
-    fmt::{Display, Write},
+    fmt::Display,
+    io::Write,
 };
 
 use ts_rs::{TS, TypeVisitor};
@@ -121,7 +122,7 @@ impl Codegen {
         &self,
         writer: &mut W,
         backend: B,
-    ) -> Result<(), std::fmt::Error> {
+    ) -> std::io::Result<()> {
         backend.begin(writer)?;
 
         for stage in B::STAGES {
@@ -135,7 +136,7 @@ impl Codegen {
                         root: bool,
                         writer: &mut W,
                         handler_backend: &<B as Backend<W>>::HandlerBackend,
-                    ) -> Result<(), std::fmt::Error> {
+                    ) -> std::io::Result<()> {
                         handler_backend.begin_nested(root, writer)?;
 
                         // Write out all the handlers.
@@ -282,45 +283,41 @@ pub trait Backend<W: Write> {
     fn get_type_backend(&self) -> &Self::TypeBackend;
 
     #[allow(unused)]
-    fn begin(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn begin(&self, writer: &mut W) -> std::io::Result<()> {
         Ok(())
     }
 
     #[allow(unused)]
-    fn end(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn end(&self, writer: &mut W) -> std::io::Result<()> {
         Ok(())
     }
 }
 
 pub trait HandlerBackend<W: Write> {
     #[allow(unused)]
-    fn begin(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn begin(&self, writer: &mut W) -> std::io::Result<()> {
         Ok(())
     }
 
     #[allow(unused)]
-    fn end(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn end(&self, writer: &mut W) -> std::io::Result<()> {
         Ok(())
     }
 
-    fn write_key(&self, key: &str, writer: &mut W) -> Result<(), std::fmt::Error>;
-    fn write_handler(
-        &self,
-        handler: &HandlerCodegen,
-        writer: &mut W,
-    ) -> Result<(), std::fmt::Error>;
-    fn begin_nested(&self, root: bool, writer: &mut W) -> Result<(), std::fmt::Error>;
-    fn end_nested(&self, root: bool, writer: &mut W) -> Result<(), std::fmt::Error>;
+    fn write_key(&self, key: &str, writer: &mut W) -> std::io::Result<()>;
+    fn write_handler(&self, handler: &HandlerCodegen, writer: &mut W) -> std::io::Result<()>;
+    fn begin_nested(&self, root: bool, writer: &mut W) -> std::io::Result<()>;
+    fn end_nested(&self, root: bool, writer: &mut W) -> std::io::Result<()>;
 }
 
 pub trait TypeBackend<W: Write> {
     #[allow(unused)]
-    fn begin(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn begin(&self, writer: &mut W) -> std::io::Result<()> {
         Ok(())
     }
 
     #[allow(unused)]
-    fn end(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn end(&self, writer: &mut W) -> std::io::Result<()> {
         Ok(())
     }
 
@@ -329,7 +326,7 @@ pub trait TypeBackend<W: Write> {
         name: &CodegenType,
         definition: &str,
         writer: &mut W,
-    ) -> Result<(), std::fmt::Error>;
+    ) -> std::io::Result<()>;
 }
 
 pub enum BackendStage {

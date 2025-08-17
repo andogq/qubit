@@ -1,4 +1,4 @@
-use std::fmt::Write;
+use std::io::Write;
 
 use crate::{
     __private::HandlerKind,
@@ -52,7 +52,7 @@ impl<W: Write> Backend<W> for TypeScript {
         self
     }
 
-    fn begin(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn begin(&self, writer: &mut W) -> Result<(), std::io::Error> {
         if self.include_preamble {
             writeln!(writer, "/* eslint-disable */")?;
             writeln!(writer, "// @ts-nocheck")?;
@@ -72,23 +72,19 @@ impl<W: Write> Backend<W> for TypeScript {
 }
 
 impl<W: Write> HandlerBackend<W> for TypeScript {
-    fn begin(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn begin(&self, writer: &mut W) -> std::io::Result<()> {
         write!(writer, "export type {} = ", self.router_name)
     }
 
-    fn end(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn end(&self, writer: &mut W) -> std::io::Result<()> {
         writeln!(writer, ";")
     }
 
-    fn write_key(&self, key: &str, writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn write_key(&self, key: &str, writer: &mut W) -> std::io::Result<()> {
         write!(writer, "{key}: ")
     }
 
-    fn write_handler(
-        &self,
-        handler: &HandlerCodegen,
-        writer: &mut W,
-    ) -> Result<(), std::fmt::Error> {
+    fn write_handler(&self, handler: &HandlerCodegen, writer: &mut W) -> std::io::Result<()> {
         let kind = match handler.kind {
             HandlerKind::Query => "Query",
             HandlerKind::Mutation => "Mutation",
@@ -107,11 +103,11 @@ impl<W: Write> HandlerBackend<W> for TypeScript {
         write!(writer, "{kind}<[{params}], {return_ty}>, ")
     }
 
-    fn begin_nested(&self, _root: bool, writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn begin_nested(&self, _root: bool, writer: &mut W) -> std::io::Result<()> {
         write!(writer, "{{ ")
     }
 
-    fn end_nested(&self, root: bool, writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn end_nested(&self, root: bool, writer: &mut W) -> std::io::Result<()> {
         write!(writer, "}}")?;
 
         if !root {
@@ -128,7 +124,7 @@ impl<W: Write> TypeBackend<W> for TypeScript {
         name: &CodegenType,
         definition: &str,
         writer: &mut W,
-    ) -> Result<(), std::fmt::Error> {
+    ) -> std::io::Result<()> {
         write!(writer, "export type {name} = {definition}")
     }
 }
