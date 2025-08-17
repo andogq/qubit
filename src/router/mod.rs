@@ -11,7 +11,7 @@ use crate::{
     FromRequestExtensions, RegisterableHandler,
     graph::Graph,
     handler::marker,
-    router2::{codegen::CodegenModule, rpc::RpcModule},
+    router::{codegen::CodegenModule, rpc::RpcModule},
 };
 
 pub struct Router<Ctx> {
@@ -24,9 +24,9 @@ struct Handler<Ctx> {
 }
 
 #[distributed_slice]
-pub static HANDLER_DEFINITIONS_2: [fn() -> (TypeId, HandlerMeta)];
+pub static HANDLER_DEFINITIONS: [fn() -> (TypeId, HandlerMeta)];
 lazy_static! {
-    static ref HANDLER_DEFINITIONS_MAP: HashMap<TypeId, HandlerMeta> = HANDLER_DEFINITIONS_2
+    static ref HANDLER_DEFINITIONS_MAP: HashMap<TypeId, HandlerMeta> = HANDLER_DEFINITIONS
         .into_iter()
         .map(|def_fn| def_fn())
         .collect();
@@ -157,7 +157,7 @@ mod test {
                 $body
             }
 
-            #[distributed_slice(HANDLER_DEFINITIONS_2)]
+            #[distributed_slice(HANDLER_DEFINITIONS)]
             static DEF: fn() -> (TypeId, HandlerMeta) = || (Any::type_id(&handler), $meta);
             handler
         }};

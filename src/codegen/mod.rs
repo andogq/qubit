@@ -1,7 +1,5 @@
 mod backend;
 mod handler;
-mod prefix_map;
-mod ts;
 
 use std::{
     any::TypeId,
@@ -11,7 +9,7 @@ use std::{
 
 use ts_rs::{TS, TypeVisitor};
 
-pub use self::handler::ParamVisitor;
+pub use self::{backend::*, handler::ParamVisitor};
 
 use crate::{
     __private::{HandlerKind, HandlerMeta},
@@ -119,58 +117,71 @@ impl Codegen {
         }
     }
 
-    pub fn generate<W: Write, B: Backend<W>>(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
-        B::begin(writer)?;
+    pub fn generate<W: Write, B: Backend<W>>(
+        &self,
+        writer: &mut W,
+        backend: B,
+    ) -> Result<(), std::fmt::Error> {
+        backend.begin(writer)?;
 
         for stage in B::STAGES {
             match stage {
                 BackendStage::Handler => {
-                    B::HandlerBackend::begin(writer)?;
+                    let handler_backend = backend.get_handler_backend();
+                    handler_backend.begin(writer)?;
 
                     fn write_node<W: Write, B: Backend<W>>(
                         node: &Node,
                         root: bool,
                         writer: &mut W,
+                        handler_backend: &<B as Backend<W>>::HandlerBackend,
                     ) -> Result<(), std::fmt::Error> {
-                        B::HandlerBackend::begin_nested(root, writer)?;
+                        handler_backend.begin_nested(root, writer)?;
 
                         // Write out all the handlers.
                         for (key, handler) in &node.handlers {
-                            B::HandlerBackend::write_key(key, writer)?;
-                            B::HandlerBackend::write_handler(handler, writer)?;
+                            handler_backend.write_key(key, writer)?;
+                            handler_backend.write_handler(handler, writer)?;
                         }
 
                         // Recurse and write nested nodes.
                         for (key, node) in &node.children {
-                            B::HandlerBackend::write_key(key, writer)?;
-                            write_node::<W, B>(node, false, writer)?;
+                            handler_backend.write_key(key, writer)?;
+                            write_node::<W, B>(node, false, writer, handler_backend)?;
                         }
 
-                        B::HandlerBackend::end_nested(root, writer)?;
+                        handler_backend.end_nested(root, writer)?;
 
                         Ok(())
                     }
 
                     // Walk tree with recursion.
-                    write_node::<W, B>(&self.tree, true, writer)?;
+                    write_node::<W, B>(&self.tree, true, writer, handler_backend)?;
 
-                    B::HandlerBackend::end(writer)?;
+                    handler_backend.end(writer)?;
                 }
                 BackendStage::Type => {
-                    B::TypeBackend::begin(writer)?;
+                    let type_backend = backend.get_type_backend();
+                    type_backend.begin(writer)?;
 
                     for (name, definition) in self.dependent_types.definitions.values() {
-                        B::TypeBackend::write_type(name, definition, writer)?;
+                        type_backend.write_type(name, definition, writer)?;
                     }
 
-                    B::TypeBackend::end(writer)?;
+                    type_backend.end(writer)?;
                 }
             }
         }
 
-        B::end(writer)?;
+        backend.end(writer)?;
 
         Ok(())
+    }
+}
+
+impl Default for Codegen {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -185,6 +196,12 @@ impl DependentTypes {
             visited_types: BTreeSet::new(),
             definitions: BTreeMap::new(),
         }
+    }
+}
+
+impl Default for DependentTypes {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -244,8 +261,14 @@ impl Node {
 
         self.children
             .entry(path[0].to_string())
-            .or_insert_with(Node::new)
+            .or_default()
             .insert(&path[1..], handler);
+    }
+}
+
+impl Default for Node {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -255,46 +278,54 @@ pub trait Backend<W: Write> {
 
     const STAGES: &[BackendStage];
 
+    fn get_handler_backend(&self) -> &Self::HandlerBackend;
+    fn get_type_backend(&self) -> &Self::TypeBackend;
+
     #[allow(unused)]
-    fn begin(writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn begin(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
         Ok(())
     }
 
     #[allow(unused)]
-    fn end(writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn end(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
         Ok(())
     }
 }
 
 pub trait HandlerBackend<W: Write> {
     #[allow(unused)]
-    fn begin(writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn begin(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
         Ok(())
     }
 
     #[allow(unused)]
-    fn end(writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn end(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
         Ok(())
     }
 
-    fn write_key(key: &str, writer: &mut W) -> Result<(), std::fmt::Error>;
-    fn write_handler(handler: &HandlerCodegen, writer: &mut W) -> Result<(), std::fmt::Error>;
-    fn begin_nested(root: bool, writer: &mut W) -> Result<(), std::fmt::Error>;
-    fn end_nested(root: bool, writer: &mut W) -> Result<(), std::fmt::Error>;
+    fn write_key(&self, key: &str, writer: &mut W) -> Result<(), std::fmt::Error>;
+    fn write_handler(
+        &self,
+        handler: &HandlerCodegen,
+        writer: &mut W,
+    ) -> Result<(), std::fmt::Error>;
+    fn begin_nested(&self, root: bool, writer: &mut W) -> Result<(), std::fmt::Error>;
+    fn end_nested(&self, root: bool, writer: &mut W) -> Result<(), std::fmt::Error>;
 }
 
 pub trait TypeBackend<W: Write> {
     #[allow(unused)]
-    fn begin(writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn begin(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
         Ok(())
     }
 
     #[allow(unused)]
-    fn end(writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn end(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
         Ok(())
     }
 
     fn write_type(
+        &self,
         name: &CodegenType,
         definition: &str,
         writer: &mut W,
@@ -308,63 +339,12 @@ pub enum BackendStage {
 
 #[cfg(test)]
 mod test {
-    use crate::__private::HandlerKind;
-
     use super::*;
 
-    macro_rules! types {
-        ($($ty:ty),* $(,)?) => {
-            [$(TypeId::of::<$ty>()),*]
-        };
-
-        ($($ident:ident: $ty:ty),* $(,)?) => {
-            [$((stringify!($ident), TypeId::of::<$ty>())),*]
-        };
-    }
-
-    pub struct AssertBackend;
-
-    impl<W: Write> Backend<W> for AssertBackend {
-        type HandlerBackend = AssertHandlerBackend;
-        type TypeBackend = AssertTypeBackend;
-
-        const STAGES: &[BackendStage] = &[BackendStage::Handler, BackendStage::Type];
-    }
-
-    pub struct AssertHandlerBackend;
-    impl<W: Write> HandlerBackend<W> for AssertHandlerBackend {
-        fn write_key(key: &str, writer: &mut W) -> Result<(), std::fmt::Error> {
-            todo!()
-        }
-
-        fn write_handler(handler: &HandlerCodegen, writer: &mut W) -> Result<(), std::fmt::Error> {
-            todo!()
-        }
-
-        fn begin_nested(root: bool, writer: &mut W) -> Result<(), std::fmt::Error> {
-            todo!()
-        }
-
-        fn end_nested(root: bool, writer: &mut W) -> Result<(), std::fmt::Error> {
-            todo!()
-        }
-    }
-
-    pub struct AssertTypeBackend;
-    impl<W: Write> TypeBackend<W> for AssertTypeBackend {
-        fn write_type(
-            name: &CodegenType,
-            definition: &str,
-            writer: &mut W,
-        ) -> Result<(), std::fmt::Error> {
-            todo!()
-        }
-    }
-
     mod dependent_types {
-        use std::{fmt::Debug, marker::PhantomData};
+        use std::fmt::Debug;
 
-        use serde::{Deserialize, Serialize};
+        use serde::Deserialize;
 
         use super::*;
 

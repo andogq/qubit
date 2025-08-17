@@ -6,7 +6,7 @@ use crate::{
     __private::HandlerMeta,
     codegen::{Backend, Codegen, DependentTypes, HandlerCodegen},
     handler::{marker, response::ResponseValue, ts::TsTypeTuple},
-    router2::{RouterModule, RouterModuleHandler},
+    router::{RouterModule, RouterModuleHandler},
 };
 
 pub struct CodegenModule(Codegen);
@@ -16,9 +16,9 @@ impl CodegenModule {
         Self(Codegen::new())
     }
 
-    pub fn generate_type<B: Backend<String>>(&self) -> Result<String, std::fmt::Error> {
+    pub fn generate_type<B: Backend<String>>(&self, backend: B) -> Result<String, std::fmt::Error> {
         let mut generated_type = String::new();
-        self.0.generate::<_, B>(&mut generated_type).unwrap();
+        self.0.generate(&mut generated_type, backend).unwrap();
         Ok(generated_type)
     }
 
@@ -26,8 +26,9 @@ impl CodegenModule {
     pub fn write_type<B: Backend<String>>(
         &self,
         output_path: impl AsRef<Path>,
+        backend: B,
     ) -> Result<(), std::fmt::Error> {
-        let generated_type = self.generate_type::<B>()?;
+        let generated_type = self.generate_type(backend)?;
         std::fs::write(output_path, generated_type).unwrap();
         Ok(())
     }

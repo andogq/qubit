@@ -11,7 +11,7 @@ use tower::{Service, ServiceBuilder, service_fn};
 
 use crate::{
     __private::HandlerMeta,
-    router2::{RouterModule, RouterModuleHandler},
+    router::{RouterModule, RouterModuleHandler},
 };
 
 pub struct RpcModule<Ctx>(JsonRpseeModule<Ctx>);
@@ -25,7 +25,7 @@ impl<Ctx> RpcModule<Ctx> {
         self.0
     }
 
-    pub fn as_service(
+    pub fn into_service(
         self,
     ) -> (
         impl Service<

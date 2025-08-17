@@ -1,1 +1,3 @@
-mod ts;
+mod typescript;
+
+pub use self::typescript::TypeScript;
