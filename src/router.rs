@@ -18,10 +18,7 @@ use lazy_static::lazy_static;
 use linkme::distributed_slice;
 use tower::{Service, ServiceBuilder, service_fn};
 
-use crate::{
-    FromRequestExtensions,
-    codegen::{Backend, Codegen},
-};
+use crate::{FromRequestExtensions, codegen::Codegen, handler::ts::TsTypeTuple, reflect::Type};
 
 use super::{
     handler::{RegisterableHandler, marker, reflection::*},
@@ -39,7 +36,8 @@ pub struct Router<Ctx> {
     /// Registration methods for all handlers present in this router.
     handler_registrations: Vec<(Option<String>, HandlerRegistration<Ctx>)>,
     /// Type information for generating TypeScript type for the router.
-    ts_router: TsRouter,
+    // ts_router: TsRouter,
+    codegen: Codegen,
 }
 
 impl<Ctx> Router<Ctx> {
@@ -47,7 +45,8 @@ impl<Ctx> Router<Ctx> {
     pub fn new() -> Self {
         Router {
             handler_registrations: Vec::new(),
-            ts_router: TsRouter::new(),
+            // ts_router: TsRouter::new(),
+            codegen: Codegen::new(),
         }
     }
 }
@@ -76,7 +75,8 @@ where
         F::Ctx: FromRequestExtensions<Ctx>,
     {
         let handler_meta = HANDLER_DEFINITIONS_MAP.get(&handler.type_id()).unwrap();
-        self.ts_router.add_handler(handler_meta, &handler);
+        // self.ts_router.add_handler(handler_meta, &handler);
+        // self.codegen.register_handler(handler_meta, &handler);
 
         // Create the registration function for this handler.
         self.handler_registrations.push((
@@ -117,7 +117,8 @@ where
                     )
                 },
             ));
-        self.ts_router.nest(prefix, router.ts_router);
+        // self.ts_router.nest(prefix, router.ts_router);
+        // self.codegen.nest(prefix, router.codegen);
 
         self
     }
@@ -150,7 +151,8 @@ where
     }
 
     pub fn generate_type_to_string(&self) -> String {
-        self.ts_router.generate_typescript()
+        // self.ts_router.generate_typescript()
+        todo!()
     }
 
     /// Consume this router, and produce an [`RpcModule`].

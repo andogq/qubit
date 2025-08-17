@@ -1,5 +1,7 @@
 //! Utilities for passing handlers and associated information at runtime.
 
+use ts_rs::TS;
+
 /// Kind of the handler. This will correspond with the method the user must call from
 /// TypeScript.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -20,4 +22,11 @@ pub struct HandlerMeta {
     pub name: &'static str,
     /// Name of the parameters for this handler.
     pub param_names: &'static [&'static str],
+}
+
+pub trait HandlerVisitor {
+    fn visit_name(&mut self, name: &'static str);
+    fn visit_param<T: TS + 'static + ?Sized>(&mut self, param_name: &'static str);
+    fn visit_return_ty<T: TS + 'static + ?Sized>(&mut self);
+    fn finish(self);
 }

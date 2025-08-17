@@ -1,164 +1,211 @@
+mod backend;
 mod handler;
 mod prefix_map;
 mod ts;
 
-use std::{any::TypeId, collections::HashSet, fmt::Write};
-
-use handler::{HandlerBuilder, ParamVisitor};
-use petgraph::graph::{DiGraph, NodeIndex};
-use ts_rs::{TS, TypeVisitor};
-
-use crate::{
-    __private::HandlerMeta,
-    RegisterableHandler,
-    handler::{marker, response::ResponseValue, ts::TsTypeTuple},
+use std::{
+    any::TypeId,
+    collections::{BTreeMap, BTreeSet},
+    fmt::{Display, Write},
 };
 
-/// Collects handler and type definitions, and dispatches them to a [`Backend`] to generate the
-/// final code. This will handle all book-keeping and tracking to prevent recursion and detect user
-/// types, so the backend is safe to trust types that are dispatched to it.
-pub struct Codegen<B: Backend> {
-    /// Types that have been visited, tracked to prevent recursing on types.
-    visited_types: HashSet<TypeId>,
-    /// Backend that will output the generated code.
-    backend: B,
+use ts_rs::{TS, TypeVisitor};
 
-    handlers: DiGraph<GraphNode<<B::HandlerBuilder as HandlerBuilder>::Output>, String>,
-    handler_root: NodeIndex,
+pub use self::handler::ParamVisitor;
 
-    types: Vec<B::UserType>,
+use crate::{
+    __private::{HandlerKind, HandlerMeta},
+    RegisterableHandler,
+    handler::{marker, response::ResponseValue},
+};
+
+pub const QUBIT_HEADER: &str = include_str!("header.txt");
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodegenType {
+    name: String,
+    generics: Vec<String>,
 }
 
-#[derive(Clone)]
-enum GraphNode<H> {
-    // TODO: Make this `Vec<H>`, and update everything. This way, the handler names aren't used in
-    // the edges between nodes.
-    Handler(H),
-    Parent,
-}
+impl CodegenType {
+    pub fn from_type_with_definition<T: TS + 'static + ?Sized>() -> (Self, String) {
+        // Generate the declaration, which includes `type ... =`, and any generic
+        // parameters.
+        let declaration = T::decl();
 
-impl<B> Codegen<B>
-where
-    B: Backend,
-{
-    /// Create a new instance with the provided backend.
-    pub fn new(backend: B) -> Self {
-        let mut handlers = DiGraph::new();
-        let handler_root = handlers.add_node(GraphNode::Parent);
+        // Split the declaration into the name and definition.
+        let (name, definition) = declaration.split_once("=").expect("valid TS declaration");
+
+        // Process the definition.
+        let definition = definition.strip_suffix(';').unwrap().trim().to_string();
+
+        let name = name.strip_prefix("type").unwrap().trim().to_string();
+
+        (Self::from_name_and_generics(name), definition)
+    }
+
+    pub fn from_type<T: TS + 'static + ?Sized>() -> Self {
+        Self::from_name_and_generics(T::name())
+    }
+
+    fn from_name_and_generics(s: impl AsRef<str>) -> Self {
+        let (name, generics) = match s.as_ref().split_once('<') {
+            Some((name, generics)) => (
+                name,
+                // Extract the generics.
+                generics
+                    .rsplit_once('>')
+                    .unwrap()
+                    .0
+                    .split(',')
+                    .map(|generic| generic.trim().to_string())
+                    .collect(),
+            ),
+            // No generics present in the definition.
+            None => (s.as_ref(), Vec::new()),
+        };
 
         Self {
-            visited_types: HashSet::new(),
-            backend,
-            handlers,
-            handler_root,
-            types: Vec::new(),
+            name: name.to_string(),
+            generics,
         }
     }
+}
 
-    /// Register a handler definition.
-    pub fn register_handler<F, Ctx, MSig, MValue, MReturn>(
-        &mut self,
-        meta: &HandlerMeta,
-        _handler: &F,
-    ) where
-        F: RegisterableHandler<Ctx, MSig, MValue, MReturn>,
-        MValue: marker::ResponseMarker,
-        MReturn: marker::HandlerReturnMarker,
-    {
-        let mut visitor = self.user_type_visitor();
+impl Display for CodegenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)?;
 
-        // Register all associated types.
-        <F::Params as TsTypeTuple>::visit_tys(&mut visitor);
-        visitor.visit::<<F::Response as ResponseValue<MValue>>::Value>();
-
-        // Begin the handler definition.
-        let handler = B::HandlerBuilder::new(meta.name, meta.kind);
-        // Add parameters.
-        let handler = ParamVisitor::visit::<F::Params>(handler, meta.param_names).unwrap();
-        // Set the return type.
-        let handler = handler.returning::<<F::Response as ResponseValue<MValue>>::Value>();
-
-        // Pass the handler on to the backend.
-        self.backend.inspect_handler(&handler);
-
-        let handler_node = self.handlers.add_node(GraphNode::Handler(handler));
-        self.handlers
-            .add_edge(self.handler_root, handler_node, meta.name.to_string());
-    }
-
-    pub fn nest(&mut self, prefix: impl ToString, other: Self) {
-        // Pull out nodes and edges of the other graph.
-        let (other_handlers, other_edges) = other.handlers.into_nodes_edges();
-
-        // Add all the nodes, tracking the new index.
-        let new_node_idx = other_handlers
-            .into_iter()
-            .map(|node| self.handlers.add_node(node.weight))
-            .collect::<Vec<_>>();
-
-        // Find the root and connect it to the existing graph.
-        let other_root = new_node_idx[other.handler_root.index()];
-        self.handlers
-            .add_edge(self.handler_root, other_root, prefix.to_string());
-
-        for edge in other_edges {
-            let start = new_node_idx[edge.source().index()];
-            let end = new_node_idx[edge.target().index()];
-
-            self.handlers.add_edge(start, end, edge.weight);
-        }
-    }
-
-    pub fn write(&self, writer: &mut impl Write) -> Result<(), std::fmt::Error> {
-        let mut handler_writer = self.backend.write(writer)?;
-
-        let mut stack = vec![self.handler_root];
-
-        while let Some(idx) = stack.pop() {
-            match &self.handlers[idx] {
-                GraphNode::Handler(handler) => handler_writer.write_handler(handler)?,
-                GraphNode::Parent => {
-                    handler_writer.begin_nested()?;
-
-                    handler_writer.end_nested()?;
-                }
-            }
+        if !self.generics.is_empty() {
+            write!(f, "<{}>", self.generics.join(", "))?;
         }
 
         Ok(())
     }
+}
 
-    /// Generate a [`UserTypeVisitor`] with this codegen instance.
-    fn user_type_visitor(&mut self) -> UserTypeVisitor<'_, B> {
-        UserTypeVisitor(self)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HandlerCodegen {
+    kind: HandlerKind,
+    params: Vec<(&'static str, CodegenType)>,
+    return_ty: CodegenType,
+}
+
+impl HandlerCodegen {
+    pub fn from_handler<F, Ctx, MSig, MValue, MReturn>(meta: &HandlerMeta, _handler: &F) -> Self
+    where
+        F: RegisterableHandler<Ctx, MSig, MValue, MReturn>,
+        MValue: marker::ResponseMarker,
+        MReturn: marker::HandlerReturnMarker,
+    {
+        HandlerCodegen {
+            kind: meta.kind,
+            params: ParamVisitor::visit::<F::Params>(meta.param_names).unwrap(),
+            return_ty: CodegenType::from_type::<<F::Response as ResponseValue<MValue>>::Value>(),
+        }
     }
 }
 
-/// [`TypeVisitor`] which will traverse a type, find any user types, and register them against
-/// the backend. It tracks the [`TypeId`] of all visited types (without their generics), in order
-/// to prevent cycles.
-struct UserTypeVisitor<'a, B: Backend>(&'a mut Codegen<B>);
-impl<B> TypeVisitor for UserTypeVisitor<'_, B>
-where
-    B: Backend,
-{
+pub struct Codegen {
+    pub dependent_types: DependentTypes,
+    pub tree: Node,
+}
+
+impl Codegen {
+    pub fn new() -> Self {
+        Self {
+            dependent_types: DependentTypes::new(),
+            tree: Node::new(),
+        }
+    }
+
+    pub fn generate<W: Write, B: Backend<W>>(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+        B::begin(writer)?;
+
+        for stage in B::STAGES {
+            match stage {
+                BackendStage::Handler => {
+                    B::HandlerBackend::begin(writer)?;
+
+                    fn write_node<W: Write, B: Backend<W>>(
+                        node: &Node,
+                        root: bool,
+                        writer: &mut W,
+                    ) -> Result<(), std::fmt::Error> {
+                        B::HandlerBackend::begin_nested(root, writer)?;
+
+                        // Write out all the handlers.
+                        for (key, handler) in &node.handlers {
+                            B::HandlerBackend::write_key(key, writer)?;
+                            B::HandlerBackend::write_handler(handler, writer)?;
+                        }
+
+                        // Recurse and write nested nodes.
+                        for (key, node) in &node.children {
+                            B::HandlerBackend::write_key(key, writer)?;
+                            write_node::<W, B>(node, false, writer)?;
+                        }
+
+                        B::HandlerBackend::end_nested(root, writer)?;
+
+                        Ok(())
+                    }
+
+                    // Walk tree with recursion.
+                    write_node::<W, B>(&self.tree, true, writer)?;
+
+                    B::HandlerBackend::end(writer)?;
+                }
+                BackendStage::Type => {
+                    B::TypeBackend::begin(writer)?;
+
+                    for (name, definition) in self.dependent_types.definitions.values() {
+                        B::TypeBackend::write_type(name, definition, writer)?;
+                    }
+
+                    B::TypeBackend::end(writer)?;
+                }
+            }
+        }
+
+        B::end(writer)?;
+
+        Ok(())
+    }
+}
+
+pub struct DependentTypes {
+    visited_types: BTreeSet<TypeId>,
+    definitions: BTreeMap<TypeId, (CodegenType, String)>,
+}
+
+impl DependentTypes {
+    pub fn new() -> Self {
+        Self {
+            visited_types: BTreeSet::new(),
+            definitions: BTreeMap::new(),
+        }
+    }
+}
+
+impl TypeVisitor for DependentTypes {
     fn visit<T: TS + 'static + ?Sized>(&mut self) {
         let type_id = TypeId::of::<T>();
         let type_id_no_generics = TypeId::of::<T::WithoutGenerics>();
 
-        let visit_dependencies = !self.0.visited_types.contains(&type_id_no_generics);
-        let visit_generics = !self.0.visited_types.contains(&type_id);
+        let visit_dependencies = !self.visited_types.contains(&type_id_no_generics);
+        let visit_generics = !self.visited_types.contains(&type_id);
 
         // Don't bother processing if this type has already been captured.
         if visit_dependencies {
-            self.0.visited_types.insert(type_id_no_generics);
+            self.visited_types.insert(type_id_no_generics);
 
             // Pass the type to the backend, if it's a user type.
             if T::output_path().is_some() {
-                let ty = B::UserType::from_type::<T::WithoutGenerics>();
-                self.0.backend.inspect_user_type(&ty);
-
-                self.0.types.push(ty);
+                self.definitions.insert(
+                    TypeId::of::<T::WithoutGenerics>(),
+                    CodegenType::from_type_with_definition::<T::WithoutGenerics>(),
+                );
             }
 
             // Process dependent types
@@ -166,7 +213,7 @@ where
         }
 
         if visit_generics {
-            self.0.visited_types.insert(type_id);
+            self.visited_types.insert(type_id);
 
             // Process all generic typGes.
             T::visit_generics(self);
@@ -174,172 +221,96 @@ where
     }
 }
 
-/*
-* { "asdf": () => {}, }
+pub struct Node {
+    handlers: BTreeMap<String, HandlerCodegen>,
+    children: BTreeMap<String, Node>,
+}
 
-export type EntityTick = {};
-
-{ "nested": { "asdf": (tick: EntityTick) => {}, } }
-
-let handlers = vec![
-    ("some.path.for.something", "(EntityTick) => void"),
-    ("some.path.for.otherthing", "(EntityTick) => void"),
-];
-
-{
-    "some": {
-        "path": {
-            "for": {
-                "something": (EntityTick) => void,
-                "otherthing": (EntityTick) => void,
-            }
+impl Node {
+    pub fn new() -> Self {
+        Self {
+            handlers: BTreeMap::new(),
+            children: BTreeMap::new(),
         }
     }
-}
 
-*/
+    pub fn insert(&mut self, path: &[&str], handler: &HandlerCodegen) {
+        assert!(!path.is_empty());
 
-struct TypeScript;
-impl<W: Write> Backend3<W> for TypeScript {
-    type HandlerBackend = ();
-    type TypeBackend = ();
-
-    fn stages(&self) -> &[BackendStage] {
-        &[BackendStage::Type, BackendStage::Handler]
-    }
-
-    fn begin_backend(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
-        Ok(())
-    }
-
-    fn end_backend(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
-        Ok(())
-    }
-
-    fn begin_stage(&self, writer: &mut W, stage: BackendStage) -> Result<(), std::fmt::Error> {
-        match stage {
-            BackendStage::Handler => {
-                write!(writer, "export type Router = ")?;
-            }
-            BackendStage::Type => {
-                writeln!(writer, "// User types")?;
-            }
+        if path.len() == 1 {
+            self.handlers.insert(path[0].to_string(), handler.clone());
+            return;
         }
 
-        Ok(())
+        self.children
+            .entry(path[0].to_string())
+            .or_insert_with(Node::new)
+            .insert(&path[1..], handler);
     }
 }
 
-impl HandlerBackend for TypeScript {
-    fn write_key(&mut self, key: &str) -> Result<(), std::fmt::Error> {
-        format!(r#""{key}: ""#);
-        Ok(())
-    }
+pub trait Backend<W: Write> {
+    type HandlerBackend: HandlerBackend<W>;
+    type TypeBackend: TypeBackend<W>;
 
-    fn write_handler(&mut self, handler: &H) -> Result<(), std::fmt::Error> {
-        todo!()
-    }
-
-    fn begin_nested(&mut self) -> Result<(), std::fmt::Error> {
-        format!("{{");
-        Ok(())
-    }
-
-    fn end_nested(&mut self) -> Result<(), std::fmt::Error> {
-        format!("}}");
-        Ok(())
-    }
-}
-
-trait Backend3<W: Write> {
-    type HandlerBackend;
-    type TypeBackend;
-
-    fn stages(&self) -> &[BackendStage];
+    const STAGES: &[BackendStage];
 
     #[allow(unused)]
-    fn begin_backend(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn begin(writer: &mut W) -> Result<(), std::fmt::Error> {
         Ok(())
     }
 
     #[allow(unused)]
-    fn end_backend(&self, writer: &mut W) -> Result<(), std::fmt::Error> {
+    fn end(writer: &mut W) -> Result<(), std::fmt::Error> {
+        Ok(())
+    }
+}
+
+pub trait HandlerBackend<W: Write> {
+    #[allow(unused)]
+    fn begin(writer: &mut W) -> Result<(), std::fmt::Error> {
         Ok(())
     }
 
     #[allow(unused)]
-    fn begin_stage(&self, writer: &mut W, stage: BackendStage) -> Result<(), std::fmt::Error> {
+    fn end(writer: &mut W) -> Result<(), std::fmt::Error> {
+        Ok(())
+    }
+
+    fn write_key(key: &str, writer: &mut W) -> Result<(), std::fmt::Error>;
+    fn write_handler(handler: &HandlerCodegen, writer: &mut W) -> Result<(), std::fmt::Error>;
+    fn begin_nested(root: bool, writer: &mut W) -> Result<(), std::fmt::Error>;
+    fn end_nested(root: bool, writer: &mut W) -> Result<(), std::fmt::Error>;
+}
+
+pub trait TypeBackend<W: Write> {
+    #[allow(unused)]
+    fn begin(writer: &mut W) -> Result<(), std::fmt::Error> {
         Ok(())
     }
 
     #[allow(unused)]
-    fn end_stage(&self, writer: &mut W, stage: BackendStage) -> Result<(), std::fmt::Error> {
+    fn end(writer: &mut W) -> Result<(), std::fmt::Error> {
         Ok(())
     }
+
+    fn write_type(
+        name: &CodegenType,
+        definition: &str,
+        writer: &mut W,
+    ) -> Result<(), std::fmt::Error>;
 }
 
-trait HandlerBackend {
-    fn write_key(&mut self, key: &str) -> Result<(), std::fmt::Error>;
-    fn write_handler(&mut self, handler: H) -> Result<(), std::fmt::Error>;
-    fn begin_nested(&mut self) -> Result<(), std::fmt::Error>;
-    fn end_nested(&mut self) -> Result<(), std::fmt::Error>;
-}
-
-trait TypeBackend {
-    fn write_type<T: TS + 'static + ?Sized>(writer: &mut impl Write)
-    -> Result<(), std::fmt::Error>;
-}
-
-enum BackendStage {
+pub enum BackendStage {
     Handler,
     Type,
 }
 
-trait Backend2 {
-    fn write_component(&mut self, key: &str) -> Result<(), std::fmt::Error>;
-
-    fn write_key(&mut self, key: &str) -> Result<(), std::fmt::Error>;
-    fn write_handler(&mut self, handler: &H) -> Result<(), std::fmt::Error>;
-    fn begin_nested(&mut self) -> Result<(), std::fmt::Error>;
-    fn end_nested(&mut self) -> Result<(), std::fmt::Error>;
-}
-
-pub trait Backend {
-    type UserType: FromType;
-    type HandlerBuilder: HandlerBuilder;
-    type HandlerWriter: HandlerWriter<<Self::HandlerBuilder as HandlerBuilder>::Output>;
-
-    fn write(&self, writer: &mut impl Write) -> Result<Self::HandlerWriter, std::fmt::Error>;
-
-    #[allow(unused)]
-    fn inspect_user_type(&mut self, user_type: &Self::UserType) {}
-    #[allow(unused)]
-    fn inspect_handler(&mut self, handler: &<Self::HandlerBuilder as HandlerBuilder>::Output) {}
-}
-
-trait HandlerWriter<H> {
-    fn write_key(&mut self, key: &str) -> Result<(), std::fmt::Error>;
-    fn write_handler(&mut self, handler: &H) -> Result<(), std::fmt::Error>;
-    fn begin_nested(&mut self) -> Result<(), std::fmt::Error>;
-    fn end_nested(&mut self) -> Result<(), std::fmt::Error>;
-}
-
-trait FromType {
-    fn from_type<T: TS + 'static + ?Sized>() -> Self;
-}
-
 #[cfg(test)]
 mod test {
-    use std::collections::VecDeque;
-
-    use petgraph::{Direction, visit::EdgeRef};
-
     use crate::__private::HandlerKind;
 
-    use super::{
-        handler::test::{AssertHandler, AssertHandlerBuilder},
-        *,
-    };
+    use super::*;
 
     macro_rules! types {
         ($($ty:ty),* $(,)?) => {
@@ -353,521 +324,173 @@ mod test {
 
     pub struct AssertBackend;
 
-    #[derive(Debug, PartialEq)]
-    pub struct AssertUserType(TypeId);
-    impl FromType for AssertUserType {
-        fn from_type<T: TS + 'static + ?Sized>() -> Self {
-            Self(TypeId::of::<T>())
-        }
+    impl<W: Write> Backend<W> for AssertBackend {
+        type HandlerBackend = AssertHandlerBackend;
+        type TypeBackend = AssertTypeBackend;
+
+        const STAGES: &[BackendStage] = &[BackendStage::Handler, BackendStage::Type];
     }
 
-    impl Backend for AssertBackend {
-        type UserType = AssertUserType;
-        type HandlerBuilder = AssertHandlerBuilder;
-        type HandlerWriter = AssertHandlerWriter;
-
-        fn write(&self, _writer: &mut impl Write) -> Result<Self::HandlerWriter, std::fmt::Error> {
-            unimplemented!()
-        }
-    }
-
-    pub struct AssertHandlerWriter;
-    impl HandlerWriter<AssertHandler> for AssertHandlerWriter {
-        fn write_key(&mut self, _key: &str) -> Result<(), std::fmt::Error> {
+    pub struct AssertHandlerBackend;
+    impl<W: Write> HandlerBackend<W> for AssertHandlerBackend {
+        fn write_key(key: &str, writer: &mut W) -> Result<(), std::fmt::Error> {
             todo!()
         }
 
-        fn write_handler(&mut self, _handler: &AssertHandler) -> Result<(), std::fmt::Error> {
+        fn write_handler(handler: &HandlerCodegen, writer: &mut W) -> Result<(), std::fmt::Error> {
             todo!()
         }
 
-        fn begin_nested(&mut self) -> Result<(), std::fmt::Error> {
+        fn begin_nested(root: bool, writer: &mut W) -> Result<(), std::fmt::Error> {
             todo!()
         }
 
-        fn end_nested(&mut self) -> Result<(), std::fmt::Error> {
+        fn end_nested(root: bool, writer: &mut W) -> Result<(), std::fmt::Error> {
             todo!()
         }
     }
 
-    fn build_handlers(codegen: &Codegen<AssertBackend>) -> Vec<(String, AssertHandler)> {
-        codegen
-            .handlers
-            .node_indices()
-            .filter_map(|idx| match &codegen.handlers[idx] {
-                GraphNode::Handler(handler) => Some((idx, handler)),
-                GraphNode::Parent => None,
-            })
-            .map(|(mut idx, handler)| {
-                let mut path = VecDeque::new();
-
-                // Walk the node edges backwards to build the path.
-                while idx != codegen.handler_root {
-                    let mut edges = codegen.handlers.edges_directed(idx, Direction::Incoming);
-                    let edge = edges.next().unwrap();
-                    assert_eq!(edges.count(), 0);
-
-                    idx = edge.source();
-                    path.push_front(edge.weight().as_str());
-                    path.push_front(".");
-                }
-
-                // Remove trailing separator.
-                path.pop_front();
-
-                (path.into_iter().collect(), handler.clone())
-            })
-            .collect()
+    pub struct AssertTypeBackend;
+    impl<W: Write> TypeBackend<W> for AssertTypeBackend {
+        fn write_type(
+            name: &CodegenType,
+            definition: &str,
+            writer: &mut W,
+        ) -> Result<(), std::fmt::Error> {
+            todo!()
+        }
     }
 
-    mod register_handler {
-        use std::marker::PhantomData;
+    mod dependent_types {
+        use std::{fmt::Debug, marker::PhantomData};
 
         use serde::{Deserialize, Serialize};
 
         use super::*;
 
-        fn assert_root_handlers(
-            codegen: Codegen<AssertBackend>,
-            expected_handlers: impl AsRef<[AssertHandler]>,
-        ) {
-            let handlers = codegen
-                .handlers
-                .node_weights()
-                .filter_map(|node| match node {
-                    GraphNode::Handler(handler) => Some(handler.clone()),
-                    GraphNode::Parent => None,
-                })
-                .collect::<Vec<_>>();
-            assert_eq!(handlers, expected_handlers.as_ref());
+        fn assert_set<T: Ord>(set: &BTreeSet<T>, expected: &[T]) {
+            assert_eq!(set.len(), expected.len());
+            for value in expected {
+                assert!(set.contains(value));
+            }
+        }
+        fn assert_map<K: Ord, V: Debug + PartialEq>(set: &BTreeMap<K, V>, expected: &[(K, V)]) {
+            assert_eq!(set.len(), expected.len());
+            for (key, value) in expected {
+                assert_eq!(set.get(key).unwrap(), value);
+            }
         }
 
         #[test]
-        fn empty_handler() {
-            let mut codegen = Codegen::new(AssertBackend);
-
-            codegen.register_handler::<_, (), _, _, _>(
-                &HandlerMeta {
-                    kind: HandlerKind::Query,
-                    name: "some_handler",
-                    param_names: &[],
-                },
-                &|| {},
-            );
-
-            assert_eq!(codegen.types, []);
-            assert_eq!(
-                build_handlers(&codegen),
-                [(
-                    "some_handler".to_string(),
-                    AssertHandler {
-                        name: "some_handler",
-                        kind: HandlerKind::Query,
-                        params: types![].to_vec(),
-                        return_ty: TypeId::of::<()>(),
-                    }
-                )],
-            );
+        fn visit_unit() {
+            let mut types = DependentTypes::new();
+            types.visit::<()>();
+            assert_set(&types.visited_types, &[TypeId::of::<()>()]);
+            assert_map(&types.definitions, &[]);
         }
 
         #[test]
-        fn multiple_parameters() {
-            let mut codegen = Codegen::new(AssertBackend);
-
-            codegen.register_handler(
-                &HandlerMeta {
-                    kind: HandlerKind::Query,
-                    name: "some_handler",
-                    param_names: &["param_a", "param_b", "param_c"],
-                },
-                #[allow(unused)]
-                &|ctx: (), param_a: u32, param_b: bool, param_c: String| {},
-            );
-
-            assert_eq!(codegen.types, []);
-            assert_eq!(
-                build_handlers(&codegen),
-                [(
-                    "some_handler".to_string(),
-                    AssertHandler {
-                        name: "some_handler",
-                        kind: HandlerKind::Query,
-                        params: types![
-                            param_a: u32,
-                            param_b: bool,
-                            param_c: String,
-                        ]
-                        .to_vec(),
-                        return_ty: TypeId::of::<()>(),
-                    }
-                )]
-            );
+        fn visit_primitive() {
+            let mut types = DependentTypes::new();
+            types.visit::<u32>();
+            assert_set(&types.visited_types, &[TypeId::of::<u32>()]);
+            assert_map(&types.definitions, &[]);
         }
 
         #[test]
-        fn return_ty() {
-            let mut codegen = Codegen::new(AssertBackend);
-
-            codegen.register_handler::<_, (), _, _, _>(
-                &HandlerMeta {
-                    kind: HandlerKind::Query,
-                    name: "some_handler",
-                    param_names: &[],
-                },
-                #[allow(unused)]
-                &|| -> Vec<u32> { todo!() },
-            );
-
-            assert_eq!(codegen.types, []);
-            assert_eq!(
-                build_handlers(&codegen),
-                [(
-                    "some_handler".to_string(),
-                    AssertHandler {
-                        name: "some_handler",
-                        kind: HandlerKind::Query,
-                        params: types![].to_vec(),
-                        return_ty: TypeId::of::<Vec<u32>>(),
-                    }
-                )],
-            );
-        }
-
-        #[test]
-        fn custom_tys() {
+        fn custom_ty() {
             #[derive(TS, Clone, Deserialize)]
-            struct TypeA;
-            #[derive(TS, Clone, Serialize)]
-            struct TypeB;
+            struct MyType;
 
-            let mut codegen = Codegen::new(AssertBackend);
-
-            codegen.register_handler(
-                &HandlerMeta {
-                    kind: HandlerKind::Query,
-                    name: "some_handler",
-                    param_names: &["param"],
-                },
-                #[allow(unused)]
-                &|ctx: (), param: TypeA| -> TypeB { todo!() },
-            );
-
-            assert_eq!(codegen.types, types![TypeA, TypeB].map(AssertUserType));
-            assert_eq!(
-                build_handlers(&codegen),
-                [(
-                    "some_handler".to_string(),
-                    AssertHandler {
-                        name: "some_handler",
-                        kind: HandlerKind::Query,
-                        params: types![
-                            param: TypeA,
-                        ]
-                        .to_vec(),
-                        return_ty: TypeId::of::<TypeB>(),
-                    }
+            let mut types = DependentTypes::new();
+            types.visit::<MyType>();
+            assert_set(&types.visited_types, &[TypeId::of::<MyType>()]);
+            assert_map(
+                &types.definitions,
+                &[(
+                    TypeId::of::<MyType>(),
+                    CodegenType::from_type_with_definition::<MyType>(),
                 )],
             );
         }
 
         #[test]
-        fn custom_tys_in_generic() {
+        fn custom_ty_in_generic() {
             #[derive(TS, Clone, Deserialize)]
-            struct TypeA;
-            #[derive(TS, Clone, Serialize)]
-            struct TypeB;
+            struct MyType;
 
-            let mut codegen = Codegen::new(AssertBackend);
-
-            codegen.register_handler(
-                &HandlerMeta {
-                    kind: HandlerKind::Query,
-                    name: "some_handler",
-                    param_names: &["param"],
-                },
-                #[allow(unused)]
-                &|ctx: (), param: Option<TypeA>| -> Option<TypeB> { todo!() },
+            let mut types = DependentTypes::new();
+            types.visit::<Vec<MyType>>();
+            assert_set(
+                &types.visited_types,
+                &[
+                    TypeId::of::<Vec<MyType>>(),
+                    TypeId::of::<Vec<ts_rs::Dummy>>(),
+                    TypeId::of::<MyType>(),
+                ],
             );
-
-            assert_eq!(codegen.types, types![TypeA, TypeB].map(AssertUserType));
-            assert_eq!(
-                build_handlers(&codegen),
-                [(
-                    "some_handler".to_string(),
-                    AssertHandler {
-                        name: "some_handler",
-                        kind: HandlerKind::Query,
-                        params: types![
-                            param: Option<TypeA>,
-                        ]
-                        .to_vec(),
-                        return_ty: TypeId::of::<Option<TypeB>>(),
-                    }
+            assert_map(
+                &types.definitions,
+                &[(
+                    TypeId::of::<MyType>(),
+                    CodegenType::from_type_with_definition::<MyType>(),
                 )],
             );
         }
 
         #[test]
-        fn custom_tys_with_generic() {
+        fn custom_ty_in_option() {
+            // NOTE: ts-rs treats `Option` as a special case, and doesn't consider it a part of the
+            // generic.
+
             #[derive(TS, Clone, Deserialize)]
-            struct TypeA<T>(PhantomData<T>);
-            #[derive(TS, Clone, Deserialize)]
-            struct InnerA;
-            #[derive(TS, Clone, Serialize)]
-            struct TypeB<T>(PhantomData<T>);
-            #[derive(TS, Clone, Serialize)]
-            struct InnerB;
+            struct MyType;
 
-            let mut codegen = Codegen::new(AssertBackend);
-
-            codegen.register_handler(
-                &HandlerMeta {
-                    kind: HandlerKind::Query,
-                    name: "some_handler",
-                    param_names: &["param"],
-                },
-                #[allow(unused)]
-                &|ctx: (), param: TypeA<InnerA>| -> TypeB<InnerB> { todo!() },
+            let mut types = DependentTypes::new();
+            types.visit::<Option<MyType>>();
+            assert_set(
+                &types.visited_types,
+                &[TypeId::of::<Option<MyType>>(), TypeId::of::<MyType>()],
             );
-
-            assert_eq!(
-                codegen.types,
-                types![TypeA<ts_rs::Dummy>, InnerA, TypeB<ts_rs::Dummy>, InnerB]
-                    .map(AssertUserType)
-            );
-            assert_eq!(
-                build_handlers(&codegen),
-                [(
-                    "some_handler".to_string(),
-                    AssertHandler {
-                        name: "some_handler",
-                        kind: HandlerKind::Query,
-                        params: types![
-                            param: TypeA<InnerA>,
-                        ]
-                        .to_vec(),
-                        return_ty: TypeId::of::<TypeB<InnerB>>(),
-                    }
+            assert_map(
+                &types.definitions,
+                &[(
+                    TypeId::of::<MyType>(),
+                    CodegenType::from_type_with_definition::<MyType>(),
                 )],
             );
         }
-    }
-
-    mod nest {
-        use super::*;
 
         #[test]
-        fn nest_something() {
-            let mut codegen = Codegen::new(AssertBackend);
-            codegen.register_handler(
-                &HandlerMeta {
-                    kind: HandlerKind::Query,
-                    name: "some_handler",
-                    param_names: &[],
-                },
-                #[allow(unused)]
-                &|ctx: ()| {},
-            );
-            codegen.nest("nested", {
-                let mut codegen = Codegen::new(AssertBackend);
-                codegen.register_handler(
-                    &HandlerMeta {
-                        kind: HandlerKind::Query,
-                        name: "other_handler",
-                        param_names: &[],
-                    },
-                    #[allow(unused)]
-                    &|ctx: ()| {},
-                );
-                codegen
-            });
+        fn custom_ty_with_generic() {
+            #[derive(TS, Clone, Deserialize)]
+            struct MyType<T>(T);
+            #[derive(TS, Clone, Deserialize)]
+            struct MyInnerType;
 
-            assert_eq!(
-                build_handlers(&codegen),
-                [
+            let mut types = DependentTypes::new();
+            types.visit::<MyType<MyInnerType>>();
+            assert_set(
+                &types.visited_types,
+                &[
+                    TypeId::of::<MyType<MyInnerType>>(),
+                    TypeId::of::<MyType<ts_rs::Dummy>>(),
+                    TypeId::of::<MyInnerType>(),
+                ],
+            );
+            assert_map(
+                &types.definitions,
+                &[
                     (
-                        "some_handler".to_string(),
-                        AssertHandler {
-                            name: "some_handler",
-                            kind: HandlerKind::Query,
-                            params: Vec::new(),
-                            return_ty: TypeId::of::<()>()
-                        }
+                        TypeId::of::<MyType<ts_rs::Dummy>>(),
+                        CodegenType::from_type_with_definition::<MyType<ts_rs::Dummy>>(),
                     ),
                     (
-                        "nested.other_handler".to_string(),
-                        AssertHandler {
-                            name: "other_handler",
-                            kind: HandlerKind::Query,
-                            params: Vec::new(),
-                            return_ty: TypeId::of::<()>()
-                        }
-                    )
-                ]
-            )
-        }
-    }
-
-    mod user_type_visitor {
-        #![allow(unused)]
-
-        use super::*;
-
-        fn visit<T: TS + 'static + ?Sized>() -> Vec<TypeId> {
-            let mut codegen = Codegen::new(AssertBackend);
-
-            let mut visitor = codegen.user_type_visitor();
-            visitor.visit::<T>();
-
-            codegen.types.iter().map(|ty| ty.0).collect()
-        }
-
-        #[test]
-        fn unit() {
-            assert_eq!(visit::<()>(), types![]);
-        }
-
-        #[test]
-        fn primitive() {
-            assert_eq!(visit::<u32>(), types![]);
-        }
-
-        #[test]
-        fn unit_struct() {
-            #[derive(TS)]
-            struct MyType;
-            assert_eq!(visit::<MyType>(), types![MyType]);
-        }
-
-        #[test]
-        fn primitive_field_struct() {
-            #[derive(TS)]
-            struct MyType {
-                a: u32,
-                b: bool,
-            }
-            assert_eq!(visit::<MyType>(), types![MyType]);
-        }
-
-        #[test]
-        fn simple_enum() {
-            #[derive(TS)]
-            enum MyType {
-                A,
-                B,
-            }
-            assert_eq!(visit::<MyType>(), types![MyType]);
-        }
-
-        #[test]
-        fn primitive_tuple_enum() {
-            #[derive(TS)]
-            enum MyType {
-                A(u32),
-                B(bool),
-            }
-            assert_eq!(visit::<MyType>(), types![MyType]);
-        }
-
-        #[test]
-        fn primitive_struct_enum() {
-            #[derive(TS)]
-            enum MyType {
-                A { field_a: u32 },
-                B { field_b: bool },
-            }
-            assert_eq!(visit::<MyType>(), types![MyType]);
-        }
-
-        #[test]
-        fn primitive_generic() {
-            #[derive(TS)]
-            struct MyType;
-            assert_eq!(visit::<Option<Box<MyType>>>(), types![MyType]);
-        }
-
-        #[test]
-        fn recursive_struct() {
-            #[derive(TS)]
-            struct MyType {
-                nested: Box<MyType>,
-            }
-            assert_eq!(visit::<MyType>(), types![MyType]);
-        }
-
-        #[test]
-        fn nested_user_types() {
-            #[derive(TS)]
-            struct MyType {
-                nested: MyNested,
-            }
-            #[derive(TS)]
-            struct MyNested;
-            assert_eq!(visit::<MyType>(), types![MyType, MyNested]);
-        }
-
-        #[test]
-        fn deeply_nested_user_types() {
-            #[derive(TS)]
-            struct MyType {
-                nested: MyNested,
-            }
-            #[derive(TS)]
-            struct MyNested {
-                super_nested: MySuperNested,
-            }
-            #[derive(TS)]
-            struct MySuperNested;
-            assert_eq!(visit::<MyType>(), types![MyType, MyNested, MySuperNested]);
-        }
-
-        #[test]
-        fn generic_user_type() {
-            #[derive(TS)]
-            struct MyType<T: TS>(T);
-            #[derive(TS)]
-            struct MyOtherType;
-            assert_eq!(
-                visit::<MyType<MyOtherType>>(),
-                types![MyType<ts_rs::Dummy>, MyOtherType]
+                        TypeId::of::<MyInnerType>(),
+                        CodegenType::from_type_with_definition::<MyInnerType>(),
+                    ),
+                ],
             );
-        }
-
-        #[test]
-        fn duplicated_generic_user_type() {
-            #[derive(TS)]
-            struct MyType<T: TS>(T);
-            #[derive(TS)]
-            struct MyOtherType;
-            assert_eq!(
-                visit::<MyType<MyType<MyOtherType>>>(),
-                types![MyType<ts_rs::Dummy>, MyOtherType,]
-            );
-        }
-
-        #[test]
-        fn different_generics() {
-            #[derive(TS)]
-            struct TypeA;
-            #[derive(TS)]
-            struct TypeB;
-
-            let mut codegen = Codegen::new(AssertBackend);
-
-            let mut visitor = codegen.user_type_visitor();
-
-            visitor.visit::<Vec<TypeA>>();
-            visitor.visit::<Vec<TypeB>>();
-
-            assert_eq!(codegen.types, types![TypeA, TypeB].map(AssertUserType));
-        }
-
-        #[test]
-        fn optional_ty() {
-            #[derive(TS)]
-            struct TypeA;
-
-            assert_eq!(visit::<Option<TypeA>>(), types![TypeA]);
         }
     }
 }

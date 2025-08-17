@@ -4,7 +4,7 @@ use ts_rs::TS;
 
 use crate::__private::HandlerKind;
 
-use super::{Backend, HandlerBuilder};
+use super::Backend;
 
 /// Lines to prepend to the beginning of the generated file.
 const HEADER_LINES: &[&str] = &["/* eslint-disable */", "// @ts-nocheck"];
@@ -148,30 +148,30 @@ struct TsHandlerBuilder {
     params: Vec<(&'static str, String)>,
 }
 
-impl HandlerBuilder for TsHandlerBuilder {
-    type Output = TsHandler;
-
-    fn new(name: &'static str, kind: HandlerKind) -> Self {
-        Self {
-            kind,
-            name,
-            params: Vec::new(),
-        }
-    }
-
-    fn push_param<T: TS + 'static + ?Sized>(&mut self, param_name: &'static str) {
-        self.params.push((param_name, T::name()));
-    }
-
-    fn returning<T: TS + 'static + ?Sized>(self) -> Self::Output {
-        TsHandler {
-            kind: self.kind,
-            name: self.name,
-            params: self.params,
-            return_ty: T::name(),
-        }
-    }
-}
+// impl HandlerBuilder for TsHandlerBuilder {
+//     type Output = TsHandler;
+//
+//     fn new(name: &'static str, kind: HandlerKind) -> Self {
+//         Self {
+//             kind,
+//             name,
+//             params: Vec::new(),
+//         }
+//     }
+//
+//     fn push_param<T: TS + 'static + ?Sized>(&mut self, param_name: &'static str) {
+//         self.params.push((param_name, T::name()));
+//     }
+//
+//     fn returning<T: TS + 'static + ?Sized>(self) -> Self::Output {
+//         TsHandler {
+//             kind: self.kind,
+//             name: self.name,
+//             params: self.params,
+//             return_ty: T::name(),
+//         }
+//     }
+// }
 
 /// Write `content` to the provided writer, wrapping it in a formatted comment block.
 fn write_comment_block(mut writer: impl Write, content: &str) -> Result<(), std::fmt::Error> {
