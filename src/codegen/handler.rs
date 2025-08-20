@@ -1,6 +1,6 @@
 use ts_rs::{TS, TypeVisitor};
 
-use crate::{codegen::CodegenType, handler::ts::TsTypeTuple};
+use crate::{handler::ts::TsTypeTuple, reflection::ty::CodegenType};
 
 /// Visits parameters in a [`TsTypeTuple`], and registers them with the associated parameter name
 /// to the handler.

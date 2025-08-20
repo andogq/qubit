@@ -10,7 +10,7 @@ use jsonrpsee::{
 use tower::{Service, ServiceBuilder, service_fn};
 
 use crate::{
-    __private::HandlerMeta,
+    reflection::handler::HandlerMeta,
     router::{RouterModule, RouterModuleHandler},
 };
 
@@ -98,7 +98,7 @@ impl<Ctx> RouterModule<Ctx> for RpcModule<Ctx> {
     type Handler = Handler<Ctx>;
 
     fn visit_handler(&mut self, path: &[&str], handler: &Self::Handler) {
-        (&handler.0)(&mut self.0, path.join("."));
+        (handler.0)(&mut self.0, path.join("."));
     }
 }
 

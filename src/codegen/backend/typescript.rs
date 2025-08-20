@@ -1,11 +1,8 @@
 use std::io::Write;
 
 use crate::{
-    __private::HandlerKind,
-    codegen::{
-        Backend, BackendStage, CodegenType, HandlerBackend, HandlerCodegen, QUBIT_HEADER,
-        TypeBackend,
-    },
+    codegen::{Backend, BackendStage, HandlerBackend, HandlerCodegen, QUBIT_HEADER, TypeBackend},
+    reflection::{handler::HandlerKind, ty::CodegenType},
 };
 
 pub struct TypeScript {

@@ -2,6 +2,7 @@ mod codegen;
 mod error;
 mod graph;
 mod handler;
+mod reflection;
 mod router;
 
 pub use qubit_macros::*;

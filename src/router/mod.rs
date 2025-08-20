@@ -1,16 +1,11 @@
 mod codegen;
 mod rpc;
 
-use std::{any::TypeId, collections::HashMap};
-
-use lazy_static::lazy_static;
-use linkme::distributed_slice;
-
 use crate::{
-    __private::HandlerMeta,
     FromRequestExtensions, RegisterableHandler,
     graph::Graph,
     handler::marker,
+    reflection::handler::HandlerMeta,
     router::{codegen::CodegenModule, rpc::RpcModule},
 };
 
@@ -21,15 +16,6 @@ pub struct Router<Ctx> {
 struct Handler<Ctx> {
     rpc: <RpcModule<Ctx> as RouterModule<Ctx>>::Handler,
     codegen: <CodegenModule as RouterModule<Ctx>>::Handler,
-}
-
-#[distributed_slice]
-pub static HANDLER_DEFINITIONS: [fn() -> (TypeId, HandlerMeta)];
-lazy_static! {
-    static ref HANDLER_DEFINITIONS_MAP: HashMap<TypeId, HandlerMeta> = HANDLER_DEFINITIONS
-        .into_iter()
-        .map(|def_fn| def_fn())
-        .collect();
 }
 
 impl<Ctx> Router<Ctx>
@@ -51,7 +37,7 @@ where
         F: RegisterableHandler<Ctx, MSig, MValue, MReturn>,
         F::Ctx: FromRequestExtensions<Ctx>,
     {
-        let handler_meta = HANDLER_DEFINITIONS_MAP.get(&TypeId::of::<F>()).unwrap();
+        let handler_meta = HandlerMeta::of(&handler);
 
         // Insert a prefix corresponding with the handler's name.
         let prefix = self
@@ -139,9 +125,9 @@ mod test {
     use jsonrpsee::RpcModule;
     use serde::Deserialize;
 
-    use std::any::Any;
+    use std::any::{Any, TypeId};
 
-    use crate::__private::HandlerKind;
+    use crate::reflection::handler::{HANDLER_DEFINITIONS, HandlerKind};
 
     use super::*;
 
@@ -160,13 +146,15 @@ mod test {
         assert_eq!(module.method_names().count(), 0);
     }
 
+    /// Manually register the provided handler, with the associated [`HandlerMeta`]. This will
+    /// normally be done with the [`crate::handler`] proc-macro.
     macro_rules! define_handler {
         (|| $body:expr, $meta:expr $(,)?) => {{
             fn handler() -> u32 {
                 $body
             }
 
-            #[distributed_slice(HANDLER_DEFINITIONS)]
+            #[linkme::distributed_slice(HANDLER_DEFINITIONS)]
             static DEF: fn() -> (TypeId, HandlerMeta) = || (Any::type_id(&handler), $meta);
             handler
         }};
