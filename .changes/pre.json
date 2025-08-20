@@ -1,4 +1,12 @@
 {
   "tag": "beta",
-  "changes": []
+  "changes": [
+    ".changes/better-handler-macro-errors.md",
+    ".changes/handler-rename-fix.md",
+    ".changes/loosen-async-requirement.md",
+    ".changes/re-export-ts-rs.md",
+    ".changes/rewrite-macro.md",
+    ".changes/router-refactor.md",
+    ".changes/update-ts-rs.md"
+  ]
 }
