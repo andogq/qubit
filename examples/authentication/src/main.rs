@@ -1,13 +1,13 @@
 use std::net::SocketAddr;
 
 use axum::{
-    Form,
     response::{IntoResponse, Response},
     routing::post,
+    Form,
 };
 use cookie::Cookie;
-use hyper::{StatusCode, header::SET_COOKIE};
-use qubit::{ErrorCode, Extensions, FromRequestExtensions, Router, RpcError, handler};
+use hyper::{header::SET_COOKIE, StatusCode};
+use qubit::{handler, ErrorCode, Extensions, FromRequestExtensions, Router, RpcError, TypeScript};
 use serde::Deserialize;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
@@ -114,9 +114,12 @@ async fn main() {
     let router = Router::<()>::new()
         .handler(echo_cookie)
         .handler(secret_endpoint);
-    router.generate_type("./auth-demo/src/bindings.ts").unwrap();
+    router
+        .as_codegen()
+        .write_type("./auth-demo/src/bindings.ts", TypeScript::new())
+        .unwrap();
 
-    let (qubit_service, handle) = router.into_service(());
+    let (qubit_service, handle) = router.as_rpc(()).into_service();
 
     let qubit_service = ServiceBuilder::new()
         .map_request(|mut req: hyper::Request<_>| {

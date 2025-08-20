@@ -1,6 +1,7 @@
 /* eslint-disable */
 // @ts-nocheck
-/*    @@@@@@@@@@@@@ & ###############
+/*
+      @@@@@@@@@@@@@ & ###############
    @@@@@@@@@@@@@@ &&& ###############
  @@@@@@@@@@@@@@ &&&&& ###############
 ############### &&&&& ###############
@@ -8,8 +9,8 @@
 ############### &&&&& ###############
 ############### &&&&& @@@@@@@@@@@@@@
 ############### && @@@@@@@@@@@@@@
-############### & @@@@@@@@@@@@@    */
+############### & @@@@@@@@@@@@@
 
+*/
 import type { Query, Mutation, Subscription } from "@qubit-rs/client";
 export type QubitServer = { add: Mutation<[n: number], null>, countdown: Subscription<[], number>, decrement: Mutation<[], null>, get: Query<[], number>, increment: Mutation<[], null>, };
-

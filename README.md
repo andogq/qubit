@@ -65,14 +65,18 @@ async fn hello_world() -> String {
 let router = Router::new()
     .handler(hello_world);
 
-router.write_bindings_to_dir("./bindings");
+router
+    .as_codegen()
+    .write_type("./bindings", TypeScript::new());
 ```
 
 3. Attach the Qubit router to an Axum router, and start it
 
 ```rs
 // Create a service and handle
-let (qubit_service, qubit_handle) = router.to_service(());
+let (qubit_service, qubit_handle) = router
+    .as_rpc()
+    .into_service(());
 
 // Nest into an Axum router
 let axum_router = axum::Router::<()>::new()

@@ -2,8 +2,8 @@ use std::net::SocketAddr;
 
 use futures::Stream;
 use manager::{ChatMessage, Client, Manager};
-use qubit::{Router, handler};
-use rand::{Rng, thread_rng};
+use qubit::{handler, Router, TypeScript};
+use rand::{thread_rng, Rng};
 use tokio::net::TcpListener;
 
 mod manager;
@@ -44,26 +44,31 @@ async fn main() {
         .handler(list_messages);
 
     // Save the type
-    router.generate_type("../src/bindings.ts").unwrap();
+    router
+        .as_codegen()
+        .write_type("../src/bindings.ts", TypeScript::new())
+        .unwrap();
     println!("Successfully wrote server bindings to `./bindings.ts`");
 
     // Create service and handle
     let client = Manager::start();
-    let (qubit_service, qubit_handle) = router.into_service(
-        Ctx {
-            client, name: '🦀'
-        }, //     move |_| {
-           //         let client = client.clone();
-           //         let name = random_emoji();
-           //         async move {
-           //             client.join(name).await;
-           //             Ctx { client, name }
-           //         }
-           //     },
-           //     |ctx| async move {
-           //         ctx.client.leave(ctx.name).await;
-           //     },
-    );
+    let (qubit_service, qubit_handle) = router
+        .as_rpc(
+            Ctx {
+                client, name: '🦀'
+            }, //     move |_| {
+               //         let client = client.clone();
+               //         let name = random_emoji();
+               //         async move {
+               //             client.join(name).await;
+               //             Ctx { client, name }
+               //         }
+               //     },
+               //     |ctx| async move {
+               //         ctx.client.leave(ctx.name).await;
+               //     },
+        )
+        .into_service();
 
     // Nest into an Axum rouer
     let axum_router = axum::Router::<()>::new().nest_service("/rpc", qubit_service);

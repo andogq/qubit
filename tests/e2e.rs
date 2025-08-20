@@ -1,4 +1,4 @@
-use qubit::Router;
+use qubit::{Router, TypeScript};
 
 #[qubit::handler(query)]
 fn cool_handler() -> u32 {
@@ -16,5 +16,12 @@ fn main() {
         .handler(cool_handler)
         .handler(even_cool_handler);
 
-    println!("{}", router.generate_type_to_string());
+    let codegen = router.as_codegen();
+
+    println!(
+        "{}",
+        codegen
+            .generate_type(TypeScript::new().without_preamble())
+            .unwrap()
+    );
 }

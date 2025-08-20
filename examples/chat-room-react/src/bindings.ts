@@ -1,6 +1,7 @@
 /* eslint-disable */
 // @ts-nocheck
-/*    @@@@@@@@@@@@@ & ###############
+/*
+      @@@@@@@@@@@@@ & ###############
    @@@@@@@@@@@@@@ &&& ###############
  @@@@@@@@@@@@@@ &&&&& ###############
 ############### &&&&& ###############
@@ -8,9 +9,9 @@
 ############### &&&&& ###############
 ############### &&&&& @@@@@@@@@@@@@@
 ############### && @@@@@@@@@@@@@@
-############### & @@@@@@@@@@@@@    */
+############### & @@@@@@@@@@@@@
 
+*/
 import type { Query, Mutation, Subscription } from "@qubit-rs/client";
 export type ChatMessage = { user: string, content: string, };
 export type QubitServer = { get_name: Query<[], string>, list_messages: Subscription<[], Array<ChatMessage>>, list_online: Subscription<[], Array<string>>, send_message: Mutation<[message: string], null>, };
-
