@@ -1,5 +1,22 @@
 # Changelog
 
+## \[1.0.0-beta.0]
+
+- [`3287e96`](https://github.com/andogq/qubit/commit/3287e96175ef8a58afe95645245a13609ab4facc) correct invalid generated handler ident when using `name` attribute.
+- [`bf34c4c`](https://github.com/andogq/qubit/commit/bf34c4c7f99edf8d0fc7d6d9c0347ff95b7e488d) Expose `ts-rs::TS` functionality via `ts` attribute macro. To migrate, replace any instances of
+  `#[derive(ts_rs::TS)]` with `#[qubit::ts]`, and remove `ts-rs` from package dependencies.
+- [`c4cd986`](https://github.com/andogq/qubit/commit/c4cd986bbfca64299e1a028726cf55a25f10c9fb) Rewrite `handler` macro to be easier to maintain and test. This isn't inherently a breaking change,
+  however there's no guarentee that the previous implementation wasn't broken or inconsistent in some
+  way.
+- [`0b46323`](https://github.com/andogq/qubit/commit/0b46323c68a54a2418b185ddfd573921e2a64587) **(BREAKING)** Refactor router to separate RPC functionality from type generation functionality.
+  Now, use `router.as_codegen().write_type(path, TypeScript::new())` to generate types, and
+  `router.as_rpc(ctx).into_service()` to build the service.
+- [`c67ced6`](https://github.com/andogq/qubit/commit/c67ced6f572065032510557feb45225f9e925648) Update `ts-rs` to `11.0.0`
+
+### Dependencies
+
+- Upgraded to `qubit-macros@1.0.0-beta.0`
+
 ## \[0.10.3]
 
 - [`a5f1638`](https://github.com/andogq/qubit/commit/a5f1638e4a21c9f5fd4e7d1dfa740f5522753e99) Update Axum to 0.8, and other dependencies (#94, thanks @epatters).
