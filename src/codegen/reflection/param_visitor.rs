@@ -85,63 +85,56 @@ pub enum ParamVisitorError {
 pub mod test {
     use super::*;
 
-    mod param_visitor {
-        use super::*;
+    #[test]
+    fn no_params() {
+        let params = ParamVisitor::visit::<()>(&[]).unwrap();
+        assert_eq!(params, &[]);
+    }
 
-        #[test]
-        fn no_params() {
-            let params = ParamVisitor::visit::<()>(&[]).unwrap();
-            assert_eq!(params, &[]);
-        }
+    #[test]
+    fn single_param() {
+        let params = ParamVisitor::visit::<(u32,)>(&["param_a"]).unwrap();
+        assert_eq!(params, &[("param_a", CodegenType::from_type::<u32>())]);
+    }
 
-        #[test]
-        fn single_param() {
-            let params = ParamVisitor::visit::<(u32,)>(&["param_a"]).unwrap();
-            assert_eq!(params, &[("param_a", CodegenType::from_type::<u32>())]);
-        }
+    #[test]
+    fn multiple_params() {
+        let params =
+            ParamVisitor::visit::<(u32, bool, String)>(&["param_a", "some_boolean", "cool_string"])
+                .unwrap();
+        assert_eq!(
+            params,
+            &[
+                ("param_a", CodegenType::from_type::<u32>()),
+                ("some_boolean", CodegenType::from_type::<bool>()),
+                ("cool_string", CodegenType::from_type::<String>()),
+            ]
+        );
+    }
 
-        #[test]
-        fn multiple_params() {
-            let params = ParamVisitor::visit::<(u32, bool, String)>(&[
-                "param_a",
-                "some_boolean",
-                "cool_string",
-            ])
-            .unwrap();
-            assert_eq!(
-                params,
-                &[
-                    ("param_a", CodegenType::from_type::<u32>()),
-                    ("some_boolean", CodegenType::from_type::<bool>()),
-                    ("cool_string", CodegenType::from_type::<String>()),
-                ]
-            );
-        }
+    #[test]
+    fn missing_names() {
+        let err = ParamVisitor::visit::<(u32, bool, String)>(&[]).unwrap_err();
+        assert!(matches!(err, ParamVisitorError::MissingNames(3)));
+    }
 
-        #[test]
-        fn missing_names() {
-            let err = ParamVisitor::visit::<(u32, bool, String)>(&[]).unwrap_err();
-            assert!(matches!(err, ParamVisitorError::MissingNames(3)));
-        }
+    #[test]
+    fn missing_some_names() {
+        let err = ParamVisitor::visit::<(u32, bool, String)>(&["param_a"]).unwrap_err();
+        assert!(matches!(err, ParamVisitorError::MissingNames(2)));
+    }
 
-        #[test]
-        fn missing_some_names() {
-            let err = ParamVisitor::visit::<(u32, bool, String)>(&["param_a"]).unwrap_err();
-            assert!(matches!(err, ParamVisitorError::MissingNames(2)));
-        }
+    #[test]
+    fn missing_types() {
+        let err =
+            ParamVisitor::visit::<()>(&["param_a", "some_boolean", "cool_string"]).unwrap_err();
+        assert!(matches!(err, ParamVisitorError::MissingTypes(3)));
+    }
 
-        #[test]
-        fn missing_types() {
-            let err =
-                ParamVisitor::visit::<()>(&["param_a", "some_boolean", "cool_string"]).unwrap_err();
-            assert!(matches!(err, ParamVisitorError::MissingTypes(3)));
-        }
-
-        #[test]
-        fn missing_some_types() {
-            let err = ParamVisitor::visit::<(u32,)>(&["param_a", "some_boolean", "cool_string"])
-                .unwrap_err();
-            assert!(matches!(err, ParamVisitorError::MissingTypes(2)));
-        }
+    #[test]
+    fn missing_some_types() {
+        let err =
+            ParamVisitor::visit::<(u32,)>(&["param_a", "some_boolean", "cool_string"]).unwrap_err();
+        assert!(matches!(err, ParamVisitorError::MissingTypes(2)));
     }
 }

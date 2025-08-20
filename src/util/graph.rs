@@ -1,27 +1,13 @@
 use std::collections::HashMap;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct PrefixId(usize);
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct ItemId(usize);
-
-struct Prefix<P> {
-    data: P,
-    parent: Option<PrefixId>,
-    items: Vec<ItemId>,
-}
-
-struct Item<I> {
-    data: I,
-    prefix: PrefixId,
-}
-
+/// Graph of items, where edges act as the 'prefix' to a given item.
 pub struct Graph<P, I> {
     prefix: Vec<Prefix<P>>,
     items: Vec<Item<I>>,
 }
 
 impl<P, I> Graph<P, I> {
+    /// Create a new instance.
     pub fn new() -> Self {
         Self {
             prefix: Vec::new(),
@@ -29,6 +15,7 @@ impl<P, I> Graph<P, I> {
         }
     }
 
+    /// Insert a prefix with an optional parent.
     pub fn insert_prefix(&mut self, parent: Option<PrefixId>, data: P) -> PrefixId {
         let prefix_id = PrefixId(self.prefix.len());
         self.prefix.push(Prefix {
@@ -39,6 +26,7 @@ impl<P, I> Graph<P, I> {
         prefix_id
     }
 
+    /// Insert an item at prefix.
     pub fn insert_item(&mut self, prefix: PrefixId, data: I) -> ItemId {
         let item_id = ItemId(self.items.len());
         self.items.push(Item { prefix, data });
@@ -46,6 +34,8 @@ impl<P, I> Graph<P, I> {
         item_id
     }
 
+    /// Merge with another graph. Note that after this, any previous IDs from the `other` graph
+    /// will be invalid.
     pub fn merge(&mut self, other: Self) -> HashMap<PrefixId, PrefixId> {
         // Insert all the prefixes.
         let prefix_map = other
@@ -84,6 +74,7 @@ impl<P, I> Graph<P, I> {
         prefix_map
     }
 
+    /// Nest a graph at the provided location.
     pub fn nest(&mut self, prefix: PrefixId, other: Self) {
         // Select all prefixes without a parent.
         let root_prefixes = other
@@ -107,6 +98,8 @@ impl<P, I> Graph<P, I> {
             });
     }
 
+    /// Create an iterator, which will visit a reference to each item, and the prefixes that come
+    /// before it.
     pub fn iter(&self) -> impl Iterator<Item = (Vec<&P>, &I)> {
         self.items.iter().map(|item| {
             (
@@ -127,6 +120,32 @@ impl<P, I> Graph<P, I> {
             )
         })
     }
+}
+
+/// ID of a prefix.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct PrefixId(usize);
+
+/// ID of an item.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ItemId(usize);
+
+/// Information stored at each prefix.
+struct Prefix<P> {
+    /// Data of the prefix.
+    data: P,
+    /// Optional parent prefix.
+    parent: Option<PrefixId>,
+    /// Nested items at this prefix.
+    items: Vec<ItemId>,
+}
+
+/// Information stored for each item.
+struct Item<I> {
+    /// The actual item.
+    data: I,
+    /// Prefix this item resides at.
+    prefix: PrefixId,
 }
 
 #[cfg(test)]

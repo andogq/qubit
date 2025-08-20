@@ -1,18 +1,24 @@
+//! The [`Router`] is the key to the exposed API of Qubit. It provides the core of the hierarchy
+//! structure, but delegates any actual work (codegen, RPC integration) to [`RpcModule`]s.
+
 mod codegen;
 mod rpc;
 
 use crate::{
     FromRequestExtensions, RegisterableHandler,
-    graph::Graph,
     handler::marker,
     reflection::handler::HandlerMeta,
     router::{codegen::CodegenModule, rpc::RpcModule},
+    util::Graph,
 };
 
+/// Qubit router, which will contain all handlers.
 pub struct Router<Ctx> {
     handlers: Graph<String, Handler<Ctx>>,
 }
 
+/// Actual information stored for each handler added to the router. Each [`RpcModule`] will have
+/// its own handler representation, used to type-erase the actual handler.
 struct Handler<Ctx> {
     rpc: <RpcModule<Ctx> as RouterModule<Ctx>>::Handler,
     codegen: <CodegenModule as RouterModule<Ctx>>::Handler,
@@ -22,6 +28,7 @@ impl<Ctx> Router<Ctx>
 where
     Ctx: 'static + Clone + Send + Sync,
 {
+    /// Create a new router.
     pub fn new() -> Self {
         Self {
             handlers: Graph::new(),
@@ -62,6 +69,7 @@ where
         self
     }
 
+    /// Nest another router at the provided prefix.
     pub fn nest(mut self, prefix: impl ToString, other: Self) -> Self {
         let prefix = self.handlers.insert_prefix(None, prefix.to_string());
         self.handlers.nest(prefix, other.handlers);
@@ -69,14 +77,18 @@ where
         self
     }
 
+    /// Build an [`RpcModule`] from this router. This is required in order to start the RPC server.
     pub fn as_rpc(&self, ctx: Ctx) -> RpcModule<Ctx> {
         self.as_module(RpcModule::new(ctx), |handler| &handler.rpc)
     }
 
+    /// Build a [`CodegenModule`] From this router. This is required to generate types for the
+    /// server.
     pub fn as_codegen(&self) -> CodegenModule {
         self.as_module(CodegenModule::new(), |handler| &handler.codegen)
     }
 
+    /// Helper to convert this router into the provided [`RouterModule`].
     fn as_module<M: RouterModule<Ctx>>(
         &self,
         module: M,
@@ -104,13 +116,23 @@ where
     }
 }
 
+/// Common functionality exposed by router modules. The module will be provided a handler, which it
+/// must generate a type-erased [`RouterModule::Handler`] representation from. At a later point,
+/// [`RouterModule::visit_handler`] will be repeatedly called with each [`RouterModule::Handler`]
+/// and the path which it was present.
 trait RouterModule<Ctx> {
+    /// Type-erased representation of a handler.
     type Handler: RouterModuleHandler<Ctx>;
 
+    /// Will be called once for each handler present, along with the path that it resides at.
     fn visit_handler(&mut self, path: &[&str], handler: &Self::Handler);
 }
 
+/// Converts a handler existing as a generic (`F`) into a type-erased value. Intended for use with
+/// the [`RouterModule`] trait.
 trait RouterModuleHandler<Ctx> {
+    /// Produce a type-erased value from the provided handler, and the associated metadata for the
+    /// handler.
     fn from_handler<F, MSig, MValue: marker::ResponseMarker, MReturn: marker::HandlerReturnMarker>(
         handler: F,
         meta: &'static HandlerMeta,

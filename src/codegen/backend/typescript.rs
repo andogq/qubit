@@ -5,12 +5,17 @@ use crate::{
     reflection::{handler::HandlerKind, ty::CodegenType},
 };
 
+/// TypeScript implementation of Qubit type generation.
 pub struct TypeScript {
+    /// Whether to include extra items at beginning of generate types (Qubit imports, header
+    /// comment).
     include_preamble: bool,
+    /// Name of the router to generate.
     router_name: String,
 }
 
 impl TypeScript {
+    /// Create a new TypeScript backend, with `QubitServer` as the router name.
     pub fn new() -> Self {
         Self {
             include_preamble: true,
@@ -18,11 +23,13 @@ impl TypeScript {
         }
     }
 
+    /// Set a custom router name.
     pub fn with_router_name(mut self, router_name: impl ToString) -> Self {
         self.router_name = router_name.to_string();
         self
     }
 
+    /// Set the inclusion of the preamble (Qubit imports, header comment).
     pub fn without_preamble(mut self) -> Self {
         self.include_preamble = false;
         self
@@ -39,6 +46,7 @@ impl<W: Write> Backend<W> for TypeScript {
     type HandlerBackend = Self;
     type TypeBackend = Self;
 
+    /// Always generate types at the beginning of the file.
     const STAGES: &[BackendStage] = &[BackendStage::Type, BackendStage::Handler];
 
     fn get_handler_backend(&self) -> &Self::HandlerBackend {

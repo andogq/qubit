@@ -10,21 +10,29 @@ use jsonrpsee::{
 use tower::{Service, ServiceBuilder, service_fn};
 
 use crate::{
+    FromRequestExtensions, RegisterableHandler,
+    handler::marker,
     reflection::handler::HandlerMeta,
     router::{RouterModule, RouterModuleHandler},
 };
 
+/// Integration between [`Router`] and [`JsonRpseeModule`].
+///
+/// [`Router`]: crate::Router
 pub struct RpcModule<Ctx>(JsonRpseeModule<Ctx>);
 
 impl<Ctx> RpcModule<Ctx> {
-    pub fn new(ctx: Ctx) -> Self {
+    /// Create a new instance.
+    pub(crate) fn new(ctx: Ctx) -> Self {
         Self(JsonRpseeModule::new(ctx))
     }
 
+    /// Consume this module, and expose the underlying [`JsonRpseeModule`].
     pub fn into_module(self) -> JsonRpseeModule<Ctx> {
         self.0
     }
 
+    /// Consume this module, and produce a [`Service`].
     pub fn into_service(
         self,
     ) -> (
@@ -102,20 +110,24 @@ impl<Ctx> RouterModule<Ctx> for RpcModule<Ctx> {
     }
 }
 
-pub struct Handler<Ctx>(Box<dyn Fn(&mut JsonRpseeModule<Ctx>, String)>);
+/// Callback function to register a handler against the provided [`JsonRpseeModule`] at the
+/// specified path.
+///
+/// This is a type-erased closure, so it's expected that the closure creator had ownership on the
+/// handler implementation, and can move it into the closure.
+type HandlerRegistrationFn<Ctx> = Box<dyn Fn(&mut JsonRpseeModule<Ctx>, String)>;
+
+/// Handler representation, which just contains the registration callback.
+pub struct Handler<Ctx>(HandlerRegistrationFn<Ctx>);
+
 impl<Ctx> RouterModuleHandler<Ctx> for Handler<Ctx> {
-    fn from_handler<
-        F,
-        MSig,
-        MValue: crate::handler::marker::ResponseMarker,
-        MReturn: crate::handler::marker::HandlerReturnMarker,
-    >(
+    fn from_handler<F, MSig, MValue: marker::ResponseMarker, MReturn: marker::HandlerReturnMarker>(
         handler: F,
         _meta: &'static HandlerMeta,
     ) -> Self
     where
-        F: crate::RegisterableHandler<Ctx, MSig, MValue, MReturn>,
-        F::Ctx: crate::FromRequestExtensions<Ctx>,
+        F: RegisterableHandler<Ctx, MSig, MValue, MReturn>,
+        F::Ctx: FromRequestExtensions<Ctx>,
     {
         Self(Box::new(move |module, path| {
             handler.clone().register(module, path);
