@@ -68,7 +68,7 @@ impl<W: Write> Backend<W> for TypeScript {
 
             writeln!(
                 writer,
-                r#"import {{ Query, Mutation, Subscription }} from "@qubit-rs/client";"#
+                r#"import type {{ Query, Mutation, Subscription }} from "@qubit-rs/client";"#
             )?;
         }
 
