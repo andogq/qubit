@@ -40,14 +40,14 @@ focus on building amazing applications.
 ```toml
 # Cargo.toml
 [dependencies]
-qubit = "0.6.1"
+qubit = "1.0.0-beta.0"
 
 serde = { version = "1.0", features = ["derive"] } # Required for serialisable types
-futures = "0.3.30" # Required for streaming functionality
+futures = "0.3" # Required for streaming functionality
 
-tokio = { version = "1.38", features = ["full"] }
-axum = "0.7"
-hyper = { version = "1.0", features = ["server"] }
+tokio = { version = "1.44", features = ["full"] }
+axum = "0.8"
+hyper = { version = "1.6", features = ["server"] }
 ```
 
 ```bash
