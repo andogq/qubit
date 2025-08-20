@@ -1,6 +1,7 @@
 /* eslint-disable */
 // @ts-nocheck
-/*    @@@@@@@@@@@@@ & ###############
+/*
+      @@@@@@@@@@@@@ & ###############
    @@@@@@@@@@@@@@ &&& ###############
  @@@@@@@@@@@@@@ &&&&& ###############
 ############### &&&&& ###############
@@ -8,14 +9,14 @@
 ############### &&&&& ###############
 ############### &&&&& @@@@@@@@@@@@@@
 ############### && @@@@@@@@@@@@@@
-############### & @@@@@@@@@@@@@    */
+############### & @@@@@@@@@@@@@
 
+*/
 import type { Query, Mutation, Subscription } from "@qubit-rs/client";
 export type User = { name: string, email: string, age: number, metadata: Metadata, };
+export type Test = { a: number, b: boolean, };
+export type Metadata = { param_a: string, param_b: number, param_c: boolean, more_metadata: Metadata | null, };
 export type UniqueType = { value: number, };
 export type NestedStruct = { a: number, b: boolean, };
-export type Test = { a: number, b: boolean, };
 export type MyEnum = "A" | { "B": number } | { "C": { field: number, } } | { "D": NestedStruct };
-export type Metadata = { param_a: string, param_b: number, param_c: boolean, more_metadata: Metadata | null, };
-export type QubitServer = { user: { asdf: Query<[], null>, create: Mutation<[name: string, email: string, age: number], User>, list: Query<[], Array<Test>>, someHandler: Query<[_id: string], User>, }, array: Query<[], Array<string>>, array_type: Query<[], Array<UniqueType>>, count: Mutation<[], number>, countdown: Subscription<[min: number, max: number], number>, enum_test: Query<[], MyEnum>, version: Query<[], string>, };
-
+export type QubitServer = { array: Query<[], Array<string>>, array_type: Query<[], Array<UniqueType>>, count: Mutation<[], number>, countdown: Subscription<[min: number, max: number], number>, enum_test: Query<[], MyEnum>, version: Query<[], string>, user: { asdf: Query<[], null>, create: Mutation<[name: string, email: string, age: number], User>, list: Query<[], Array<Test>>, someHandler: Query<[_id: string], User>, }, };

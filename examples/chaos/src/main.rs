@@ -1,13 +1,13 @@
 use std::{
     net::SocketAddr,
     sync::{
-        Arc,
         atomic::{AtomicUsize, Ordering},
+        Arc,
     },
     time::Duration,
 };
 
-use futures::{Stream, StreamExt, stream};
+use futures::{stream, Stream, StreamExt};
 use qubit::*;
 
 use axum::routing::get;
@@ -213,10 +213,12 @@ async fn main() {
         .nest("user", user::create_router());
 
     // Save the router's bindings
-    app.generate_type("./bindings.ts").unwrap();
+    app.as_codegen()
+        .write_type("./bindings.ts", TypeScript::new())
+        .unwrap();
 
     // Create a service and handle for the app
-    let (app_service, app_handle) = app.into_service(AppCtx::default());
+    let (app_service, app_handle) = app.as_rpc(AppCtx::default()).into_service();
 
     // Set up the axum router
     let router = axum::Router::<()>::new()
