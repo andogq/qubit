@@ -109,6 +109,15 @@ where
     }
 }
 
+impl<Ctx> Default for Router<Ctx>
+where
+    Ctx: 'static + Clone + Send + Sync,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 trait RouterModule<Ctx> {
     type Handler: RouterModuleHandler<Ctx>;
 
