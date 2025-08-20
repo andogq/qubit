@@ -130,6 +130,6 @@ impl<W: Write> TypeBackend<W> for TypeScript {
         definition: &str,
         writer: &mut W,
     ) -> std::io::Result<()> {
-        write!(writer, "export type {name} = {definition}")
+        writeln!(writer, "export type {name} = {definition};")
     }
 }
