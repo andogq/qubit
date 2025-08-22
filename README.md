@@ -75,8 +75,8 @@ router
 ```rs
 // Create a service and handle
 let (qubit_service, qubit_handle) = router
-    .as_rpc()
-    .into_service(());
+    .as_rpc(())
+    .into_service();
 
 // Nest into an Axum router
 let axum_router = axum::Router::<()>::new()
