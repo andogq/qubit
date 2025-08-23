@@ -67,7 +67,7 @@ let router = Router::new()
 
 router
     .as_codegen()
-    .write_type("./bindings", TypeScript::new());
+    .write_type("./bindings.ts", TypeScript::new());
 ```
 
 3. Attach the Qubit router to an Axum router, and start it
@@ -75,8 +75,8 @@ router
 ```rs
 // Create a service and handle
 let (qubit_service, qubit_handle) = router
-    .as_rpc()
-    .into_service(());
+    .as_rpc(())
+    .into_service();
 
 // Nest into an Axum router
 let axum_router = axum::Router::<()>::new()
@@ -100,7 +100,7 @@ qubit_handle.stop().unwrap();
 ```ts
 // Import transport from client, and generated server type
 import { build_client, http } from "@qubit-rs/client";
-import type { QubitServer } from "./bindings";
+import type { QubitServer } from "./bindings.ts";
 
 // Connect with the API
 const api = build_client<QubitServer>(http("http://localhost:9944/rpc"));
