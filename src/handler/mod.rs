@@ -5,7 +5,7 @@ pub mod ts;
 
 use futures::{Stream, StreamExt};
 use jsonrpsee::{
-    RpcModule, SubscriptionCloseResponse, SubscriptionMessage,
+    DisconnectError, RpcModule, SubscriptionCloseResponse, SubscriptionMessage,
     types::{Params, ResponsePayload},
 };
 use serde::Deserialize;
@@ -270,7 +270,10 @@ where
 
                         while let Some(item) = stream.next().await {
                             let item = serde_json::value::to_raw_value(&item.transform()).unwrap();
-                            sink.send(item).await.unwrap();
+                            if let Some(DisconnectError(..)) = sink.send(item).await.err() {
+                                break;
+                            };
+
                             count += 1;
                         }
 
@@ -338,7 +341,9 @@ where
 
                         while let Some(item) = stream.next().await {
                             let item = serde_json::value::to_raw_value(&item.transform()).unwrap();
-                            sink.send(item).await.unwrap();
+                            if let Some(DisconnectError(..)) = sink.send(item).await.err() {
+                                break;
+                            };
                             count += 1;
                         }
 
