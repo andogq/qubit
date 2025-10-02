@@ -1,5 +1,9 @@
 # Changelog
 
+## \[1.0.0-beta.1]
+
+- [`a976e91`](https://github.com/andogq/qubit/commit/a976e918a1edf6181624f1b25d0b2db433345e2b) Handle disconnects raising unhandled DisconnectError
+
 ## \[1.0.0-beta.0]
 
 - [`3287e96`](https://github.com/andogq/qubit/commit/3287e96175ef8a58afe95645245a13609ab4facc) correct invalid generated handler ident when using `name` attribute.
