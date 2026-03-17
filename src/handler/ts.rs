@@ -1,5 +1,7 @@
 //! Utilities for representing TypeScript types at runtime.
 
+#[cfg(test)]
+use ts_rs::Config;
 use ts_rs::{TS, TypeVisitor};
 
 /// Tuple of [`TS`] types.
@@ -58,8 +60,10 @@ mod test {
 
     impl TypeVisitor for TypeCollector {
         fn visit<T: TS + 'static + ?Sized>(&mut self) {
-            self.0
-                .push((T::name(), T::output_path().map(|_| T::decl())));
+            self.0.push((
+                T::name(&Config::default()),
+                T::output_path().map(|_| T::decl(&Config::default())),
+            ));
         }
     }
 

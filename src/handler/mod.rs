@@ -557,7 +557,7 @@ mod test {
             expected_params.into_iter().collect::<Vec<_>>()
         );
         assert_eq!(
-            <<H::Response as ResponseValue<_>>::Value as TS>::name(),
+            <<H::Response as ResponseValue<_>>::Value as TS>::name(&ts_rs::Config::default()),
             expected_return
         );
     }
