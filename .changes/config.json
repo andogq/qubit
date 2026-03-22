@@ -3,7 +3,12 @@
   "pkgManagers": {
     "javascript": {
       "version": true,
-      "getPublishedVersion": "npm view ${ pkgFile.pkg.name } version",
+      "getPublishedVersion": {
+        "use": "fetch:check",
+        "options": {
+          "url": "https://registry.npmjs.com/${ pkg.pkg }/${ pkg.pkgFile.version }"
+        }
+      },
       "prepublish": ["pnpm i", "pnpm build"],
       "publish": ["pnpm publish --access public --no-git-checks"],
       "postversion": ["pnpm i --lockfile-only"],
@@ -15,7 +20,12 @@
     },
     "rust": {
       "version": true,
-      "getPublishedVersion": "cargo search ${ pkg.pkg } --limit 1 | sed -nE 's/^[^\"]*\"//; s/\".*//1p'",
+      "getPublishedVersion": {
+        "use": "fetch:check",
+        "options": {
+          "url": "https://crates.io/api/v1/crates/${ pkg.pkg }/${ pkg.pkgFile.version }"
+        }
+      },
       "postversion": [
         {
           "command": "./scripts/generate-lock-files.sh",
@@ -24,7 +34,7 @@
           "pipe": false
         }
       ],
-      "publish": ["cargo publish"],
+      "publish": ["cargo publish --no-verify --allow-dirty"],
       "postpublish": [
         "git tag ${ pkg.pkg }-v${ pkgFile.versionMajor } -f",
         "git tag ${ pkg.pkg }-v${ pkgFile.versionMajor }.${ pkgFile.versionMinor } -f",
