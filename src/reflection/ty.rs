@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 
-use ts_rs::TS;
+use ts_rs::{Config, TS};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CodegenType {
@@ -14,7 +14,7 @@ impl CodegenType {
     pub fn from_type_with_definition<T: TS + 'static + ?Sized>() -> (Self, String) {
         // Generate the declaration, which includes `type ... =`, and any generic
         // parameters.
-        let declaration = T::decl();
+        let declaration = T::decl(&Config::default());
 
         // Split the declaration into the name and definition.
         let (name, definition) = declaration.split_once("=").expect("valid TS declaration");
@@ -28,7 +28,7 @@ impl CodegenType {
     }
 
     pub fn from_type<T: TS + 'static + ?Sized>() -> Self {
-        Self::from_name_and_generics(T::name())
+        Self::from_name_and_generics(T::name(&Config::default()))
     }
 
     fn from_name_and_generics(s: impl AsRef<str>) -> Self {
