@@ -1,5 +1,13 @@
 # Changelog
 
+## \[0.1.0-beta.0]
+
+- [`83f8c57`](https://github.com/andogq/qubit/commit/83f8c5762e714a87f94137fa300366fc027311ee) Update dependencies with warnings.
+
+### Dependencies
+
+- Upgraded to `@qubit-rs/client@0.5.0-beta.0`
+
 ## \[0.0.6]
 
 - [`b6ef950`](https://github.com/andogq/qubit/commit/b6ef95077345cb4db4143e364c48eef010f41fc8) Bump dependencies
