@@ -1,5 +1,9 @@
 # Changelog
 
+## \[1.0.0-beta.2]
+
+- [`4a33fd9`](https://github.com/andogq/qubit/commit/4a33fd9d528746d92ce2469783859cb4068d8dc6) Update `ts-rs` to `0.12.1`
+
 ## \[1.0.0-beta.1]
 
 - [`a976e91`](https://github.com/andogq/qubit/commit/a976e918a1edf6181624f1b25d0b2db433345e2b) Handle disconnects raising unhandled DisconnectError
