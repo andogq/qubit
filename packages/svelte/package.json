@@ -1,6 +1,6 @@
 {
   "name": "@qubit-rs/svelte",
-  "version": "0.1.0-beta.0",
+  "version": "0.1.0-beta.1",
   "description": "Seamless RPC for Rust & TypeScript - Svelte style",
   "keywords": [
     "api",

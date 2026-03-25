@@ -1,5 +1,9 @@
 # Changelog
 
+## \[0.5.0-beta.1]
+
+- [`f21f6d9`](https://github.com/andogq/qubit/commit/f21f6d9a3658bcee07da78c333ec60f9f111b0e1) Fix publish tag for npm
+
 ## \[0.5.0-beta.0]
 
 - [`83f8c57`](https://github.com/andogq/qubit/commit/83f8c5762e714a87f94137fa300366fc027311ee) Update dependencies with warnings.

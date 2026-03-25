@@ -3,6 +3,7 @@
   "changes": [
     ".changes/better-handler-macro-errors.md",
     ".changes/bump-js-deps.md",
+    ".changes/fix-npm-release-tag.md",
     ".changes/handler-rename-fix.md",
     ".changes/loosen-async-requirement.md",
     ".changes/patch-disc-err.md",
