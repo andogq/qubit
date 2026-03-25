@@ -10,7 +10,9 @@
         }
       },
       "prepublish": ["pnpm i", "pnpm build"],
-      "publish": ["pnpm publish --access public --no-git-checks --provenance"],
+      "publish": [
+        "pnpm publish --access public --no-git-checks --provenance --tag ${ pkg.versionPrerelease?.[0] || 'latest' }"
+      ],
       "postversion": ["pnpm i --lockfile-only"],
       "postpublish": [
         "git tag ${ pkg.pkg }-v${ pkgFile.versionMajor } -f",
