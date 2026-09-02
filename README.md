@@ -40,7 +40,7 @@ focus on building amazing applications.
 ```toml
 # Cargo.toml
 [dependencies]
-qubit = "1.0.0-beta.0"
+qubit = "1.0.0-beta.2"
 
 serde = { version = "1.0", features = ["derive"] } # Required for serialisable types
 futures = "0.3" # Required for streaming functionality
@@ -54,37 +54,41 @@ hyper = { version = "1.6", features = ["server"] }
 pnpm i @qubit-rs/client@latest
 ```
 
-2. Setup a Qubit router, and save the generated types
+2. Create a Qubit handler
 
 ```rs
-#[handler(query)]
+#[qubit::handler(query)]
 async fn hello_world() -> String {
     "Hello, world!".to_string()
 }
-
-let router = Router::new()
-    .handler(hello_world);
-
-router
-    .as_codegen()
-    .write_type("./bindings.ts", TypeScript::new());
 ```
 
-3. Attach the Qubit router to an Axum router, and start it
+3. Define a qubit router and save the generated TS types
+```rs
+#[tokio::main]
+async fn main() {
+    // Define available handlers
+    let router = qubit::Router::new().handler(hello_world);
 
+    // Write out TypeScript bindings
+    router
+        .as_codegen()
+        .write_type("./bindings.ts", qubit::TypeScript::new())
+        .unwrap();
+}
+```
+
+4. Attach the Qubit router to an Axum router, and start the server
 ```rs
 // Create a service and handle
-let (qubit_service, qubit_handle) = router
-    .as_rpc(())
-    .into_service();
+let (qubit_service, qubit_handle) = router.as_rpc(()).into_service();
 
-// Nest into an Axum router
-let axum_router = axum::Router::<()>::new()
-    .nest_service("/rpc", qubit_service);
+// Nest into an Axum router at /rpc
+let axum_router = axum::Router::<()>::new().nest_service("/rpc", qubit_service);
 
 // Start a Hyper server
 axum::serve(
-    tokio::net::TcpListener::bind(&SocketAddr::from(([127, 0, 0, 1], 9944)))
+    tokio::net::TcpListener::bind(("127.0.0.1", 9944))
         .await
         .unwrap(),
     axum_router,
@@ -92,10 +96,11 @@ axum::serve(
 .await
 .unwrap();
 
+// Shutdown qubit
 qubit_handle.stop().unwrap();
 ```
 
-4. Make requests from the TypeScript client
+5. Make requests from a TypeScript client
 
 ```ts
 // Import transport from client, and generated server type
