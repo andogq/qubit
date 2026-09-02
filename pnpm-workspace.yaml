@@ -6,3 +6,6 @@ packages:
     - examples/chat-room-react
     - examples/counter
     - examples/hello-world
+allowBuilds:
+  '@biomejs/biome': true
+  esbuild: true
