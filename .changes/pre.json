@@ -11,6 +11,8 @@
     ".changes/rewrite-macro.md",
     ".changes/router-refactor.md",
     ".changes/ts-rs-0.12.md",
+    ".changes/update-pnpm.md",
+    ".changes/update-rust-deps.md",
     ".changes/update-ts-rs.md"
   ]
 }
