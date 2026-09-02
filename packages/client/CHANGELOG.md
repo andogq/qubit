@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.5.0-beta.2]
+
+- [`5f5e154`](https://github.com/andogq/qubit/commit/5f5e154a1888e87fa4185a9a42afb5c9b325846c) Update pnpm and dependencies
+
 ## \[0.5.0-beta.1]
 
 - [`f21f6d9`](https://github.com/andogq/qubit/commit/f21f6d9a3658bcee07da78c333ec60f9f111b0e1) Fix publish tag for npm

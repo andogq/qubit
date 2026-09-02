@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.0.0-beta.1]
+
+- [`5f5e154`](https://github.com/andogq/qubit/commit/5f5e154a1888e87fa4185a9a42afb5c9b325846c) Update rust dependencies
+
 ## \[1.0.0-beta.0]
 
 - [`91b3375`](https://github.com/andogq/qubit/commit/91b3375ffbe941007973689b96ba6e7da3a2fb2e) Generate better spans for errors in the `handler` macro, including UI tests to verify error

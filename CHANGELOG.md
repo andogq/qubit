@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0-beta.3]
+
+- [`5f5e154`](https://github.com/andogq/qubit/commit/5f5e154a1888e87fa4185a9a42afb5c9b325846c) Update rust dependencies
+
+### Dependencies
+
+- Upgraded to `qubit-macros@1.0.0-beta.1`
+
 ## \[1.0.0-beta.2]
 
 - [`4a33fd9`](https://github.com/andogq/qubit/commit/4a33fd9d528746d92ce2469783859cb4068d8dc6) Update `ts-rs` to `0.12.1`
