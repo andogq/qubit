@@ -12,9 +12,9 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: corepack enable pnpm
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
       - run: pnpm i
       - run: pnpm biome ci --error-on-warnings --reporter=github
 
@@ -33,9 +33,9 @@ jobs:
 
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: corepack enable pnpm
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           cache: pnpm
           cache-dependency-path: '**/pnpm-lock.yaml'
@@ -65,7 +65,7 @@ jobs:
       RUSTFLAGS: "-Dwarnings" # Fail on warnings
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: cargo clippy
         working-directory: ${{ matrix.dir }}
 
@@ -79,6 +79,6 @@ jobs:
 
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: cargo test
         working-directory: ${{ matrix.dir }}
